@@ -1,9 +1,11 @@
-import NextAuth from 'next-auth';
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-import { authConfig } from '@/app/(auth)/auth.config';
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
 
-export default NextAuth(authConfig).auth;
-
-export const config = {
-  matcher: ['/', '/:id', '/api/:path*', '/login', '/register'],
-};
+  await supabase.auth.getSession()
+  return res
+}
