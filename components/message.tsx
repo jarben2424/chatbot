@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { MessageEditor } from './message-editor';
 import { DocumentPreview } from './document-preview';
 import { MessageReasoning } from './message-reasoning';
+import { Dashboard } from '@/components/ui/dashboard';
 
 const PurePreviewMessage = ({
   chatId,
@@ -154,6 +155,8 @@ const PurePreviewMessage = ({
                             isReadonly={isReadonly}
                             result={result}
                           />
+                        ) : toolName === 'createDashboard' ? (
+                          <Dashboard {...result} />
                         ) : toolName === 'updateDocument' ? (
                           <DocumentToolResult
                             type="update"

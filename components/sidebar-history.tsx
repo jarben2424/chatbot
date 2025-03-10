@@ -7,6 +7,8 @@ import type { User } from 'next-auth';
 import { memo, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import useSWR from 'swr';
+import { PencilIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 import {
   CheckCircleFillIcon,
@@ -69,10 +71,68 @@ const PureChatItem = ({
   onDelete: (chatId: string) => void;
   setOpenMobile: (open: boolean) => void;
 }) => {
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [newTitle, setNewTitle] = useState(chat.title);
+  const { mutate } = useSWR<Array<Chat>>('/api/history', fetcher);
   const { visibilityType, setVisibilityType } = useChatVisibility({
     chatId: chat.id,
     initialVisibility: chat.visibility,
   });
+
+  const handleRename = async () => {
+    if (!newTitle.trim()) {
+      setNewTitle(chat.title);
+      setIsRenaming(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/chat?id=${chat.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: newTitle }),
+      });
+
+      if (!response.ok) throw new Error('Failed to rename chat');
+      
+      setIsRenaming(false);
+      mutate(); // Refresh the chat list
+      toast.success('Chat renamed successfully');
+    } catch (error) {
+      toast.error('Failed to rename chat');
+      setNewTitle(chat.title);
+    }
+  };
+
+  if (isRenaming) {
+    return (
+      <SidebarMenuItem>
+        <form 
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleRename();
+          }}
+          className="flex w-full items-center gap-2"
+        >
+          <Input
+            autoFocus
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setNewTitle(chat.title);
+                setIsRenaming(false);
+              }
+            }}
+            onBlur={handleRename}
+            className="h-8"
+          />
+        </form>
+      </SidebarMenuItem>
+    );
+  }
 
   return (
     <SidebarMenuItem>
@@ -130,6 +190,14 @@ const PureChatItem = ({
               </DropdownMenuSubContent>
             </DropdownMenuPortal>
           </DropdownMenuSub>
+
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() => setIsRenaming(true)}
+          >
+            <PencilIcon className="w-4 h-4 mr-2" />
+            <span>Rename</span>
+          </DropdownMenuItem>
 
           <DropdownMenuItem
             className="cursor-pointer text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"

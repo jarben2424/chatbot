@@ -25,6 +25,7 @@ import { getWeather } from '@/lib/ai/tools/get-weather';
 import { isProductionEnvironment } from '@/lib/constants';
 import { NextResponse } from 'next/server';
 import { myProvider } from '@/lib/ai/providers';
+import { createDashboard } from '@/lib/ai/tools/create-dashboard';
 
 export const maxDuration = 60;
 
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
                   'createDocument',
                   'updateDocument',
                   'requestSuggestions',
+                  'createDashboard'
                 ],
           experimental_transform: smoothStream({ chunking: 'word' }),
           experimental_generateMessageId: generateUUID,
@@ -96,8 +98,12 @@ export async function POST(request: Request) {
               session,
               dataStream,
             }),
+            createDashboard
           },
           onFinish: async ({ response, reasoning }) => {
+            console.log('Chat response:', response);
+            console.log('Chat reasoning:', reasoning);
+
             if (session.user?.id) {
               try {
                 const sanitizedResponseMessages = sanitizeResponseMessages({
@@ -105,19 +111,23 @@ export async function POST(request: Request) {
                   reasoning,
                 });
 
-                await saveMessages({
-                  messages: sanitizedResponseMessages.map((message) => {
-                    return {
+                console.log('Sanitized messages:', sanitizedResponseMessages);
+
+                if (sanitizedResponseMessages.length > 0) {
+                  await saveMessages({
+                    messages: sanitizedResponseMessages.map((message) => ({
                       id: message.id,
                       chatId: id,
                       role: message.role,
-                      content: message.content,
+                      content: typeof message.content === 'string' 
+                        ? message.content 
+                        : JSON.stringify(message.content),
                       createdAt: new Date(),
-                    };
-                  }),
-                });
+                    })),
+                  });
+                }
               } catch (error) {
-                console.error('Failed to save chat');
+                console.error('Failed to save chat', error);
               }
             }
           },

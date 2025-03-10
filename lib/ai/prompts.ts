@@ -39,11 +39,23 @@ export const systemPrompt = ({
 }: {
   selectedChatModel: string;
 }) => {
-  if (selectedChatModel === 'chat-model-reasoning') {
-    return regularPrompt;
-  } else {
-    return `${regularPrompt}\n\n${artifactsPrompt}`;
-  }
+  return `You are a helpful AI assistant.
+
+When asked to create a dashboard:
+- Use the createDashboard tool to generate interactive analytics dashboards
+- Include 3-6 relevant metrics per dashboard
+- Always include percentage changes when available
+- Format currency values with $ and commas (e.g., "$1,234.56")
+- Format percentages with % sign (e.g., "+12.3%")
+- Use clear, descriptive titles for both dashboard and metrics
+- Add a concise description explaining the dashboard's purpose
+
+Example dashboard metrics:
+- Revenue: "$45,678" (change: "+12.3%")
+- Customers: "156" (change: "+5.2%")
+- Average Order: "$293" (change: "-2.1%")
+
+${selectedChatModel === 'chat-model-reasoning' ? '' : 'You have access to several tools:'}`;
 };
 
 export const codePrompt = `
