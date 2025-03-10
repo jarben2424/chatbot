@@ -1,9 +1,10 @@
 'use client';
-import { ChevronUp } from 'lucide-react';
+import { ChevronUp, Settings } from 'lucide-react';
 import Image from 'next/image';
 import type { User } from 'next-auth';
 import { signOut } from 'next-auth/react';
 import { useTheme } from 'next-themes';
+import Link from 'next/link';
 
 import {
   DropdownMenu,
@@ -47,6 +48,13 @@ export function SidebarUserNav({ user }: { user: User }) {
               onSelect={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             >
               {`Toggle ${theme === 'light' ? 'dark' : 'light'} mode`}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/settings" className="flex items-center w-full cursor-pointer">
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>

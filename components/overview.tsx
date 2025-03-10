@@ -1,7 +1,10 @@
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import { useTheme } from 'next-themes';
 
 export const Overview = () => {
+  const { theme } = useTheme();
+
   return (
     <motion.div
       key="overview"
@@ -14,7 +17,10 @@ export const Overview = () => {
       <div className="rounded-xl p-6 flex flex-col gap-8 leading-relaxed text-center max-w-xl">
         <div className="flex justify-center">
           <Image
-            src="/images/Hang-Logo-Full-RichBlack.png"
+            src={theme === 'dark' 
+              ? '/images/Hang-Logo-Full-White (1).png'
+              : '/images/Hang-Logo-Full-RichBlack.png'
+            }
             alt="Hang Logo"
             width={200}
             height={50}
