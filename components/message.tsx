@@ -18,6 +18,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { MessageEditor } from './message-editor';
 import { DocumentPreview } from './document-preview';
 import { MessageReasoning } from './message-reasoning';
+import { DataVisualization } from './data-visualization';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/utils';
+import { QueryDisplay } from './data-visualization/query-display';
+import { VisualizationPanel } from './data-visualization/visualization-panel';
+import { useArtifactSelector } from '@/hooks/use-artifact';
 
 const PurePreviewMessage = ({
   chatId,
@@ -43,6 +49,11 @@ const PurePreviewMessage = ({
   index: number;
 }) => {
   const [mode, setMode] = useState<'view' | 'edit'>('view');
+
+  const { data: votes } = useSWR<Array<Vote>>(
+    chatId ? `/chat?chatId=${chatId}` : null,
+    fetcher
+  );
 
   return (
     <AnimatePresence>
@@ -145,32 +156,64 @@ const PurePreviewMessage = ({
                   if (state === 'result') {
                     const { result } = toolInvocation;
 
-                    return (
-                      <div key={toolCallId}>
-                        {toolName === 'getWeather' ? (
+                    if (toolName === 'queryData') {
+                      return (
+                        <div key={toolCallId} className="mt-4">
+                          <QueryDisplay 
+                            data={result.data} 
+                            sql={result.sql}
+                            title={result.title}
+                            description={result.description}
+                          />
+                        </div>
+                      );
+                    } else if (toolName === 'visualizeData') {
+                      return (
+                        <div key={toolCallId} className="mt-4">
+                          <VisualizationPanel 
+                            data={result.data}
+                            visualization={result.visualization}
+                            title={result.title}
+                            description={result.description}
+                            artifactId={result.artifactId}
+                            expandable={true}
+                          />
+                        </div>
+                      );
+                    } else if (toolName === 'getWeather') {
+                      return (
+                        <div key={toolCallId}>
                           <Weather weatherAtLocation={result} />
-                        ) : toolName === 'createDocument' ? (
-                          <DocumentPreview
-                            isReadonly={isReadonly}
-                            result={result}
-                          />
-                        ) : toolName === 'updateDocument' ? (
-                          <DocumentToolResult
-                            type="update"
-                            result={result}
-                            isReadonly={isReadonly}
-                          />
-                        ) : toolName === 'requestSuggestions' ? (
-                          <DocumentToolResult
-                            type="request-suggestions"
-                            result={result}
-                            isReadonly={isReadonly}
-                          />
-                        ) : (
-                          <pre>{JSON.stringify(result, null, 2)}</pre>
-                        )}
-                      </div>
-                    );
+                        </div>
+                      );
+                    } else if (toolName === 'createDocument') {
+                      return (
+                        <DocumentPreview
+                          isReadonly={isReadonly}
+                          result={result}
+                        />
+                      );
+                    } else if (toolName === 'updateDocument') {
+                      return (
+                        <DocumentToolResult
+                          type="update"
+                          result={result}
+                          isReadonly={isReadonly}
+                        />
+                      );
+                    } else if (toolName === 'requestSuggestions') {
+                      return (
+                        <DocumentToolResult
+                          type="request-suggestions"
+                          result={result}
+                          isReadonly={isReadonly}
+                        />
+                      );
+                    } else {
+                      return (
+                        <pre>{JSON.stringify(result, null, 2)}</pre>
+                      );
+                    }
                   }
                   return (
                     <div

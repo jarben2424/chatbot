@@ -7,6 +7,7 @@ import type { User } from 'next-auth';
 import { memo, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import useSWR from 'swr';
+import { Button } from '@/components/ui/button';
 
 import {
   CheckCircleFillIcon,
@@ -157,39 +158,61 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     data: history,
     isLoading,
     mutate,
-  } = useSWR<Array<Chat>>(user ? '/api/history' : null, fetcher, {
+  } = useSWR<Array<Chat>>(user ? '/chat' : null, fetcher, {
     fallbackData: [],
+    revalidateOnFocus: true,
+    revalidateOnMount: true,
+    dedupingInterval: 0
   });
 
   useEffect(() => {
-    mutate();
+    const fetchChats = async () => {
+      try {
+        const response = await fetch('/chat');
+        if (!response.ok) {
+          throw new Error('Failed to fetch chat history');
+        }
+        const chats = await response.json();
+        console.log('Fetched chat history:', chats.length);
+        mutate(chats);
+      } catch (error) {
+        console.error('Error fetching chat history:', error);
+      }
+    };
+
+    fetchChats();
   }, [pathname, mutate]);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const router = useRouter();
   const handleDelete = async () => {
-    const deletePromise = fetch(`/api/chat?id=${deleteId}`, {
-      method: 'DELETE',
-    });
+    if (!deleteId) return;
 
-    toast.promise(deletePromise, {
-      loading: 'Deleting chat...',
-      success: () => {
-        mutate((history) => {
-          if (history) {
-            return history.filter((h) => h.id !== id);
-          }
-        });
-        return 'Chat deleted successfully';
-      },
-      error: 'Failed to delete chat',
-    });
+    try {
+      const response = await fetch(`/chat?id=${deleteId}`, {
+        method: 'DELETE',
+      });
 
-    setShowDeleteDialog(false);
+      if (!response.ok) {
+        throw new Error('Failed to delete chat');
+      }
 
-    if (deleteId === id) {
-      router.push('/');
+      mutate((history) => {
+        if (!history) return [];
+        return history.filter((h) => h.id !== deleteId);
+      });
+
+      if (deleteId === id) {
+        router.push('/');
+      }
+
+      toast.success('Chat deleted successfully');
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete chat');
+    } finally {
+      setShowDeleteDialog(false);
     }
   };
 
@@ -197,8 +220,13 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     return (
       <SidebarGroup>
         <SidebarGroupContent>
-          <div className="px-2 text-zinc-500 w-full flex flex-row justify-center items-center text-sm gap-2">
-            Login to save and revisit previous chats!
+          <div className="px-4 py-6 text-center">
+            <p className="text-zinc-500 mb-4">
+              Login to save and revisit previous chats!
+            </p>
+            <Button asChild className="w-full">
+              <Link href="/login">Sign In / Sign Up</Link>
+            </Button>
           </div>
         </SidebarGroupContent>
       </SidebarGroup>
@@ -398,7 +426,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Chat</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete your
               chat and remove it from our servers.
@@ -407,7 +435,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>
-              Continue
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

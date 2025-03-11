@@ -13,6 +13,18 @@ import { Messages } from './messages';
 import { VisibilityType } from './visibility-selector';
 import { useArtifactSelector } from '@/hooks/use-artifact';
 import { toast } from 'sonner';
+import { QueryResult } from '@/components/data-visualization/query-result';
+import { VisualizationPanel } from '@/components/data-visualization/visualization-panel';
+import { QueryDisplay } from '@/components/data-visualization/query-display';
+
+interface ChatProps {
+  id: string;
+  initialMessages: Array<Message>;
+  selectedChatModel: string;
+  selectedVisibilityType: VisibilityType;
+  isReadonly: boolean;
+  children?: React.ReactNode;
+}
 
 export function Chat({
   id,
@@ -20,13 +32,8 @@ export function Chat({
   selectedChatModel,
   selectedVisibilityType,
   isReadonly,
-}: {
-  id: string;
-  initialMessages: Array<Message>;
-  selectedChatModel: string;
-  selectedVisibilityType: VisibilityType;
-  isReadonly: boolean;
-}) {
+  children
+}: ChatProps) {
   const { mutate } = useSWRConfig();
 
   const {
@@ -41,21 +48,22 @@ export function Chat({
     reload,
   } = useChat({
     id,
+    api: '/chat',
     body: { id, selectedChatModel: selectedChatModel },
     initialMessages,
     experimental_throttle: 100,
     sendExtraMessageFields: true,
     generateId: generateUUID,
     onFinish: () => {
-      mutate('/api/history');
+      mutate('/chat');
     },
     onError: () => {
-      toast.error('An error occured, please try again!');
+      toast.error('An error occurred, please try again!');
     },
   });
 
   const { data: votes } = useSWR<Array<Vote>>(
-    `/api/vote?chatId=${id}`,
+    `/chat?chatId=${id}`,
     fetcher,
   );
 
@@ -63,44 +71,60 @@ export function Chat({
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
 
   return (
-    <>
-      <div className="flex flex-col min-w-0 h-dvh bg-background">
-        <ChatHeader
-          chatId={id}
-          selectedModelId={selectedChatModel}
-          selectedVisibilityType={selectedVisibilityType}
-          isReadonly={isReadonly}
-        />
+    <div className="flex flex-col min-w-0 h-dvh bg-background">
+      <ChatHeader
+        chatId={id}
+        selectedModelId={selectedChatModel}
+        selectedVisibilityType={selectedVisibilityType}
+        isReadonly={isReadonly}
+      />
 
-        <Messages
-          chatId={id}
-          isLoading={isLoading}
-          votes={votes}
-          messages={messages}
-          setMessages={setMessages}
-          reload={reload}
-          isReadonly={isReadonly}
-          isArtifactVisible={isArtifactVisible}
-        />
+      <Messages
+        chatId={id}
+        isLoading={isLoading}
+        votes={votes}
+        messages={messages}
+        setMessages={setMessages}
+        reload={reload}
+        isReadonly={isReadonly}
+        isArtifactVisible={isArtifactVisible}
+        renderMessage={(message) => (
+          <>
+            {message.content}
+            {message.data && (
+              <div className="mt-4">
+                <QueryDisplay 
+                  data={message.data} 
+                  visualization={message.visualization}
+                  sql={message.sql}
+                  title={message.title}
+                  description={message.description}
+                />
+              </div>
+            )}
+          </>
+        )}
+      />
 
-        <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
-          {!isReadonly && (
-            <MultimodalInput
-              chatId={id}
-              input={input}
-              setInput={setInput}
-              handleSubmit={handleSubmit}
-              isLoading={isLoading}
-              stop={stop}
-              attachments={attachments}
-              setAttachments={setAttachments}
-              messages={messages}
-              setMessages={setMessages}
-              append={append}
-            />
-          )}
-        </form>
-      </div>
+      <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
+        {!isReadonly && (
+          <MultimodalInput
+            chatId={id}
+            input={input}
+            setInput={setInput}
+            handleSubmit={handleSubmit}
+            isLoading={isLoading}
+            stop={stop}
+            attachments={attachments}
+            setAttachments={setAttachments}
+            messages={messages}
+            setMessages={setMessages}
+            append={append}
+          />
+        )}
+      </form>
+
+      {children}
 
       <Artifact
         chatId={id}
@@ -118,6 +142,6 @@ export function Chat({
         votes={votes}
         isReadonly={isReadonly}
       />
-    </>
+    </div>
   );
 }

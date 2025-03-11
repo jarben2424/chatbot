@@ -19,6 +19,7 @@ interface MessagesProps {
   ) => Promise<string | null | undefined>;
   isReadonly: boolean;
   isArtifactVisible: boolean;
+  renderMessage?: (message: Message) => React.ReactNode;
 }
 
 function PureMessages({
@@ -29,6 +30,7 @@ function PureMessages({
   setMessages,
   reload,
   isReadonly,
+  renderMessage,
 }: MessagesProps) {
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();

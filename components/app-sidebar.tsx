@@ -24,7 +24,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 export function AppSidebar({ user }: { user: User | undefined }) {
   const router = useRouter();
   const { setOpenMobile } = useSidebar();
-  const { theme } = useTheme();
+  const { theme, systemTheme } = useTheme();
+
+  // Determine which logo to use
+  const currentTheme = theme === 'system' ? systemTheme : theme;
+  const logoSrc = currentTheme === 'dark' 
+    ? '/images/Hang-Logo-Short-W.png'
+    : '/images/Hang-Logo-Short.png';
 
   const navigationItems = [
     {
@@ -60,10 +66,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
               className="flex items-center"
             >
               <Image
-                src={theme === 'dark' 
-                  ? '/images/Hang-Logo-Short-W.png'
-                  : '/images/Hang-Logo-Short.png'
-                }
+                src={logoSrc}
                 alt="Hang Logo"
                 width={32}
                 height={32}

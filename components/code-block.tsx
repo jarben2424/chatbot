@@ -1,38 +1,22 @@
 'use client';
 
+import React from 'react';
+import { cn } from '@/lib/utils';
+
 interface CodeBlockProps {
-  node: any;
-  inline: boolean;
-  className: string;
-  children: any;
+  code: string;
+  language?: string;
+  className?: string;
 }
 
-export function CodeBlock({
-  node,
-  inline,
-  className,
-  children,
-  ...props
-}: CodeBlockProps) {
-  if (!inline) {
-    return (
-      <div className="not-prose flex flex-col">
-        <pre
-          {...props}
-          className={`text-sm w-full overflow-x-auto dark:bg-zinc-900 p-4 border border-zinc-200 dark:border-zinc-700 rounded-xl dark:text-zinc-50 text-zinc-900`}
-        >
-          <code className="whitespace-pre-wrap break-words">{children}</code>
-        </pre>
-      </div>
-    );
-  } else {
-    return (
-      <code
-        className={`${className} text-sm bg-zinc-100 dark:bg-zinc-800 py-0.5 px-1 rounded-md`}
-        {...props}
-      >
-        {children}
-      </code>
-    );
-  }
+export function CodeBlock({ code, language = 'plaintext', className }: CodeBlockProps) {
+  return (
+    <div className={cn('rounded-md bg-muted overflow-x-auto', className)}>
+      <pre className="p-4 text-sm">
+        <code className={`language-${language}`}>
+          {code}
+        </code>
+      </pre>
+    </div>
+  );
 }

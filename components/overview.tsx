@@ -1,9 +1,22 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
+import { useEffect, useState } from 'react';
 
 export const Overview = () => {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null; // or a loading placeholder
+  }
 
   return (
     <motion.div
@@ -16,16 +29,27 @@ export const Overview = () => {
     >
       <div className="rounded-xl p-6 flex flex-col gap-8 leading-relaxed text-center max-w-xl">
         <div className="flex justify-center">
-          <Image
-            src={theme === 'dark' 
-              ? '/images/Hang-Logo-Full-White (1).png'
-              : '/images/Hang-Logo-Full-RichBlack.png'
-            }
-            alt="Hang Logo"
-            width={200}
-            height={50}
-            priority
-          />
+          <div className="w-full max-w-[320px]">
+            {isDark ? (
+              <Image
+                src="/images/Hang-Logo-Full-White (1).png"
+                alt="Hang AI"
+                width={320}
+                height={96}
+                className="w-full h-auto"
+                priority
+              />
+            ) : (
+              <Image
+                src="/images/Hang-Logo-Full-RichBlack.png"
+                alt="Hang AI"
+                width={320}
+                height={96}
+                className="w-full h-auto"
+                priority
+              />
+            )}
+          </div>
         </div>
       </div>
     </motion.div>
