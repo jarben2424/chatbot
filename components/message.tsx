@@ -87,9 +87,9 @@ const PurePreviewMessage = ({
                 data-testid={`message-attachments-${index}`}
                 className="flex flex-row justify-end gap-2"
               >
-                {message.experimental_attachments.map((attachment) => (
+                {message.experimental_attachments.map((attachment, i) => (
                   <PreviewAttachment
-                    key={attachment.url}
+                    key={`attachment-${i}`}
                     attachment={attachment}
                   />
                 ))}
@@ -98,70 +98,116 @@ const PurePreviewMessage = ({
 
             {message.reasoning && (
               <MessageReasoning
-                isLoading={isLoading}
                 reasoning={message.reasoning}
+                isLoading={isLoading}
               />
             )}
 
-            {(message.content || message.reasoning) && mode === 'view' && (
-              <div className="flex flex-row gap-2 items-start">
-                {message.role === 'user' && !isReadonly && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        data-testid={`edit-${message.role}-${index}`}
-                        variant="ghost"
-                        className="px-2 h-fit rounded-full text-muted-foreground opacity-0 group-hover/message:opacity-100"
-                        onClick={() => {
-                          setMode('edit');
-                        }}
-                      >
-                        <PencilEditIcon />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Edit message</TooltipContent>
-                  </Tooltip>
-                )}
-
+            {mode === 'view' && message.content && (
+              <div className="hidden-scrollbar -mr-4 overflow-auto pb-2 pr-4 md:block">
                 <div
-                  className={cn('flex flex-col gap-4', {
-                    'bg-primary text-primary-foreground px-3 py-2 rounded-xl':
-                      message.role === 'user',
-                  })}
+                  className={cx(
+                    'min-h-[60px] min-w-[1px] w-full md:pb-4 whitespace-pre-wrap font-normal',
+                    {
+                      'break-words': message.role === 'assistant',
+                    },
+                  )}
                 >
                   <Markdown>{message.content as string}</Markdown>
                 </div>
               </div>
             )}
 
-            {message.content && mode === 'edit' && (
-              <div className="flex flex-row gap-2 items-start">
-                <div className="size-8" />
+            {mode === 'edit' && (
+              <div className="flex flex-col pb-2 gap-2">
+                <div className="hidden-scrollbar -mr-4 overflow-auto pb-2 pr-4 grow ml-6">
+                  <MessageEditor
+                    initialContent={message.content as string}
+                    onSave={(content) => {
+                      setMode('view');
+                      setMessages((messages) =>
+                        messages.map((m) =>
+                          m.id === message.id
+                            ? {
+                                ...m,
+                                content,
+                              }
+                            : m,
+                        ),
+                      );
+                    }}
+                    onCancel={() => {
+                      setMode('view');
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
-                <MessageEditor
-                  key={message.id}
-                  message={message}
-                  setMode={setMode}
-                  setMessages={setMessages}
-                  reload={reload}
+            {message.content && !isReadonly && message.role === 'user' && (
+              <div className="flex flex-row items-center justify-end gap-2 h-6">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setMode('edit')}
+                    >
+                      <PencilEditIcon size={12} />
+                      <span className="sr-only">Edit Message</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Edit message</TooltipContent>
+                </Tooltip>
+              </div>
+            )}
+
+            {message.visualization && (
+              <div className="mt-4">
+                <VisualizationPanel
+                  type={message.visualization}
+                  content={message.content as string}
+                  data={message.data}
+                />
+              </div>
+            )}
+
+            {message.data?.type === 'query' && (
+              <div className="mt-2">
+                <QueryDisplay
+                  query={message.data.query}
+                  result={message.data.result}
+                />
+              </div>
+            )}
+
+            {message.data?.visualization && (
+              <div className="mt-2">
+                <DataVisualization
+                  data={message.data.data}
+                  visualization={message.data.visualization}
+                  title={message.data.title}
+                  description={message.data.description}
                 />
               </div>
             )}
 
             {message.toolInvocations && message.toolInvocations.length > 0 && (
-              <div className="flex flex-col gap-4">
+              <div className="mt-2 flex flex-col gap-4">
                 {message.toolInvocations.map((toolInvocation) => {
-                  const { toolName, toolCallId, state, args } = toolInvocation;
-
-                  if (state === 'result') {
-                    const { result } = toolInvocation;
-
+                  const { toolCallId, toolName, args } = toolInvocation;
+                  
+                  if (toolInvocation.state === 'result') {
+                    const result = toolInvocation.result;
+                    
                     if (toolName === 'queryData') {
                       return (
-                        <div key={toolCallId} className="mt-4">
+                        <div key={`tool-result-${toolCallId}`} className="mt-4">
                           <QueryDisplay 
                             data={result.data} 
-                            sql={result.sql}
+                            query={result.sql}
                             title={result.title}
                             description={result.description}
                           />
@@ -169,55 +215,66 @@ const PurePreviewMessage = ({
                       );
                     } else if (toolName === 'visualizeData') {
                       return (
-                        <div key={toolCallId} className="mt-4">
+                        <div key={`tool-result-${toolCallId}`} className="mt-4">
                           <VisualizationPanel 
                             data={result.data}
-                            visualization={result.visualization}
+                            type={result.visualization}
                             title={result.title}
                             description={result.description}
-                            artifactId={result.artifactId}
-                            expandable={true}
                           />
                         </div>
                       );
                     } else if (toolName === 'getWeather') {
                       return (
-                        <div key={toolCallId}>
+                        <div key={`tool-result-${toolCallId}`}>
                           <Weather weatherAtLocation={result} />
                         </div>
                       );
                     } else if (toolName === 'createDocument') {
                       return (
-                        <DocumentPreview
-                          isReadonly={isReadonly}
-                          result={result}
-                        />
+                        <div key={`tool-result-${toolCallId}`}>
+                          <DocumentToolResult
+                            type="create"
+                            args={args}
+                            result={result}
+                            isReadonly={isReadonly}
+                          />
+                        </div>
                       );
                     } else if (toolName === 'updateDocument') {
                       return (
-                        <DocumentToolResult
-                          type="update"
-                          result={result}
-                          isReadonly={isReadonly}
-                        />
+                        <div key={`tool-result-${toolCallId}`}>
+                          <DocumentToolResult
+                            type="update"
+                            args={args}
+                            result={result}
+                            isReadonly={isReadonly}
+                          />
+                        </div>
                       );
                     } else if (toolName === 'requestSuggestions') {
                       return (
-                        <DocumentToolResult
-                          type="request-suggestions"
-                          result={result}
-                          isReadonly={isReadonly}
-                        />
-                      );
-                    } else {
-                      return (
-                        <pre>{JSON.stringify(result, null, 2)}</pre>
+                        <div key={`tool-result-${toolCallId}`}>
+                          <DocumentToolResult
+                            type="request-suggestions"
+                            args={args}
+                            result={result}
+                            isReadonly={isReadonly}
+                          />
+                        </div>
                       );
                     }
+                    
+                    return (
+                      <div key={`tool-result-${toolCallId}`} className="p-4 rounded-lg bg-secondary">
+                        <pre>{JSON.stringify(result, null, 2)}</pre>
+                      </div>
+                    );
                   }
+                  
                   return (
                     <div
-                      key={toolCallId}
+                      key={`tool-call-${toolCallId}`}
                       className={cx({
                         skeleton: ['getWeather'].includes(toolName),
                       })}

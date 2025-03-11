@@ -22,6 +22,19 @@
     .text-balance {
         text-wrap: balance;
     }
+    .hover-accent:hover {
+        background-color: hsl(var(--accent));
+    }
+    .dark .hover-accent:hover {
+        background-color: hsl(var(--accent));
+    }
+    .auto-suggestion {
+        transition: background-color 0.2s ease;
+    }
+    .auto-suggestion:hover {
+        background-color: hsl(var(--accent));
+        color: hsl(var(--accent-foreground));
+    }
 }
 
 @layer base {
@@ -38,6 +51,7 @@
         --secondary-foreground: 222.2 47.4% 11.2%;
         --muted: 210 40% 96.1%;
         --muted-foreground: 215.4 16.3% 46.9%;
+        --accent: 252 80% 96%;
         --accent-foreground: 222.2 47.4% 11.2%;
         --destructive: 0 84.2% 60.2%;
         --destructive-foreground: 210 40% 98%;
