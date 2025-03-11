@@ -18,7 +18,7 @@ import {
   Cable
 } from 'lucide-react';
 
-// Create navigation items with proper structure
+// Define navigation items
 const sidebarNavItems = [
   {
     title: 'Dashboard',
@@ -74,6 +74,8 @@ const sidebarNavItems = [
 
 export function Sidebar({ className }) {
   const pathname = usePathname();
+
+  console.log("Sidebar items:", sidebarNavItems);  // Debugging line
 
   return (
     <div className={cn("pb-12", className)}>

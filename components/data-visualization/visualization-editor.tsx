@@ -244,7 +244,7 @@ export function VisualizationEditor({
                     <div className="flex items-center gap-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button className="whitespace-nowrap">
+                          <Button className="whitespace-nowrap" variant="purple">
                             <Save className="mr-2 h-4 w-4" />
                             Save<ChevronDown className="ml-2 h-4 w-4" />
                           </Button>
@@ -555,6 +555,7 @@ export function VisualizationEditor({
                               toast.success('Chart options applied');
                             }}
                             className="w-full"
+                            variant="purple"
                           >
                             Apply Changes
                           </Button>
