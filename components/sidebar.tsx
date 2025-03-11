@@ -5,7 +5,18 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Database, LayoutDashboard, MessageSquare, Settings, Users, Link as LinkIcon } from 'lucide-react';
+import { 
+  Database, 
+  LayoutDashboard, 
+  MessageSquare, 
+  Settings, 
+  Users, 
+  Link as LinkIcon, 
+  PieChart, 
+  Layers,
+  Cpu,
+  Cable
+} from 'lucide-react';
 
 // Create navigation items with proper structure
 const sidebarNavItems = [
@@ -20,9 +31,29 @@ const sidebarNavItems = [
     icon: <MessageSquare className="h-5 w-5" />,
   },
   {
+    title: 'Dashboards',
+    href: '/dashboards',
+    icon: <PieChart className="h-5 w-5" />,
+  },
+  {
+    title: 'Segments',
+    href: '/segments',
+    icon: <Layers className="h-5 w-5" />,
+  },
+  {
     title: 'Campaigns',
     href: '/campaigns',
     icon: <Users className="h-5 w-5" />,
+  },
+  {
+    title: 'AI Tools',
+    href: '/ai-tools',
+    icon: <Cpu className="h-5 w-5" />,
+  },
+  {
+    title: 'Connectors',
+    href: '/connectors',
+    icon: <Cable className="h-5 w-5" />,
   },
   {
     title: 'Connections',

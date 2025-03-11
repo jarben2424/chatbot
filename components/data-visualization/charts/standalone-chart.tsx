@@ -21,98 +21,128 @@ const fallbackData = [
 
 export function StandaloneChart({ 
   type = 'line', 
-  data = fallbackData,
+  data = [],
   height = 400,
-  width = '100%'
+  width = '100%',
+  colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
 }) {
-  // Check data and log for debugging
-  useEffect(() => {
-    console.log('StandaloneChart received:', {
-      type,
-      data: data?.slice(0, 2) || [],
-      keys: data && data.length > 0 ? Object.keys(data[0]) : []
-    });
-  }, [type, data]);
-
   // Ensure we have data
   const hasData = data && Array.isArray(data) && data.length > 0;
+  
   if (!hasData) {
     return <div className="p-8 text-center text-muted-foreground">No data available</div>;
   }
 
-  // Force parsing of data to ensure proper number handling
-  const parsedData = data.map(item => {
-    const result = {...item};
-    // Convert string numbers to actual numbers
-    Object.keys(result).forEach(key => {
-      if (typeof result[key] === 'string' && 
-          !isNaN(parseFloat(result[key].replace(/[^0-9.-]+/g, '')))) {
-        result[key] = parseFloat(result[key].replace(/[^0-9.-]+/g, ''));
-      }
+  // Log visualization data for debugging
+  useEffect(() => {
+    console.log('Chart data:', {
+      type,
+      dataLength: data.length,
+      sampleRow: data[0],
     });
-    return result;
-  });
+  }, [type, data]);
 
   // Get all keys and determine the first string and first number
   const allKeys = Object.keys(data[0]);
-  const firstStringKey = allKeys.find(key => typeof data[0][key] === 'string') || allKeys[0];
-  const firstNumberKey = allKeys.find(key => typeof data[0][key] === 'number') || allKeys[allKeys.length > 1 ? 1 : 0];
+  const stringKeys = allKeys.filter(key => typeof data[0][key] === 'string');
+  const numberKeys = allKeys.filter(key => typeof data[0][key] === 'number');
+  
+  const firstStringKey = stringKeys[0] || allKeys[0];
+  const firstNumberKey = numberKeys[0] || allKeys[allKeys.length > 1 ? 1 : 0];
 
-  // Colors
-  const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
+  // Find date or month column if available
+  const dateOrMonthKey = stringKeys.find(key => 
+    key.toLowerCase().includes('date') || 
+    key.toLowerCase().includes('month') ||
+    key.toLowerCase().includes('year') ||
+    key.toLowerCase().includes('time')
+  ) || firstStringKey;
+
+  // Find value columns
+  const valueKeys = numberKeys.length > 0 ? numberKeys : [firstNumberKey];
+  
+  // Check for time series data
+  const isTimeSeries = stringKeys.some(key => 
+    key.toLowerCase().includes('date') || 
+    key.toLowerCase().includes('month') ||
+    key.toLowerCase().includes('year') ||
+    key.toLowerCase().includes('time')
+  );
+  
+  // Sort data if it's time series
+  let sortedData = [...data];
+  if (isTimeSeries) {
+    sortedData = sortedData.sort((a, b) => {
+      if (a[dateOrMonthKey] < b[dateOrMonthKey]) return -1;
+      if (a[dateOrMonthKey] > b[dateOrMonthKey]) return 1;
+      return 0;
+    });
+  }
 
   switch (type) {
-    case 'line':
-      return (
-        <ResponsiveContainer width={width} height={height}>
-          <LineChart data={parsedData}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-            <XAxis dataKey={firstStringKey} />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Line 
-              type="monotone" 
-              dataKey={firstNumberKey} 
-              stroke={colors[0]} 
-              activeDot={{ r: 8 }} 
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      );
-    
     case 'bar':
       return (
         <ResponsiveContainer width={width} height={height}>
-          <BarChart data={parsedData}>
+          <BarChart data={sortedData}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-            <XAxis dataKey={firstStringKey} />
+            <XAxis dataKey={dateOrMonthKey} />
             <YAxis />
             <Tooltip />
             <Legend />
-            <Bar dataKey={firstNumberKey} fill={colors[0]} />
+            {valueKeys.map((key, index) => (
+              <Bar 
+                key={key} 
+                dataKey={key} 
+                fill={colors[index % colors.length]} 
+                name={key.replace(/_/g, ' ')}
+              />
+            ))}
           </BarChart>
         </ResponsiveContainer>
       );
-    
+      
+    case 'line':
+      return (
+        <ResponsiveContainer width={width} height={height}>
+          <LineChart data={sortedData}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+            <XAxis dataKey={dateOrMonthKey} />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            {valueKeys.map((key, index) => (
+              <Line 
+                key={key} 
+                type="monotone" 
+                dataKey={key} 
+                stroke={colors[index % colors.length]} 
+                name={key.replace(/_/g, ' ')}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      );
+      
     case 'pie':
-      // Get a key to use for category (string) and value (number)
-      const categoryKey = firstStringKey;
-      const valueKey = firstNumberKey;
+      // For pie charts, we need a different data structure
+      const pieData = data.map(item => ({
+        name: item[dateOrMonthKey],
+        value: item[valueKeys[0]]
+      }));
       
       return (
         <ResponsiveContainer width={width} height={height}>
           <PieChart>
             <Pie
-              data={parsedData}
-              nameKey={categoryKey}
-              dataKey={valueKey}
+              data={pieData}
+              nameKey="name"
+              dataKey="value"
               cx="50%"
               cy="50%"
               outerRadius={120}
               label
             >
-              {parsedData.map((entry, index) => (
+              {pieData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
               ))}
             </Pie>
@@ -123,6 +153,48 @@ export function StandaloneChart({
       );
       
     default:
-      return <div>Unknown chart type</div>;
+      // Auto choose best visualization
+      if (isTimeSeries) {
+        return (
+          <ResponsiveContainer width={width} height={height}>
+            <LineChart data={sortedData}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+              <XAxis dataKey={dateOrMonthKey} />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              {valueKeys.map((key, index) => (
+                <Line 
+                  key={key} 
+                  type="monotone" 
+                  dataKey={key} 
+                  stroke={colors[index % colors.length]} 
+                  name={key.replace(/_/g, ' ')}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        );
+      } else {
+        return (
+          <ResponsiveContainer width={width} height={height}>
+            <BarChart data={sortedData}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+              <XAxis dataKey={dateOrMonthKey} />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              {valueKeys.map((key, index) => (
+                <Bar 
+                  key={key} 
+                  dataKey={key} 
+                  fill={colors[index % colors.length]} 
+                  name={key.replace(/_/g, ' ')}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        );
+      }
   }
 } 
