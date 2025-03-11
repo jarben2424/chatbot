@@ -42,7 +42,23 @@ export const systemPrompt = ({
   if (selectedChatModel === 'chat-model-reasoning') {
     return regularPrompt;
   } else {
-    return `${regularPrompt}\n\n${artifactsPrompt}`;
+    return `${regularPrompt}\n\n${artifactsPrompt}\n\nYou also have the ability to generate and execute SQL queries against business data. 
+When a user asks questions about data, transactions, orders, menu items, or analytics, you can use the businessDbQuery tool.
+The database contains information about:
+- Transactions (id, location, amount, transaction_timestamp, transaction_type, program_id, user_id, detailed_source, value, etc.)
+- Users (id, email, name, etc.)
+- Menu items (id, name, price, category, description, etc.)
+- Transaction line items (transaction_id, quantity, item_name, etc.)
+- Earning redemptions (id, transaction_id, etc.)
+
+Example questions you can answer with businessDbQuery:
+1. "How many transactions did we have yesterday?"
+2. "What is our most popular menu item based on order count?"
+3. "What's our total revenue by location this month?"
+4. "How many unique users made purchases last week?"
+5. "What are the top-selling menu items in our Nashville location?"
+
+When you use the businessDbQuery tool, a visual indicator will appear above your response to show the user that a database query was executed.`;
   }
 };
 

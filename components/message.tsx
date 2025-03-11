@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { MessageEditor } from './message-editor';
 import { DocumentPreview } from './document-preview';
 import { MessageReasoning } from './message-reasoning';
+import { DbQueryIndicator } from './db-query-indicator';
 
 const PurePreviewMessage = ({
   chatId,
@@ -142,60 +143,73 @@ const PurePreviewMessage = ({
                 {message.toolInvocations.map((toolInvocation) => {
                   const { toolName, toolCallId, state, args } = toolInvocation;
 
-                  if (state === 'result') {
-                    const { result } = toolInvocation;
-
-                    return (
-                      <div key={toolCallId}>
-                        {toolName === 'getWeather' ? (
-                          <Weather weatherAtLocation={result} />
-                        ) : toolName === 'createDocument' ? (
-                          <DocumentPreview
-                            isReadonly={isReadonly}
-                            result={result}
-                          />
-                        ) : toolName === 'updateDocument' ? (
-                          <DocumentToolResult
-                            type="update"
-                            result={result}
-                            isReadonly={isReadonly}
-                          />
-                        ) : toolName === 'requestSuggestions' ? (
-                          <DocumentToolResult
-                            type="request-suggestions"
-                            result={result}
-                            isReadonly={isReadonly}
-                          />
-                        ) : (
-                          <pre>{JSON.stringify(result, null, 2)}</pre>
-                        )}
-                      </div>
-                    );
-                  }
+                  // Display the DB Query indicator for businessDbQuery tools
+                  const isDbQueryTool = toolName === 'businessDbQuery' || toolName === 'textToSql';
+                  const dbQuery = state === 'result' && isDbQueryTool ? toolInvocation.result?.query : null;
+                  
                   return (
-                    <div
-                      key={toolCallId}
-                      className={cx({
-                        skeleton: ['getWeather'].includes(toolName),
-                      })}
-                    >
-                      {toolName === 'getWeather' ? (
-                        <Weather />
-                      ) : toolName === 'createDocument' ? (
-                        <DocumentPreview isReadonly={isReadonly} args={args} />
-                      ) : toolName === 'updateDocument' ? (
-                        <DocumentToolCall
-                          type="update"
-                          args={args}
-                          isReadonly={isReadonly}
-                        />
-                      ) : toolName === 'requestSuggestions' ? (
-                        <DocumentToolCall
-                          type="request-suggestions"
-                          args={args}
-                          isReadonly={isReadonly}
-                        />
-                      ) : null}
+                    <div key={toolCallId}>
+                      {isDbQueryTool && state === 'result' && <DbQueryIndicator query={dbQuery} />}
+                      
+                      {state === 'result' ? (
+                        <div>
+                          {toolName === 'getWeather' ? (
+                            <Weather weatherAtLocation={toolInvocation.result} />
+                          ) : toolName === 'createDocument' ? (
+                            <DocumentPreview
+                              isReadonly={isReadonly}
+                              result={toolInvocation.result}
+                            />
+                          ) : toolName === 'updateDocument' ? (
+                            <DocumentToolResult
+                              type="update"
+                              result={toolInvocation.result}
+                              isReadonly={isReadonly}
+                            />
+                          ) : toolName === 'requestSuggestions' ? (
+                            <DocumentToolResult
+                              type="request-suggestions"
+                              result={toolInvocation.result}
+                              isReadonly={isReadonly}
+                            />
+                          ) : toolName === 'businessDbQuery' || toolName === 'textToSql' ? (
+                            <div className="bg-muted p-4 rounded-md">
+                              <h4 className="text-sm font-medium mb-2">Database Query Results</h4>
+                              <pre className="text-xs overflow-auto max-h-60">{JSON.stringify(toolInvocation.result.results, null, 2)}</pre>
+                            </div>
+                          ) : (
+                            <pre>{JSON.stringify(toolInvocation.result, null, 2)}</pre>
+                          )}
+                        </div>
+                      ) : (
+                        <div
+                          className={cx({
+                            skeleton: ['getWeather'].includes(toolName),
+                          })}
+                        >
+                          {toolName === 'getWeather' ? (
+                            <Weather />
+                          ) : toolName === 'createDocument' ? (
+                            <DocumentPreview isReadonly={isReadonly} args={args} />
+                          ) : toolName === 'updateDocument' ? (
+                            <DocumentToolCall
+                              type="update"
+                              args={args}
+                              isReadonly={isReadonly}
+                            />
+                          ) : toolName === 'requestSuggestions' ? (
+                            <DocumentToolCall
+                              type="request-suggestions"
+                              args={args}
+                              isReadonly={isReadonly}
+                            />
+                          ) : toolName === 'businessDbQuery' || toolName === 'textToSql' ? (
+                            <div className="bg-muted p-4 rounded-md animate-pulse">
+                              <p className="text-sm">Running database query...</p>
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
