@@ -35,6 +35,13 @@
         background-color: hsl(var(--accent));
         color: hsl(var(--accent-foreground));
     }
+    .card-hover {
+        position: relative;
+        z-index: 1;
+    }
+    .card-hover:hover {
+        background-color: hsl(var(--muted) / 50%);
+    }
 }
 
 @layer base {

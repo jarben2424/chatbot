@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { LayoutDashboard, Users, Megaphone, Cpu, Cable } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { PlusIcon } from '@/components/icons';
 import { SidebarHistory } from '@/components/sidebar-history';
@@ -25,12 +26,15 @@ export function AppSidebar({ user }: { user: User | undefined }) {
   const router = useRouter();
   const { setOpenMobile } = useSidebar();
   const { theme, systemTheme } = useTheme();
-
-  // Determine which logo to use
-  const currentTheme = theme === 'system' ? systemTheme : theme;
-  const logoSrc = currentTheme === 'dark' 
-    ? '/images/Hang-Logo-Short-W.png'
-    : '/images/Hang-Logo-Short.png';
+  
+  const [logoSrc, setLogoSrc] = useState('/images/Hang-Logo-Short.png');
+  
+  useEffect(() => {
+    const currentTheme = theme === 'system' ? systemTheme : theme;
+    setLogoSrc(currentTheme === 'dark' 
+      ? '/images/Hang-Logo-Short-W.png'
+      : '/images/Hang-Logo-Short.png');
+  }, [theme, systemTheme]);
 
   const navigationItems = [
     {
