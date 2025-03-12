@@ -15,6 +15,8 @@ import {
   type Message,
   message,
   vote,
+  dashboardQuery,
+  type DashboardQuery,
 } from './schema';
 import { ArtifactKind } from '@/components/artifact';
 
@@ -339,9 +341,98 @@ export async function updateChatVisiblityById({
   visibility: 'private' | 'public';
 }) {
   try {
-    return await db.update(chat).set({ visibility }).where(eq(chat.id, chatId));
+    return await db
+      .update(chat)
+      .set({ visibility })
+      .where(eq(chat.id, chatId));
   } catch (error) {
     console.error('Failed to update chat visibility in database');
+    throw error;
+  }
+}
+
+// Dashboard queries
+export async function saveDashboardQuery({
+  title,
+  question,
+  sqlQuery,
+  userId,
+}: {
+  title: string;
+  question: string;
+  sqlQuery: string;
+  userId: string;
+}) {
+  try {
+    const now = new Date();
+    return await db.insert(dashboardQuery).values({
+      title,
+      question,
+      sqlQuery,
+      userId,
+      createdAt: now,
+      updatedAt: now,
+    });
+  } catch (error) {
+    console.error('Failed to save dashboard query in database');
+    throw error;
+  }
+}
+
+export async function getDashboardQueriesByUserId({ userId }: { userId: string }) {
+  try {
+    return await db
+      .select()
+      .from(dashboardQuery)
+      .where(and(eq(dashboardQuery.userId, userId), eq(dashboardQuery.isActive, true)))
+      .orderBy(desc(dashboardQuery.updatedAt));
+  } catch (error) {
+    console.error('Failed to get dashboard queries from database');
+    throw error;
+  }
+}
+
+export async function updateDashboardQuery({
+  id,
+  title,
+  question,
+  sqlQuery,
+  isActive,
+}: {
+  id: string;
+  title?: string;
+  question?: string;
+  sqlQuery?: string;
+  isActive?: boolean;
+}) {
+  try {
+    const updateData: Partial<DashboardQuery> = {
+      updatedAt: new Date(),
+    };
+    
+    if (title !== undefined) updateData.title = title;
+    if (question !== undefined) updateData.question = question;
+    if (sqlQuery !== undefined) updateData.sqlQuery = sqlQuery;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    
+    return await db
+      .update(dashboardQuery)
+      .set(updateData)
+      .where(eq(dashboardQuery.id, id));
+  } catch (error) {
+    console.error('Failed to update dashboard query in database');
+    throw error;
+  }
+}
+
+export async function deleteDashboardQuery({ id }: { id: string }) {
+  try {
+    return await db
+      .update(dashboardQuery)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(dashboardQuery.id, id));
+  } catch (error) {
+    console.error('Failed to delete dashboard query from database');
     throw error;
   }
 }

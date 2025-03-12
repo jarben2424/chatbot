@@ -13,6 +13,7 @@ import {
   GlobeIcon,
   LockIcon,
   MoreHorizontalIcon,
+  PlusIcon,
   ShareIcon,
   TrashIcon,
 } from '@/components/icons';
@@ -26,6 +27,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -153,6 +160,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
   const { setOpenMobile } = useSidebar();
   const { id } = useParams();
   const pathname = usePathname();
+  const router = useRouter();
   const {
     data: history,
     isLoading,
@@ -167,7 +175,6 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const router = useRouter();
   const handleDelete = async () => {
     const deletePromise = fetch(`/api/chat?id=${deleteId}`, {
       method: 'DELETE',
@@ -281,6 +288,30 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
 
   return (
     <>
+      <div className="flex items-center justify-between pt-2 pb-1">
+        <div className="px-4">
+          <div className="text-sm font-semibold text-sidebar-foreground">Chat</div>
+        </div>
+        <div className="px-4">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                type="button"
+                className="h-6 w-6 p-0"
+                onClick={() => {
+                  setOpenMobile(false);
+                  router.push('/');
+                  router.refresh();
+                }}
+              >
+                <PlusIcon size={16} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent align="end">New Chat</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
       <SidebarGroup>
         <SidebarGroupContent>
           <SidebarMenu>

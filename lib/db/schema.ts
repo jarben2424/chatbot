@@ -113,3 +113,18 @@ export const suggestion = pgTable(
 );
 
 export type Suggestion = InferSelectModel<typeof suggestion>;
+
+export const dashboardQuery = pgTable('DashboardQuery', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  userId: uuid('userId')
+    .notNull()
+    .references(() => user.id),
+  title: text('title').notNull(),
+  question: text('question').notNull(),
+  sqlQuery: text('sqlQuery').notNull(),
+  createdAt: timestamp('createdAt').notNull(),
+  updatedAt: timestamp('updatedAt').notNull(),
+  isActive: boolean('isActive').notNull().default(true),
+});
+
+export type DashboardQuery = InferSelectModel<typeof dashboardQuery>;

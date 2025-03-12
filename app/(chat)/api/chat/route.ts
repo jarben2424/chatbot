@@ -23,6 +23,7 @@ import { updateDocument } from '@/lib/ai/tools/update-document';
 import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
 import { businessDbQuery } from '@/lib/ai/tools/business-db-query';
+import { dashboardEmailSubscription } from '@/lib/ai/tools/dashboard-email-subscription';
 import { isProductionEnvironment } from '@/lib/constants';
 import { NextResponse } from 'next/server';
 import { myProvider } from '@/lib/ai/providers';
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
                   'updateDocument',
                   'requestSuggestions',
                   'businessDbQuery',
+                  'dashboardEmailSubscription',
                 ],
           experimental_transform: smoothStream({ chunking: 'word' }),
           experimental_generateMessageId: generateUUID,
@@ -99,6 +101,7 @@ export async function POST(request: Request) {
               dataStream,
             }),
             businessDbQuery,
+            dashboardEmailSubscription,
           },
           onFinish: async ({ response, reasoning }) => {
             if (session.user?.id) {

@@ -58,7 +58,36 @@ Example questions you can answer with businessDbQuery:
 4. "How many unique users made purchases last week?"
 5. "What are the top-selling menu items in our Nashville location?"
 
-When you use the businessDbQuery tool, a visual indicator will appear above your response to show the user that a database query was executed.`;
+When you use the businessDbQuery tool, a visual indicator will appear above your response to show the user that a database query was executed.
+
+You also have the ability to manage email subscriptions for dashboard metrics through the dashboardEmailSubscription tool.
+This tool allows users to:
+- Create new email subscriptions for dashboard metrics
+- Update existing email subscriptions
+- Delete email subscriptions
+- List all current email subscriptions
+- Preview how an email subscription will look
+
+Example requests you can handle with dashboardEmailSubscription:
+1. "Set up a weekly email subscription for my sales dashboard"
+2. "Email me the revenue metrics every Monday"
+3. "Update my dashboard email subscription to include the new customer metrics"
+4. "Remove my email subscription for the monthly reports"
+5. "Show me all my dashboard email subscriptions"
+6. "Preview what my dashboard email will look like"
+7. "I want to subscribe to dashboard updates"
+8. "Create an email subscription for my dashboard"
+9. "Can I get dashboard metrics by email?"
+
+IMPORTANT: When a user mentions anything about dashboard subscriptions, emails for dashboards, or automated updates, you MUST use the dashboardEmailSubscription tool with action='create' to start the process. DO NOT just provide a text response asking for details.
+
+When creating or updating subscriptions, you'll need to collect the following information:
+- Subscription name
+- Email recipients
+- Frequency (daily, weekly, or monthly)
+- Which dashboard metrics to include
+
+When you use the dashboardEmailSubscription tool, a visual indicator will appear above your response to show the user that an email subscription action was performed.`;
   }
 };
 

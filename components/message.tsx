@@ -19,6 +19,9 @@ import { MessageEditor } from './message-editor';
 import { DocumentPreview } from './document-preview';
 import { MessageReasoning } from './message-reasoning';
 import { DbQueryIndicator } from './db-query-indicator';
+import { EmailSubscriptionIndicator } from './email-subscription-indicator';
+import { AddToDashboardButton } from './add-to-dashboard-button';
+import { DashboardSubscriptionButton } from './dashboard-subscription-button';
 
 const PurePreviewMessage = ({
   chatId,
@@ -147,9 +150,14 @@ const PurePreviewMessage = ({
                   const isDbQueryTool = toolName === 'businessDbQuery' || toolName === 'textToSql';
                   const dbQuery = state === 'result' && isDbQueryTool ? toolInvocation.result?.query : null;
                   
+                  // Display the Email Subscription indicator for dashboardEmailSubscription tool
+                  const isEmailSubscriptionTool = toolName === 'dashboardEmailSubscription';
+                  const subscriptionAction = state === 'result' && isEmailSubscriptionTool ? toolInvocation.result?.action : null;
+                  
                   return (
                     <div key={toolCallId}>
                       {isDbQueryTool && state === 'result' && <DbQueryIndicator query={dbQuery} />}
+                      {isEmailSubscriptionTool && state === 'result' && <EmailSubscriptionIndicator action={subscriptionAction} />}
                       
                       {state === 'result' ? (
                         <div>
@@ -174,8 +182,32 @@ const PurePreviewMessage = ({
                             />
                           ) : toolName === 'businessDbQuery' || toolName === 'textToSql' ? (
                             <div className="bg-muted p-4 rounded-md">
-                              <h4 className="text-sm font-medium mb-2">Database Query Results</h4>
+                              <div className="flex justify-between items-start mb-2">
+                                <h4 className="text-sm font-medium">Database Query Results</h4>
+                                <AddToDashboardButton 
+                                  question={args.question}
+                                  sqlQuery={toolInvocation.result.query}
+                                />
+                              </div>
                               <pre className="text-xs overflow-auto max-h-60">{JSON.stringify(toolInvocation.result.results, null, 2)}</pre>
+                            </div>
+                          ) : toolName === 'dashboardEmailSubscription' ? (
+                            <div className="bg-muted p-4 rounded-md">
+                              <div className="flex justify-between items-start mb-2">
+                                <h4 className="text-sm font-medium">Email Subscription</h4>
+                                <DashboardSubscriptionButton 
+                                  initialSubscriptionName={args.subscription?.name || ""}
+                                />
+                              </div>
+                              <p className="text-sm">{subscriptionAction === 'create' 
+                                ? 'Create a new subscription for dashboard metrics.' 
+                                : subscriptionAction === 'update'
+                                ? 'Update an existing subscription.'
+                                : subscriptionAction === 'delete'
+                                ? 'Delete an existing subscription.'
+                                : subscriptionAction === 'list'
+                                ? 'View your current subscriptions.'
+                                : 'Preview your email subscription.'}</p>
                             </div>
                           ) : (
                             <pre>{JSON.stringify(toolInvocation.result, null, 2)}</pre>
