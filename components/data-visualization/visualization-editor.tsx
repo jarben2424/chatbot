@@ -177,21 +177,36 @@ export function VisualizationEditor({
     if (!chatInput.trim()) return;
     
     // Add user message
-    setChatMessages([...chatMessages, {
+    const newUserMessage = {
       role: 'user',
       content: chatInput
-    }]);
+    };
     
-    // Clear input
-    setChatInput('');
+    setChatMessages(prev => [...prev, newUserMessage]);
+    const userQuestion = chatInput;
+    setChatInput(''); // Clear input immediately
     
-    // Simulate AI response
+    // Force immediate response with helpful message
     setTimeout(() => {
-      setChatMessages(prevMessages => [...prevMessages, {
+      let response = "I've updated the visualization based on your request.";
+      
+      // Check for specific questions and give appropriate responses
+      if (userQuestion.toLowerCase().includes('monthly') || 
+          userQuestion.toLowerCase().includes('revenue')) {
+        response = "Here's the monthly revenue data visualization. You can edit using the controls on the right.";
+      } else if (userQuestion.toLowerCase().includes('sales') || 
+                userQuestion.toLowerCase().includes('trend')) {
+        response = "I've created a visualization showing the sales trends. You can change the chart type or styling as needed.";
+      } else if (userQuestion.toLowerCase().includes('compare') || 
+                userQuestion.toLowerCase().includes('comparison')) {
+        response = "Here's a comparison visualization of the data. A bar chart works well for comparisons, but you can switch to other types.";
+      }
+      
+      setChatMessages(prev => [...prev, {
         role: 'assistant',
-        content: "I'm continuing to show the visualization you requested. You can edit it using the controls on the right."
+        content: response
       }]);
-    }, 500);
+    }, 300); // Faster response time
   };
 
   // Debounced function to apply pending settings to actual settings
@@ -225,97 +240,31 @@ export function VisualizationEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background">
-      {/* Header with just the close button */}
-      <div className="flex items-center justify-between p-3 border-b bg-background shadow-sm">
-        <div className="flex-1">
-          {/* Empty space for alignment */}
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onClose} 
-            className="h-8 w-8"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-        
-        <div className="flex items-center gap-2 flex-1 justify-end">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="whitespace-nowrap" variant="purple">
-                <Save className="mr-2 h-4 w-4" />
-                Save<ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => {
-                  if (onSave) {
-                    onSave({
-                      visualization: settings.type,
-                      data,
-                      title,
-                      description,
-                      settings
-                    });
-                  }
-                  onClose();
-                  toast.success('Visualization saved');
-                }}
-              >
-                Save changes
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  if (onSave) {
-                    onSave({
-                      visualization: settings.type,
-                      data,
-                      title,
-                      description,
-                      settings,
-                      saveAsNew: true,
-                    });
-                  }
-                  onClose();
-                  toast.success('Saved as new visualization');
-                }}
-              >
-                Save as new
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-      
-      <div className="flex flex-1 h-[calc(100vh-48px)] overflow-hidden">
-        {/* Chat panel on the left (restored) */}
-        <div className="w-1/3 p-4 overflow-auto border-r bg-gray-50 dark:bg-gray-900">
+    <div className="fixed inset-0 z-50 bg-background flex">
+      {/* Chat panel on the left */}
+      <div className="w-1/4 h-full border-r bg-gray-50 dark:bg-gray-900 overflow-auto">
+        <div className="p-4">
           <h3 className="font-semibold mb-4">Chat History</h3>
           
-          <div className="flex flex-col gap-4 mb-4">
+          <div className="flex flex-col gap-3 mb-4">
             {chatMessages.map((message, idx) => (
               <div 
                 key={idx} 
                 className={cn(
-                  "p-3 rounded-lg",
+                  "p-2 rounded-lg", 
                   message.role === 'user' 
                     ? "bg-blue-100 dark:bg-blue-900 ml-8" 
                     : "bg-gray-100 dark:bg-gray-800 mr-8"
                 )}
               >
-                <div className="text-sm">
+                <div className="text-sm whitespace-pre-wrap">
                   {message.content}
                 </div>
               </div>
             ))}
           </div>
           
-          <div className="flex gap-2 mt-4">
+          <div className="flex gap-2 mt-2 sticky bottom-0 bg-gray-50 dark:bg-gray-900 py-2">
             <Input
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
@@ -332,129 +281,200 @@ export function VisualizationEditor({
             </Button>
           </div>
         </div>
-        
-        {/* Visualization preview in center */}
-        <div className="w-2/5 p-6 overflow-auto">
-          <div className="mb-4">
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Visualization Title"
-              className="text-xl font-bold mb-2"
-            />
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add a description"
-              className="text-sm text-muted-foreground"
-            />
+      </div>
+      
+      {/* Editor content on the right */}
+      <div className="flex flex-col w-3/4 h-full">
+        {/* Header with just the close button - only above editor part */}
+        <div className="flex items-center justify-between p-3 border-b bg-background shadow-sm">
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={onClose} 
+              className="h-8 w-8"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
           
-          <div className="bg-card rounded-lg border h-[calc(100vh-200px)] flex items-center justify-center p-4">
-            <StandaloneChart
-              data={parsedData}
-              type={settings.type}
-              colors={settings.colors}
-              showLegend={settings.showLegend}
-              showGrid={settings.showGrid}
-              title={title}
-              className="w-full h-full"
-            />
+          <div className="flex-1"></div>
+          
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="whitespace-nowrap" variant="purple">
+                  <Save className="mr-2 h-4 w-4" />
+                  Save<ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="dropdown-menu-content bg-background border border-border shadow-md p-1 z-50">
+                <DropdownMenuItem
+                  className="dropdown-menu-item"
+                  onClick={() => {
+                    if (onSave) {
+                      onSave({
+                        visualization: settings.type,
+                        data,
+                        title,
+                        description,
+                        settings
+                      });
+                    }
+                    onClose();
+                    toast.success('Visualization saved');
+                  }}
+                >
+                  Save changes
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="dropdown-menu-item"
+                  onClick={() => {
+                    if (onSave) {
+                      onSave({
+                        visualization: settings.type,
+                        data,
+                        title,
+                        description,
+                        settings,
+                        saveAsNew: true,
+                      });
+                    }
+                    onClose();
+                    toast.success('Saved as new visualization');
+                  }}
+                >
+                  Save as new
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         
-        {/* Settings panel on right */}
-        <div className="w-1/4 p-4 overflow-auto border-l">
-          <Tabs defaultValue="chart" className="w-full">
-            <TabsList className="w-full mb-4">
-              <TabsTrigger value="chart" className="flex-1">Chart</TabsTrigger>
-              <TabsTrigger value="style" className="flex-1">Style</TabsTrigger>
-              <TabsTrigger value="data" className="flex-1">Data</TabsTrigger>
-            </TabsList>
+        <div className="flex flex-1 overflow-hidden">
+          {/* Visualization preview */}
+          <div className="w-2/3 p-6 overflow-auto">
+            <div className="mb-4">
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Visualization Title"
+                className="text-xl font-bold mb-2"
+              />
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Add a description"
+                className="text-sm text-muted-foreground"
+              />
+            </div>
             
-            <TabsContent value="chart" className="space-y-4">
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant={settings.type === 'bar' ? 'default' : 'outline'}
-                  onClick={() => applySettings({ type: 'bar' })}
-                  className="p-6"
-                >
-                  Bar Chart
-                </Button>
-                <Button
-                  variant={settings.type === 'line' ? 'default' : 'outline'}
-                  onClick={() => applySettings({ type: 'line' })}
-                  className="p-6"
-                >
-                  Line Chart
-                </Button>
-                <Button
-                  variant={settings.type === 'pie' ? 'default' : 'outline'}
-                  onClick={() => applySettings({ type: 'pie' })}
-                  className="p-6"
-                >
-                  Pie Chart
-                </Button>
-                <Button
-                  variant={settings.type === 'scatter' ? 'default' : 'outline'}
-                  onClick={() => applySettings({ type: 'scatter' })}
-                  className="p-6"
-                >
-                  Scatter Plot
-                </Button>
-                <Button
-                  variant={settings.type === 'table' ? 'default' : 'outline'}
-                  onClick={() => applySettings({ type: 'table' })}
-                  className="p-6"
-                >
-                  Data Table
-                </Button>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="style" className="space-y-4">
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-semibold">Chart Colors</Label>
-                  <ColorPicker 
-                    colors={settings.colors} 
-                    onChange={(colors) => applySettings({ colors })}
-                  />
+            <div className="bg-card rounded-lg border h-[calc(100vh-200px)] flex items-center justify-center p-4">
+              <StandaloneChart
+                data={parsedData}
+                type={settings.type}
+                colors={settings.colors}
+                showLegend={settings.showLegend}
+                showGrid={settings.showGrid}
+                title={title}
+                className="w-full h-full"
+              />
+            </div>
+          </div>
+          
+          {/* Settings panel */}
+          <div className="w-1/3 p-4 overflow-auto border-l">
+            <Tabs defaultValue="chart" className="w-full">
+              <TabsList className="w-full mb-4">
+                <TabsTrigger value="chart" className="flex-1">Chart</TabsTrigger>
+                <TabsTrigger value="style" className="flex-1">Style</TabsTrigger>
+                <TabsTrigger value="data" className="flex-1">Data</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="chart" className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant={settings.type === 'bar' ? 'default' : 'outline'}
+                    onClick={() => applySettings({ type: 'bar' })}
+                    className="p-6"
+                  >
+                    Bar Chart
+                  </Button>
+                  <Button
+                    variant={settings.type === 'line' ? 'default' : 'outline'}
+                    onClick={() => applySettings({ type: 'line' })}
+                    className="p-6"
+                  >
+                    Line Chart
+                  </Button>
+                  <Button
+                    variant={settings.type === 'pie' ? 'default' : 'outline'}
+                    onClick={() => applySettings({ type: 'pie' })}
+                    className="p-6"
+                  >
+                    Pie Chart
+                  </Button>
+                  <Button
+                    variant={settings.type === 'scatter' ? 'default' : 'outline'}
+                    onClick={() => applySettings({ type: 'scatter' })}
+                    className="p-6"
+                  >
+                    Scatter Plot
+                  </Button>
+                  <Button
+                    variant={settings.type === 'table' ? 'default' : 'outline'}
+                    onClick={() => applySettings({ type: 'table' })}
+                    className="p-6"
+                  >
+                    Data Table
+                  </Button>
                 </div>
-                
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">Show Legend</Label>
-                  <Switch 
-                    checked={settings.showLegend}
-                    onCheckedChange={(checked) => 
-                      applySettings({ showLegend: checked })
-                    }
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">Show Grid</Label>
-                  <Switch 
-                    checked={settings.showGrid}
-                    onCheckedChange={(checked) => 
-                      applySettings({ showGrid: checked })
-                    }
-                  />
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="data" className="space-y-4">
-              <div className="space-y-4">
-                <div className="p-4 border rounded-lg bg-muted/30">
-                  <h3 className="font-medium mb-2">Data Preview</h3>
-                  <div className="max-h-[300px] overflow-auto text-xs">
-                    <pre>{JSON.stringify(parsedData, null, 2)}</pre>
+              </TabsContent>
+              
+              <TabsContent value="style" className="space-y-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-semibold">Chart Colors</Label>
+                    <ColorPicker 
+                      colors={settings.colors} 
+                      onChange={(colors) => applySettings({ colors })}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold">Show Legend</Label>
+                    <Switch 
+                      checked={settings.showLegend}
+                      onCheckedChange={(checked) => 
+                        applySettings({ showLegend: checked })
+                      }
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold">Show Grid</Label>
+                    <Switch 
+                      checked={settings.showGrid}
+                      onCheckedChange={(checked) => 
+                        applySettings({ showGrid: checked })
+                      }
+                    />
                   </div>
                 </div>
-              </div>
-            </TabsContent>
-          </Tabs>
+              </TabsContent>
+              
+              <TabsContent value="data" className="space-y-4">
+                <div className="space-y-4">
+                  <div className="p-4 border rounded-lg bg-muted/30">
+                    <h3 className="font-medium mb-2">Data Preview</h3>
+                    <div className="max-h-[300px] overflow-auto text-xs">
+                      <pre>{JSON.stringify(parsedData, null, 2)}</pre>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
       </div>
       

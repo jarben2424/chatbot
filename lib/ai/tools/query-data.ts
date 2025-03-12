@@ -4,6 +4,7 @@ import { AbortSignal } from 'node:abort-controller';
 import snowflake from 'snowflake-sdk';
 import { auth } from '@/app/(auth)/auth';
 import { getProgramIdForUser } from '@/lib/auth/program-mapping';
+import { queryData } from '@/lib/actions/data-tools';
 // Or your preferred data warehouse client
 // import { createClient } from '@snowflake-sdk/client';
 // import { BigQuery } from '@google-cloud/bigquery';
@@ -231,52 +232,44 @@ async function mockQueryDatabase(query: string, programId: number, userEmail?: s
 }
 
 // The actual query data tool
-export const queryData = tool({
-  description: `Query business data from the Snowflake data warehouse. Available tables include: ${AVAILABLE_TABLES.join(', ')}. 
-  Only SELECT queries are permitted, and results will be automatically filtered to the user's program ID.
-  For example: "SELECT * FROM HANG_LOYALTY_PUBLIC.transactions LIMIT 10" will only return data for the current user's program.`,
+export const queryDataTool = tool({
+  name: 'query_data',
+  description: 'Execute SQL queries against the database to retrieve or analyze data.',
   parameters: z.object({
-    query: z.string().describe('The SQL query to execute against Snowflake'),
-    title: z.string().optional().describe('Title for the data result'),
-    description: z.string().optional().describe('Description of what the data shows'),
+    query: z.string().describe('The SQL query to execute'),
+    description: z.string().optional().describe('Description of what the query does')
   }),
-  execute: async ({ query, title, description }, { toolCallId, abortSignal }) => {
-    try {
-      const session = await auth();
-      const userEmail = session?.user?.email || '';
-      const { programId, isAdmin } = getProgramIdForUser(userEmail);
-
-      // Always force mock data for brian@hang.com
-      const forceMockData = userEmail.toLowerCase().includes('brian@hang.com');
-      const useTestData = process.env.USE_MOCK_DATA === 'true';
-
-      const data = (forceMockData || useTestData)
-        ? await mockQueryDatabase(query, programId, userEmail)
-        : await queryDatabase(query, abortSignal);
-
-      return {
-        data: formatDataForDisplay(data),
-        sql: query,
-        title: title || 'Query Results',
-        description: '',
-      };
-    } catch (error) {
-      console.error('Query data tool error:', error);
-      
-      // Return mock data instead of throwing error
-      const session = await auth();
-      const userEmail = session?.user?.email;
-      const { programId, isAdmin } = getProgramIdForUser(userEmail);
-      const mockData = await mockQueryDatabase(query, programId, userEmail);
-      
-      return {
-        data: formatDataForDisplay(mockData),
-        sql: query,
-        title: title || 'Demo Data',
-        description: "Showing demo data. " + 
-                    (error instanceof Error ? error.message : String(error)),
-      };
+  execute: async ({ query, description }) => {
+    if (!query) {
+      throw new Error('Query is required');
     }
+
+    // Check for dangerous operations
+    const lowerQuery = query.toLowerCase();
+    if (
+      lowerQuery.includes('drop table') ||
+      lowerQuery.includes('delete from') ||
+      lowerQuery.includes('truncate table')
+    ) {
+      throw new Error('Dangerous operations (DROP, DELETE, TRUNCATE) are not allowed');
+    }
+
+    // Execute query via server action
+    const result = await queryData({
+      query,
+      description: description || 'Data query'
+    });
+
+    // Return result
+    return {
+      result: result.data,
+      id: result.id,
+      url: `/artifacts/${result.id}`,
+      rowCount: result.data.length,
+      columns: result.data.length > 0 ? Object.keys(result.data[0]) : [],
+      query,
+      description
+    };
   }
 });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,169 +10,170 @@ import { ColorPicker } from './color-picker';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
 import { Check, BarChart, LineChart, PieChart, Table } from 'lucide-react';
-
-interface VisualizationSettings {
-  colors: string[];
-  showLegend: boolean;
-  showDataLabels: boolean;
-  title: string;
-  type: string;
-  showTitle: boolean;
-  showLabels: boolean;
-  xAxis?: string;
-}
+import { VisualizationSettings } from '@/lib/types/visualization';
+import { HexColorPicker } from 'react-colorful';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface VisualizationControlsProps {
-  type: string;
   data: any[];
   settings: VisualizationSettings;
   onChange: (settings: VisualizationSettings) => void;
 }
 
-export function VisualizationControls({ type, data, settings, onChange }: VisualizationControlsProps) {
-  const chartTypes = [
-    { id: 'bar', label: 'Bar Chart', icon: BarChart },
-    { id: 'line', label: 'Line Chart', icon: LineChart },
-    { id: 'pie', label: 'Pie Chart', icon: PieChart },
-    { id: 'table', label: 'Table', icon: Table },
-  ];
+export function VisualizationControls({
+  data,
+  settings,
+  onChange
+}: VisualizationControlsProps) {
+  const [localSettings, setLocalSettings] = useState(settings);
+  const [activeTab, setActiveTab] = useState('type');
+  const [activeColorIndex, setActiveColorIndex] = useState(0);
   
-  // Color palette options
-  const colorPalettes = [
-    { id: 'default', colors: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'] },
-    { id: 'pastels', colors: ['#67e8f9', '#a5b4fc', '#fda4af', '#99f6e4', '#fcd34d'] },
-    { id: 'monochrome', colors: ['#1e3a8a', '#1e40af', '#1d4ed8', '#2563eb', '#3b82f6'] },
-  ];
-
-  const handleChange = (update: Partial<VisualizationSettings>) => {
-    const newSettings = { ...settings, ...update };
-    onChange(newSettings);
+  // Update parent when settings change
+  useEffect(() => {
+    onChange(localSettings);
+  }, [localSettings, onChange]);
+  
+  // Get available data keys for axis selection
+  const dataKeys = data.length > 0 ? Object.keys(data[0]) : [];
+  
+  // Handle type change
+  const handleTypeChange = (type: string) => {
+    setLocalSettings(prev => ({
+      ...prev,
+      type
+    }));
   };
-
-  const handleSave = () => {
-    // Save to "Custom Views" in dashboard
-    console.log('Saving visualization', settings);
-    // Animation would be triggered here
+  
+  // Handle color change
+  const handleColorChange = (color: string) => {
+    const newColors = [...localSettings.colors];
+    newColors[activeColorIndex] = color;
+    setLocalSettings(prev => ({
+      ...prev,
+      colors: newColors
+    }));
   };
-
+  
+  // Handle toggle settings
+  const handleToggle = (key: keyof VisualizationSettings, value: boolean) => {
+    setLocalSettings(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+  
+  // Handle x-axis change
+  const handleXAxisChange = (value: string) => {
+    setLocalSettings(prev => ({
+      ...prev,
+      xAxis: value
+    }));
+  };
+  
   return (
-    <div className="space-y-6 p-4">
-      <Tabs defaultValue="chart-type">
+    <div className="visualization-controls">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid grid-cols-3 mb-4">
-          <TabsTrigger value="chart-type">Chart Type</TabsTrigger>
+          <TabsTrigger value="type">Chart Type</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
-          <TabsTrigger value="data">Data Options</TabsTrigger>
+          <TabsTrigger value="data">Data</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="chart-type" className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {chartTypes.map((type) => {
-              const Icon = type.icon;
-              return (
-                <Button
-                  key={type.id}
-                  variant={settings.type === type.id ? "default" : "outline"}
-                  className="h-24 flex flex-col items-center justify-center gap-2"
-                  onClick={() => handleChange({ type: type.id })}
-                >
-                  <Icon className="h-6 w-6" />
-                  <span>{type.label}</span>
-                  {settings.type === type.id && (
-                    <Check className="h-4 w-4 absolute top-2 right-2" />
-                  )}
-                </Button>
-              );
-            })}
+        <TabsContent value="type" className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {['bar', 'line', 'pie', 'scatter', 'table'].map(type => (
+              <Button
+                key={type}
+                variant={localSettings.type === type ? "default" : "outline"}
+                className="text-sm capitalize"
+                onClick={() => handleTypeChange(type)}
+              >
+                {type}
+              </Button>
+            ))}
           </div>
         </TabsContent>
         
         <TabsContent value="appearance" className="space-y-4">
-          <div className="space-y-2">
-            <Label>Color Theme</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {colorPalettes.map((palette) => (
-                <Button
-                  key={palette.id}
-                  variant="outline"
-                  className="h-10 flex items-center gap-2 justify-center"
-                  onClick={() => handleChange({ colors: palette.colors })}
-                >
-                  <div className="flex">
-                    {palette.colors.slice(0, 3).map((color, i) => (
-                      <div 
-                        key={i} 
-                        className="w-4 h-4 rounded-full border" 
-                        style={{ backgroundColor: color, marginLeft: i > 0 ? -4 : 0 }}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Colors</Label>
+              <div className="flex gap-2 flex-wrap">
+                {localSettings.colors.map((color, index) => (
+                  <Popover key={index}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className="w-8 h-8 rounded-md border shadow-sm"
+                        style={{ backgroundColor: color }}
+                        onClick={() => setActiveColorIndex(index)}
                       />
-                    ))}
-                  </div>
-                  {palette.id.charAt(0).toUpperCase() + palette.id.slice(1)}
-                </Button>
-              ))}
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Show Legend</Label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleChange({ showLegend: !settings.showLegend })}
-              >
-                {settings.showLegend ? 'On' : 'Off'}
-              </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <HexColorPicker 
+                        color={localSettings.colors[activeColorIndex]} 
+                        onChange={handleColorChange} 
+                      />
+                    </PopoverContent>
+                  </Popover>
+                ))}
+              </div>
             </div>
             
-            <div className="flex items-center justify-between">
-              <Label>Show Title</Label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleChange({ showTitle: !settings.showTitle })}
-              >
-                {settings.showTitle ? 'On' : 'Off'}
-              </Button>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Label>Show Labels</Label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleChange({ showLabels: !settings.showLabels })}
-              >
-                {settings.showLabels ? 'On' : 'Off'}
-              </Button>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="showLegend">Show Legend</Label>
+                <Switch
+                  id="showLegend"
+                  checked={localSettings.showLegend !== false}
+                  onCheckedChange={(value) => handleToggle('showLegend', value)}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <Label htmlFor="showLabels">Show Labels</Label>
+                <Switch
+                  id="showLabels"
+                  checked={localSettings.showLabels !== false}
+                  onCheckedChange={(value) => handleToggle('showLabels', value)}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <Label htmlFor="showGrid">Show Grid</Label>
+                <Switch
+                  id="showGrid"
+                  checked={localSettings.showGrid !== false}
+                  onCheckedChange={(value) => handleToggle('showGrid', value)}
+                />
+              </div>
             </div>
           </div>
         </TabsContent>
         
         <TabsContent value="data" className="space-y-4">
-          <div className="space-y-2">
-            <Label>X-Axis</Label>
-            <Select
-              value={settings.xAxis || Object.keys(data[0])[0]}
-              onValueChange={(value) => handleChange({ xAxis: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select X-Axis" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.keys(data[0]).map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {key}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="xAxis">X Axis</Label>
+              <Select
+                value={localSettings.xAxis || ''}
+                onValueChange={handleXAxisChange}
+              >
+                <SelectTrigger id="xAxis">
+                  <SelectValue placeholder="Select field" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dataKeys.map(key => (
+                    <SelectItem key={key} value={key}>
+                      {key}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
-      
-      <Button className="w-full" onClick={handleSave}>
-        Save Visualization
-      </Button>
     </div>
   );
 } 

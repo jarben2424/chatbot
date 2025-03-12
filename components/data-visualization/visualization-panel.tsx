@@ -11,6 +11,20 @@ import { ArtifactKind } from '@/components/artifact';
 import { StandaloneChart } from './charts/standalone-chart';
 import { cn } from '@/lib/utils';
 import { VisualizationEditor } from './visualization-editor';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Expand, DownloadIcon, Share2, Plus, XIcon, MoreVertical } from 'lucide-react';
+import { exportChartAsImage, exportChartAsCSV } from '@/lib/utils/export-utils';
+import { VisualizationSettings } from '@/lib/types/visualization';
+import { addToDashboard } from '@/lib/actions/data-tools';
+import { toast } from 'sonner';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useRouter } from 'next/navigation';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from 'next-themes';
 
 interface VisualizationPanelProps {
   data: any[];
@@ -24,12 +38,15 @@ interface VisualizationPanelProps {
   onExpand?: () => void;
   onSave?: (visualizationData: any) => void;
   onEdit?: () => void;
+  editable?: boolean;
+  dashboardId?: string;
+  isEmbedded?: boolean;
 }
 
 export function VisualizationPanel({
-  data,
-  visualization,
-  title,
+  data = [],
+  visualization = 'table',
+  title = 'Visualization',
   description,
   artifactId,
   expandable = true,
@@ -37,17 +54,23 @@ export function VisualizationPanel({
   onClose,
   onExpand,
   onSave,
-  onEdit
+  onEdit,
+  editable = false,
+  dashboardId,
+  isEmbedded = false
 }: VisualizationPanelProps) {
   const { setArtifact, isVisible } = useArtifact();
+  const router = useRouter();
+  const { theme } = useTheme();
   
   // Add state for visualization settings
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<VisualizationSettings>({
     type: visualization || 'auto',
     colors: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'],
     showLegend: true,
     showTitle: true,
     showLabels: true,
+    showGrid: true,
     xAxis: data && data.length > 0 ? Object.keys(data[0])[0] : undefined
   });
   
@@ -62,26 +85,39 @@ export function VisualizationPanel({
   // Add state to track editor mode
   const [isEditMode, setIsEditMode] = useState(false);
   
+  // Add state for adding to dashboard
+  const [isAddToDashboardOpen, setIsAddToDashboardOpen] = useState(false);
+  
+  // Add state for available dashboards
+  const [availableDashboards, setAvailableDashboards] = useState<Array<{ id: string; title: string }>>([]);
+  
+  // Add state for selected dashboard
+  const [selectedDashboardId, setSelectedDashboardId] = useState<string>('');
+  
+  // Add state for adding to dashboard
+  const [isAddingToDashboard, setIsAddingToDashboard] = useState(false);
+  
   // Update when prop changes
   useEffect(() => {
     setIsForceExpanded(forceExpanded);
   }, [forceExpanded]);
   
-  // Simulate loading state
+  // Make sure visualization is immediately visible upon loading
   useEffect(() => {
+    // Simulate a shorter loading time to show visualization faster
     const timer = setTimeout(() => {
       setIsLoading(false);
-      
-      // Auto-expand after loading (with a slight delay for visual effect)
-      const expandTimer = setTimeout(() => {
-        setExpanded(true);
-      }, 300);
-      
-      return () => clearTimeout(expandTimer);
-    }, 1000);
+      setExpanded(true); // Always expand initially
+    }, 300); // Reduced from 1000ms
     
     return () => clearTimeout(timer);
   }, []);
+  
+  // Make sure we have valid data to render
+  const validData = Array.isArray(data) && data.length > 0 ? data : [
+    // Fallback data in case real data is missing
+    { category: 'Sample', value: 100 }
+  ];
   
   // Update the handleExpand function to include settings
   const handleExpand = () => {
@@ -95,7 +131,7 @@ export function VisualizationPanel({
         type: 'visualization' as ArtifactKind,
         title,
         content: { 
-          data, 
+          data: validData, 
           visualization: settings.type,
           description,
           settings
@@ -107,40 +143,35 @@ export function VisualizationPanel({
     }
   };
   
-  // Update renderVisualization to use settings
+  // Update renderVisualization to force chart type
   const renderVisualization = () => {
-    // Ensure we have data
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      // Provide fallback data for monthly revenue query
-      if (title.toLowerCase().includes('monthly revenue')) {
-        const fallbackData = [
-          { month: 'January', revenue: 75000 },
-          { month: 'February', revenue: 82500 },
-          { month: 'March', revenue: 79800 },
-          { month: 'April', revenue: 88000 },
-          { month: 'May', revenue: 94200 }
-        ];
-        
-        return (
-          <StandaloneChart 
-            type={settings.type} 
-            data={fallbackData}
-            height={240}
-            width="100%"
-          />
-        );
-      }
-      
-      return <div className="p-4 text-center text-muted-foreground">No data available</div>;
+    // Use validData instead of data to ensure something always renders
+    if (!validData || validData.length === 0) {
+      return <div className="flex items-center justify-center h-full text-muted-foreground">No data available</div>;
     }
+    
+    // Ensure consistent props for all chart types
+    const chartProps = {
+      data: validData,
+      className: "w-full h-full",
+      responsive: true
+    };
+    
+    // Always use a chart type (not table) for better visualization
+    const chartType = settings.type === 'table' ? 'bar' : settings.type;
     
     // Return the visualization
     return (
       <StandaloneChart 
-        type={settings.type} 
-        data={data}
-        height={240}
+        type={chartType} 
+        data={validData}
+        height="100%"
         width="100%"
+        showLegend={settings.showLegend}
+        showGrid={settings.showGrid}
+        colors={settings.colors}
+        xAxis={settings.xAxis}
+        showLabels={settings.showLabels}
       />
     );
   };
@@ -168,7 +199,7 @@ export function VisualizationPanel({
       onSave({
         title,
         description,
-        data: processedData, // Use processed data
+        data: validData, // Use validData
         visualization: settings.type,
         settings
       });
@@ -182,6 +213,106 @@ export function VisualizationPanel({
       onClose();
     }
   };
+  
+  // Toggle fullscreen mode
+  const toggleFullscreen = () => {
+    setFullscreen(!fullscreen);
+  };
+  
+  // Toggle edit mode
+  const toggleEditMode = () => {
+    setIsEditMode(!isEditMode);
+    if (onEdit) {
+      onEdit();
+    }
+  };
+  
+  // Export chart as image
+  const handleExportImage = async () => {
+    if (!validData.length) {
+      toast.error('No data to export');
+      return;
+    }
+    
+    try {
+      await exportChartAsImage(`visualization-${artifactId || Date.now()}`, title);
+      toast.success('Chart exported as image');
+    } catch (error) {
+      toast.error('Failed to export chart');
+      console.error('Export error:', error);
+    }
+  };
+  
+  // Export data as CSV
+  const handleExportCSV = async () => {
+    if (!validData.length) {
+      toast.error('No data to export');
+      return;
+    }
+    
+    try {
+      await exportChartAsCSV(validData, `${title.toLowerCase().replace(/\s+/g, '-')}`);
+      toast.success('Data exported as CSV');
+    } catch (error) {
+      toast.error('Failed to export data');
+      console.error('Export error:', error);
+    }
+  };
+  
+  // Add to dashboard
+  const handleAddToDashboard = async () => {
+    if (!selectedDashboardId) {
+      toast({
+        title: 'Selection Required',
+        description: 'Please select a dashboard',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setIsAddingToDashboard(true);
+    
+    try {
+      const result = await addToDashboard({
+        artifactId,
+        dashboardId: selectedDashboardId
+      });
+      
+      if (result.success) {
+        toast.success('Added to dashboard');
+        setIsAddToDashboardOpen(false);
+        router.push(`/dashboard/${selectedDashboardId}`);
+      } else {
+        toast.error(result.error || 'Failed to add to dashboard');
+      }
+    } catch (error) {
+      toast.error('Error adding to dashboard');
+      console.error('Dashboard error:', error);
+    } finally {
+      setIsAddingToDashboard(false);
+    }
+  };
+  
+  // Load dashboards when dialog opens
+  useEffect(() => {
+    if (isAddToDashboardOpen) {
+      const fetchDashboards = async () => {
+        try {
+          const dashboards = await getDashboards();
+          setAvailableDashboards(dashboards);
+        } catch (error) {
+          console.error('Error fetching dashboards:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to load dashboards',
+            variant: 'destructive',
+          });
+        }
+      };
+      
+      fetchDashboards();
+    }
+  }, [isAddToDashboardOpen, toast]);
   
   if (shouldShowFullScreen) {
     // Render full visualization in full screen view with controls
@@ -216,7 +347,7 @@ export function VisualizationPanel({
             
             <div className="w-80 border-l">
               <VisualizationControls 
-                data={data}
+                data={validData}
                 settings={settings}
                 onChange={setSettings}
               />
@@ -232,7 +363,7 @@ export function VisualizationPanel({
     <>
       {isEditMode && fullscreen ? (
         <VisualizationEditor
-          data={data}
+          data={validData}
           visualization={settings.type}
           title={title}
           description={description}
@@ -263,11 +394,10 @@ export function VisualizationPanel({
               <Button 
                 onClick={handleExpand} 
                 variant="ghost" 
-                size="sm"
+                size="icon"
                 className={cn(isLoading ? "opacity-0" : "opacity-100", "transition-opacity duration-300")}
               >
-                <Maximize2 className="h-4 w-4 mr-1" />
-                Expand
+                <Maximize2 className="h-4 w-4" />
               </Button>
             </div>
           </div>

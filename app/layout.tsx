@@ -3,6 +3,8 @@ import { Toaster } from 'sonner';
 
 import { ThemeProvider } from '@/components/theme-provider';
 import { SidebarProvider } from '@/hooks/use-sidebar';
+import { DocumentErrorHandler } from '@/components/document-error-handler';
+import { GlobalErrorHandler } from '@/components/error-handling/global-error-handler';
 
 import './globals.css';
 
@@ -36,7 +38,7 @@ const THEME_COLOR_SCRIPT = `\
   updateThemeColor();
 })();`;
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -65,8 +67,11 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <SidebarProvider>
-            <Toaster position="top-center" />
-            {children}
+            <GlobalErrorHandler>
+              <DocumentErrorHandler />
+              <Toaster position="top-center" />
+              {children}
+            </GlobalErrorHandler>
           </SidebarProvider>
         </ThemeProvider>
       </body>

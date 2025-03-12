@@ -194,3 +194,24 @@ export function getDocumentTimestampByIndex(
 
   return documents[index].createdAt;
 }
+
+/**
+ * Extract function call from AI response
+ */
+export function extractFunctionCall(content: string) {
+  try {
+    // Look for function call format in the message content
+    const functionCallRegex = /```json\s*(\{[\s\S]*?\})\s*```/;
+    const match = content.match(functionCallRegex);
+    
+    if (match && match[1]) {
+      const functionData = JSON.parse(match[1]);
+      return functionData;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error extracting function call:', error);
+    return null;
+  }
+}

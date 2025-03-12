@@ -68,4 +68,4 @@ export const createDocument = ({ session, dataStream }: CreateDocumentProps) =>
         content: 'A document was created and is now visible to the user.',
       };
     },
-  });
+  }); 

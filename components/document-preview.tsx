@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import { ArtifactKind, UIArtifact } from './artifact';
 import { FileIcon, FullscreenIcon, ImageIcon, LoaderIcon } from './icons';
@@ -21,97 +22,73 @@ import { useArtifact } from '@/hooks/use-artifact';
 import equal from 'fast-deep-equal';
 import { SpreadsheetEditor } from './sheet-editor';
 import { ImageEditor } from './image-editor';
+import { Button } from './ui/button';
+import { ChevronDown, ChevronUp, File, Code, Table, Image } from 'lucide-react';
 
 interface DocumentPreviewProps {
-  isReadonly: boolean;
-  result?: any;
-  args?: any;
+  document: {
+    id: string;
+    title: string;
+    content: string;
+    kind: string;
+    createdAt?: Date | string;
+  };
+  expanded?: boolean;
+  className?: string;
 }
 
-export function DocumentPreview({
-  isReadonly,
-  result,
-  args,
-}: DocumentPreviewProps) {
-  const { artifact, setArtifact } = useArtifact();
-
-  const { data: documents, isLoading: isDocumentsFetching } = useSWR<
-    Array<Document>
-  >(result ? `/api/document?id=${result.id}` : null, fetcher);
-
-  const previewDocument = useMemo(() => documents?.[0], [documents]);
-  const hitboxRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const boundingBox = hitboxRef.current?.getBoundingClientRect();
-
-    if (artifact.documentId && boundingBox) {
-      setArtifact((artifact) => ({
-        ...artifact,
-        boundingBox: {
-          left: boundingBox.x,
-          top: boundingBox.y,
-          width: boundingBox.width,
-          height: boundingBox.height,
-        },
-      }));
+export function DocumentPreview({ document, expanded = false, className }: DocumentPreviewProps) {
+  const [isExpanded, setIsExpanded] = useState(expanded);
+  
+  if (!document) return null;
+  
+  const { id, title, content, kind } = document;
+  
+  const getIcon = () => {
+    switch (kind) {
+      case 'code':
+        return <Code className="h-4 w-4" />;
+      case 'sheet':
+        return <Table className="h-4 w-4" />;
+      case 'image':
+        return <Image className="h-4 w-4" />;
+      case 'text':
+      default:
+        return <File className="h-4 w-4" />;
     }
-  }, [artifact.documentId, setArtifact]);
-
-  if (artifact.isVisible) {
-    if (result) {
-      return (
-        <DocumentToolResult
-          type="create"
-          result={{ id: result.id, title: result.title, kind: result.kind }}
-          isReadonly={isReadonly}
-        />
-      );
-    }
-
-    if (args) {
-      return (
-        <DocumentToolCall
-          type="create"
-          args={{ title: args.title }}
-          isReadonly={isReadonly}
-        />
-      );
-    }
-  }
-
-  if (isDocumentsFetching) {
-    return <LoadingSkeleton artifactKind={result.kind ?? args.kind} />;
-  }
-
-  const document: Document | null = previewDocument
-    ? previewDocument
-    : artifact.status === 'streaming'
-      ? {
-          title: artifact.title,
-          kind: artifact.kind,
-          content: artifact.content,
-          id: artifact.documentId,
-          createdAt: new Date(),
-          userId: 'noop',
-        }
-      : null;
-
-  if (!document) return <LoadingSkeleton artifactKind={artifact.kind} />;
-
+  };
+  
   return (
-    <div className="relative w-full cursor-pointer">
-      <HitboxLayer
-        hitboxRef={hitboxRef}
-        result={result}
-        setArtifact={setArtifact}
-      />
-      <DocumentHeader
-        title={document.title}
-        kind={document.kind}
-        isStreaming={artifact.status === 'streaming'}
-      />
-      <DocumentContent document={document} />
+    <div className={cn("border rounded-lg overflow-hidden", className)}>
+      <div className="bg-card p-3 flex justify-between items-center border-b">
+        <div className="flex items-center gap-2">
+          <span className="text-primary">{getIcon()}</span>
+          <span className="font-medium text-sm">{title || 'Untitled'}</span>
+        </div>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="h-8 w-8 p-0"
+        >
+          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
+      </div>
+      
+      {isExpanded && content && (
+        <div className="p-4 bg-card/50 max-h-80 overflow-y-auto">
+          {kind === 'code' ? (
+            <pre className="text-xs font-mono p-2 bg-muted/30 rounded overflow-x-auto">
+              {content}
+            </pre>
+          ) : (
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              {content}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

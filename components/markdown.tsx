@@ -1,6 +1,8 @@
+'use client'
+
 import Link from 'next/link';
 import React, { memo } from 'react';
-import ReactMarkdown, { type Components } from 'react-markdown';
+import ReactMarkdown, { type Components, Options } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CodeBlock } from './code-block';
 
@@ -103,7 +105,9 @@ const NonMemoizedMarkdown = ({ children }: { children: string }) => {
   );
 };
 
-export const Markdown = memo(
-  NonMemoizedMarkdown,
-  (prevProps, nextProps) => prevProps.children === nextProps.children,
-);
+export const MemoizedReactMarkdown: React.FC<Options> = React.memo(
+  ReactMarkdown,
+  (prevProps, nextProps) =>
+    prevProps.children === nextProps.children &&
+    prevProps.className === nextProps.className
+)

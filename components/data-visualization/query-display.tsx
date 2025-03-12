@@ -10,6 +10,12 @@ import { generateUUID } from '@/lib/utils';
 import { useArtifact } from '@/hooks/use-artifact';
 import { ArtifactKind } from '@/components/artifact';
 import { VisualizationEditor } from './visualization-editor';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { IconCode, IconExport, IconEye, IconBarChart } from '@/components/ui/icons';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { exportChartAsCSV } from '@/lib/utils/export-utils';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export interface QueryDisplayProps {
   data: any[];
@@ -17,6 +23,8 @@ export interface QueryDisplayProps {
   title: string;
   description?: string;
   visualization?: string;
+  query: string;
+  id: string;
 }
 
 export function QueryDisplay({ 
@@ -24,7 +32,9 @@ export function QueryDisplay({
   sql, 
   title, 
   description, 
-  visualization 
+  visualization,
+  query,
+  id
 }: QueryDisplayProps) {
   const { setArtifact } = useArtifact();
   const [showSql, setShowSql] = useState(false);
@@ -34,6 +44,7 @@ export function QueryDisplay({
   const [showVisualizationPanel, setShowVisualizationPanel] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [savedVisualizations, setSavedVisualizations] = useState([]);
+  const router = useRouter();
 
   // Move determineBestVisualization out of visualizeData function to component level
   function determineBestVisualization(data) {
@@ -215,116 +226,88 @@ export function QueryDisplay({
     }).join('\n');
   }
 
+  const handleExportCSV = () => {
+    exportChartAsCSV(data, 'query-results');
+  };
+
   return (
-    <>
-      <div className="border rounded-lg overflow-hidden">
-        {!showSql ? (
-          // Data table view
-          <div>
-            <div className="bg-muted p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-medium">{title}</h3>
-                  {description && <p className="text-sm text-muted-foreground">{description}</p>}
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={downloadCSV}>
-                    Download CSV
-                  </Button>
-                  {!visualization && (
-                    <Button 
-                      size="sm" 
-                      onClick={visualizeData} 
-                      disabled={isVisualizing}
-                    >
-                      {isVisualizing ? 'Creating...' : 'Visualize'}
-                    </Button>
-                  )}
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => setShowSql(true)}
-                    className="ml-2"
-                  >
-                    Show SQL
-                  </Button>
-                </div>
-              </div>
-            </div>
-            <div className="max-h-96 overflow-auto">
-              <DataTable data={data} />
-            </div>
-          </div>
-        ) : (
-          // SQL view
-          <div>
-            <div className="bg-muted p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">SQL Query</h3>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={() => setShowSql(false)}
-                >
-                  Show Data
-                </Button>
-              </div>
-            </div>
-            <div className="p-4 bg-muted/20 h-96 overflow-auto">
-              <pre className="text-sm">
-                <code>{formatSql(sql || '')}</code>
-              </pre>
-            </div>
+    <Card className="w-full overflow-hidden">
+      <CardHeader className="bg-muted/50 pb-2">
+        <CardTitle className="text-base flex items-center justify-between">
+          <span>Query Results ({data.length} rows)</span>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowSql(!showSql)}
+            className="h-8 px-2"
+          >
+            <IconCode className="h-4 w-4 mr-1" />
+            {showSql ? 'Hide SQL' : 'Show SQL'}
+          </Button>
+        </CardTitle>
+        
+        {showSql && (
+          <div className="mt-2 p-2 bg-muted/60 rounded overflow-x-auto">
+            <pre className="text-xs font-mono">{query}</pre>
           </div>
         )}
-      </div>
-
-      {/* Add visualization panel */}
-      {showVisualizationPanel && !isExpanded && (
-        <div className="mt-6">
-          <VisualizationPanel
-            data={data}
-            visualization={visualization || 'auto'}
-            title={title}
-            expandable={true}
-            onClose={() => setShowVisualizationPanel(false)}
-            onExpand={() => setIsExpanded(true)}
-          />
-        </div>
-      )}
-
-      {isExpanded && (
-        <VisualizationEditor
-          data={data}
-          visualization={visualization || determineBestVisualization(data)}
-          title={title}
-          onClose={() => {
-            setIsExpanded(false);
-            setShowVisualizationPanel(true);
-          }}
-          onSave={(savedViz) => {
-            // Save the visualization to the dashboard
-            console.log('Saving visualization:', savedViz);
-            
-            // Close the editor after saving
-            setIsExpanded(false);
-            setShowVisualizationPanel(false);
-            toast.success('Saved to Dashboard');
-          }}
+      </CardHeader>
+      
+      <CardContent className="p-0 max-h-80 overflow-auto">
+        <DataTable data={data} pageSize={5} />
+      </CardContent>
+      
+      <CardFooter className="flex justify-between bg-muted/20 p-2">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-8 px-2"
+          onClick={handleExportCSV}
         >
-          <div className="text-muted-foreground">
-            <h3 className="font-medium mb-2">Current Query</h3>
-            <p className="text-sm mb-4">
-              {title}
-            </p>
-            {sql && (
-              <div className="text-xs mt-2 p-2 bg-muted/30 rounded">
-                <code>{sql.substring(0, 80)}...</code>
+          <IconExport className="h-4 w-4 mr-1" />
+          Export CSV
+        </Button>
+        
+        <div>
+          <Link href={`/artifacts/${id}`} passHref>
+            <Button variant="ghost" size="sm" className="h-8 px-2">
+              <IconEye className="h-4 w-4 mr-1" />
+              View Details
+            </Button>
+          </Link>
+          
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 px-2">
+                <IconBarChart className="h-4 w-4 mr-1" />
+                Visualize
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Visualization</DialogTitle>
+              </DialogHeader>
+              <div className="p-4">
+                <p>Enter a simple message to create a visualization from this data:</p>
+                <div className="mt-4 p-2 bg-muted rounded">
+                  <p className="text-sm italic">
+                    "Create a bar chart visualization from the query results showing the count by category"
+                  </p>
+                </div>
+                <Button 
+                  className="mt-4"
+                  onClick={() => {
+                    // This would ideally be handled by sending a message to the AI
+                    router.push('/chat');
+                  }}
+                >
+                  Start New Chat with This Data
+                </Button>
               </div>
-            )}
-          </div>
-        </VisualizationEditor>
-      )}
-    </>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardFooter>
+    </Card>
   );
 } 
