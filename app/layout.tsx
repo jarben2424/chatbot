@@ -18,20 +18,12 @@ interface RootLayoutProps {
 }
 
 export const metadata = {
-  title: {
-    default: siteConfig.name,
-    template: `%s | ${siteConfig.name}`,
-  },
-  description: siteConfig.description,
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
-  ],
-  icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon-16x16.png',
-    apple: '/apple-touch-icon.png',
-  },
+  title: 'AI Chat App',
+  description: 'An AI chat application'
+}
+
+export const viewport = {
+  themeColor: '#000000' // Move theme color here from metadata
 }
 
 export default function RootLayout({ children }: RootLayoutProps) {
