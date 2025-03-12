@@ -244,3 +244,37 @@
 .hover-purple:hover {
   @apply text-purple-600;
 }
+
+/* Add these animation utilities for visualizations */
+@keyframes fadeInBlur {
+  0% {
+    opacity: 0;
+    filter: blur(10px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes expandVisualization {
+  0% {
+    max-height: 0;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    max-height: 500px;
+    opacity: 1;
+  }
+}
+
+.visualization-loading {
+  animation: fadeInBlur 1s ease-out;
+}
+
+.visualization-expand {
+  animation: expandVisualization 0.7s ease-in-out;
+}

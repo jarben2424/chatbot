@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button';
 import { BarChart, LineChart, PieChart, ScatterChart } from './charts';
 import { DataTable } from './data-table';
 import { VisualizationControls } from './visualization-controls';
-import { X, Maximize2 } from 'lucide-react';
+import { X, Maximize2, ChevronDown, ChevronUp, Edit } from 'lucide-react';
 import { ArtifactKind } from '@/components/artifact';
 import { StandaloneChart } from './charts/standalone-chart';
+import { cn } from '@/lib/utils';
+import { VisualizationEditor } from './visualization-editor';
 
 interface VisualizationPanelProps {
   data: any[];
@@ -21,6 +23,7 @@ interface VisualizationPanelProps {
   onClose: () => void;
   onExpand?: () => void;
   onSave?: (visualizationData: any) => void;
+  onEdit?: () => void;
 }
 
 export function VisualizationPanel({
@@ -29,11 +32,12 @@ export function VisualizationPanel({
   title,
   description,
   artifactId,
-  expandable = false,
+  expandable = true,
   forceExpanded = false,
   onClose,
   onExpand,
-  onSave
+  onSave,
+  onEdit
 }: VisualizationPanelProps) {
   const { setArtifact, isVisible } = useArtifact();
   
@@ -50,13 +54,39 @@ export function VisualizationPanel({
   // Add state to track force expanded state
   const [isForceExpanded, setIsForceExpanded] = useState(forceExpanded);
   
+  // Add state for expanded and fullscreen states
+  const [expanded, setExpanded] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Add state to track editor mode
+  const [isEditMode, setIsEditMode] = useState(false);
+  
   // Update when prop changes
   useEffect(() => {
     setIsForceExpanded(forceExpanded);
   }, [forceExpanded]);
   
+  // Simulate loading state
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+      
+      // Auto-expand after loading (with a slight delay for visual effect)
+      const expandTimer = setTimeout(() => {
+        setExpanded(true);
+      }, 300);
+      
+      return () => clearTimeout(expandTimer);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
   // Update the handleExpand function to include settings
   const handleExpand = () => {
+    setIsEditMode(true);
+    setFullscreen(true);
     if (onExpand) {
       onExpand();
     } else if (artifactId) {
@@ -145,6 +175,14 @@ export function VisualizationPanel({
     }
   };
   
+  const handleClose = () => {
+    setFullscreen(false);
+    setIsEditMode(false);
+    if (onClose) {
+      onClose();
+    }
+  };
+  
   if (shouldShowFullScreen) {
     // Render full visualization in full screen view with controls
     return (
@@ -161,7 +199,7 @@ export function VisualizationPanel({
                   Save to Dashboard
                 </Button>
               )}
-              <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8" title="Close">
+              <Button variant="ghost" size="icon" onClick={handleClose} className="h-8 w-8" title="Close">
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -191,29 +229,62 @@ export function VisualizationPanel({
   
   // Render preview in chat
   return (
-    <div className="border rounded-lg overflow-hidden bg-card animate-in fade-in-0 zoom-in-95 duration-300">
-      <div className="bg-muted/20 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-medium">{title}</h3>
-            {description && <p className="text-sm text-muted-foreground">{description}</p>}
-          </div>
-          <div className="flex items-center gap-2">
-            {expandable && (
-              <Button variant="ghost" size="icon" onClick={handleExpand} className="h-8 w-8" title="Expand">
-                <Maximize2 className="h-4 w-4" />
+    <>
+      {isEditMode && fullscreen ? (
+        <VisualizationEditor
+          data={data}
+          visualization={settings.type}
+          title={title}
+          description={description}
+          onClose={handleClose}
+          onSave={(savedData) => {
+            if (onSave) {
+              onSave(savedData);
+            }
+            setIsEditMode(false);
+            setFullscreen(false);
+          }}
+        />
+      ) : (
+        <div 
+          className={cn(
+            "visualization-panel border rounded-lg overflow-hidden transition-all duration-500 ease-in-out mb-1",
+            isLoading ? "blur-sm animate-pulse" : "",
+            fullscreen ? "fixed inset-0 z-50 bg-background p-6" : ""
+          )}
+        >
+          <div className="p-2 flex justify-between items-center border-b bg-card">
+            <div>
+              <h3 className="font-medium">{title || 'Visualization'}</h3>
+              {description && <p className="text-sm text-muted-foreground">{description}</p>}
+            </div>
+            
+            <div className="flex space-x-2">
+              <Button 
+                onClick={handleExpand} 
+                variant="ghost" 
+                size="sm"
+                className={cn(isLoading ? "opacity-0" : "opacity-100", "transition-opacity duration-300")}
+              >
+                <Maximize2 className="h-4 w-4 mr-1" />
+                Expand
               </Button>
+            </div>
+          </div>
+          
+          <div 
+            className={cn(
+              "transition-all duration-700 ease-in-out bg-card",
+              expanded ? "max-h-[180px] opacity-100 mt-0" : "max-h-0 opacity-0 overflow-hidden", 
+              fullscreen ? "h-[calc(100vh-10rem)]" : ""
             )}
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8" title="Close">
-              <X className="h-4 w-4" />
-            </Button>
+          >
+            <div className="p-0 h-[180px]">
+              {renderVisualization()}
+            </div>
           </div>
         </div>
-      </div>
-      
-      <div className="p-4 max-h-96 overflow-auto">
-        {renderVisualization()}
-      </div>
-    </div>
+      )}
+    </>
   );
 } 

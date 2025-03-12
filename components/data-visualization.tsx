@@ -1,72 +1,113 @@
 'use client';
 
-import {
-  LineChart,
-  BarChart as RechartsBarChart,
-  Line,
-  Bar,
-  PieChart,
-  Pie,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer
-} from 'recharts';
+import { useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
+import { DataTable } from './data-visualization/data-table';
+import { BarChart, LineChart, PieChart, ScatterChart } from './data-visualization/charts';
+import { Button } from './ui/button';
+import { Edit, Maximize } from 'lucide-react';
 
 interface DataVisualizationProps {
   data: any[];
-  type: 'line' | 'bar' | 'pie';
-  columns: string[];
+  visualization: 'table' | 'bar' | 'line' | 'pie' | 'scatter' | string;
+  title?: string;
+  description?: string;
+  onEdit?: () => void;
 }
 
-export function DataVisualization({ data, type, columns }: DataVisualizationProps) {
-  const renderChart = () => {
-    switch (type) {
-      case 'line':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey={columns[0]} />
-              <YAxis />
-              <Tooltip />
-              <Line type="monotone" dataKey={columns[1]} stroke="#8884d8" />
-            </LineChart>
-          </ResponsiveContainer>
-        );
+export function DataVisualization({
+  data,
+  visualization,
+  title,
+  description,
+  onEdit
+}: DataVisualizationProps) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Simulate loading state
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  // Function to expand visualization
+  const expandVisualization = () => {
+    setIsExpanded(true);
+  };
+  
+  // Render the appropriate chart type
+  const renderVisualization = () => {
+    switch(visualization) {
       case 'bar':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <RechartsBarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey={columns[0]} />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey={columns[1]} fill="#82ca9d" />
-            </RechartsBarChart>
-          </ResponsiveContainer>
-        );
+        return <BarChart data={data} />;
+      case 'line':
+        return <LineChart data={data} />;
       case 'pie':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <PieChart>
-              <Pie
-                data={data}
-                dataKey={columns[1]}
-                nameKey={columns[0]}
-                cx="50%"
-                cy="50%"
-                fill="#8884d8"
-              />
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        );
+        return <PieChart data={data} />;
+      case 'scatter':
+        return <ScatterChart data={data} />;
       default:
-        return null;
+        return <DataTable data={data} />;
     }
   };
-
-  return renderChart();
+  
+  return (
+    <div 
+      className={cn(
+        "visualization-container rounded-lg border overflow-hidden transition-all duration-500 ease-in-out",
+        isLoading ? "blur-sm animate-pulse" : "",
+        isExpanded ? "fixed inset-0 z-50 bg-background p-6" : ""
+      )}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-lg font-medium">{title || 'Data Visualization'}</h3>
+          {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        </div>
+        <div className="flex space-x-2">
+          {onEdit && (
+            <Button 
+              onClick={onEdit} 
+              variant="outline" 
+              size="sm"
+              className={cn(isLoading ? "opacity-0" : "opacity-100", "transition-opacity duration-300")}
+            >
+              <Edit className="h-4 w-4 mr-1" />
+              Edit
+            </Button>
+          )}
+          {!isExpanded && (
+            <Button 
+              onClick={expandVisualization} 
+              variant="outline" 
+              size="sm"
+              className={cn(isLoading ? "opacity-0" : "opacity-100", "transition-opacity duration-300")}
+            >
+              <Maximize className="h-4 w-4 mr-1" />
+              Expand
+            </Button>
+          )}
+        </div>
+      </div>
+      
+      <div className={cn(
+        "transition-all duration-500 ease-in-out",
+        isExpanded ? "h-[calc(100vh-10rem)]" : "h-[300px]"
+      )}>
+        {renderVisualization()}
+      </div>
+      
+      {isExpanded && (
+        <div className="absolute top-4 right-4">
+          <Button onClick={() => setIsExpanded(false)} variant="outline">
+            Close
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 } 
