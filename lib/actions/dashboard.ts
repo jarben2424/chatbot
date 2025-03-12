@@ -4,88 +4,85 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { dashboards, visualizations } from '@/lib/db/schema'
+import { dashboards, visualizations, artifacts } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { nanoid } from '@/lib/utils'
 
 export async function getDashboards() {
   const session = await auth()
-  if (!session?.user) {
-    return []
+  const userId = session?.user?.id
+
+  if (!userId) {
+    throw new Error('Unauthorized: User not logged in')
   }
 
-  const result = await db
-    .select({
-      id: dashboards.id,
-      title: dashboards.title,
-      createdAt: dashboards.createdAt
+  try {
+    const result = await db.query.dashboards.findMany({
+      where: eq(dashboards.userId, userId),
+      orderBy: (dashboards, { desc }) => [desc(dashboards.createdAt)]
     })
-    .from(dashboards)
-    .where(eq(dashboards.userId, session.user.id))
-    .orderBy(dashboards.createdAt)
-    
-  // Count visualizations for each dashboard
-  const dashboardsWithCounts = await Promise.all(
-    result.map(async (dashboard) => {
-      const visualizationCount = await db
-        .select({ count: count() })
-        .from(visualizations)
-        .where(eq(visualizations.dashboardId, dashboard.id))
-        .then(res => res[0]?.count || 0)
-        
-      return {
-        ...dashboard,
-        visualizationCount
-      }
-    })
-  )
 
-  return dashboardsWithCounts
+    return result
+  } catch (error) {
+    console.error('Failed to get dashboards:', error)
+    throw new Error('Failed to get dashboards')
+  }
 }
 
 export async function getDashboardById(id: string) {
   const session = await auth()
-  if (!session?.user) {
-    return null
+  const userId = session?.user?.id
+
+  if (!userId) {
+    throw new Error('Unauthorized: User not logged in')
   }
 
-  const dashboard = await db
-    .select()
-    .from(dashboards)
-    .where(eq(dashboards.id, id))
-    .then(res => res[0] || null)
-    
-  if (!dashboard) {
-    return null
-  }
-  
-  const dashboardVisualizations = await db
-    .select()
-    .from(visualizations)
-    .where(eq(visualizations.dashboardId, dashboard.id))
-    .orderBy(visualizations.createdAt)
+  try {
+    const dashboard = await db.query.dashboards.findFirst({
+      where: and(
+        eq(dashboards.id, id),
+        eq(dashboards.userId, userId)
+      ),
+      with: {
+        visualizations: true
+      }
+    })
 
-  return {
-    ...dashboard,
-    visualizations: dashboardVisualizations
+    if (!dashboard) {
+      throw new Error('Dashboard not found')
+    }
+
+    return dashboard
+  } catch (error) {
+    console.error('Failed to get dashboard:', error)
+    throw new Error('Failed to get dashboard')
   }
 }
 
-export async function createDashboard(title: string) {
+export async function createDashboard(data: { title: string; description?: string }) {
   const session = await auth()
-  if (!session?.user) {
-    redirect('/login')
+  const userId = session?.user?.id
+
+  if (!userId) {
+    throw new Error('Unauthorized: User not logged in')
   }
 
-  const id = nanoid()
-  await db.insert(dashboards).values({
-    id,
-    userId: session.user.id,
-    title: title || 'New Dashboard'
-  })
+  try {
+    const result = await db.insert(dashboards).values({
+      id: nanoid(),
+      userId,
+      title: data.title,
+      description: data.description || '',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning()
 
-  revalidatePath('/dashboard')
-  return id
+    revalidatePath('/dashboard')
+    return result[0]
+  } catch (error) {
+    console.error('Failed to create dashboard:', error)
+    throw new Error('Failed to create dashboard')
+  }
 }
 
 export async function removeDashboard(id: string) {
@@ -134,60 +131,56 @@ export interface AddVisualizationParams {
   };
 }
 
-export async function addVisualizationToDashboard({
-  dashboardId,
-  visualizationId,
-  position
-}: AddVisualizationParams) {
-  const session = await auth();
-  if (!session?.user) {
-    return {
-      success: false,
-      error: 'Unauthorized'
-    };
+export async function addToDashboard({ 
+  artifactId, 
+  dashboardId 
+}: { 
+  artifactId: string; 
+  dashboardId: string 
+}) {
+  const session = await auth()
+  const userId = session?.user?.id
+
+  if (!userId) {
+    return { success: false, error: 'Unauthorized: User not logged in' }
+  }
+
+  if (!artifactId || !dashboardId) {
+    return { success: false, error: 'Missing required parameters' }
   }
 
   try {
-    // Get the artifact/visualization from artifacts
-    const artifact = await db
-      .select()
-      .from(artifacts)
-      .where(eq(artifacts.id, visualizationId))
-      .then(res => res[0] || null);
+    // Get the artifact data
+    const artifact = await db.query.artifacts.findFirst({
+      where: and(
+        eq(artifacts.id, artifactId),
+        eq(artifacts.userId, userId)
+      )
+    })
 
     if (!artifact) {
-      return {
-        success: false,
-        error: 'Visualization not found'
-      };
+      return { success: false, error: 'Artifact not found' }
     }
 
-    // Create visualization entry
-    const id = nanoid();
-    await db.insert(visualizations).values({
-      id,
+    // Insert into visualizations
+    const result = await db.insert(visualizations).values({
+      id: nanoid(),
       dashboardId,
-      userId: session.user.id,
-      title: artifact.title,
-      type: artifact.content.visualization || 'bar',
-      data: artifact.content.data,
-      settings: artifact.content.settings || {},
-      position
-    });
+      title: artifact.title || 'Visualization',
+      description: '',
+      type: artifact.type,
+      data: artifact.content,
+      settings: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      position: { x: 0, y: 0, w: 6, h: 4 }
+    }).returning()
 
-    revalidatePath(`/dashboard/${dashboardId}`);
-    
-    return {
-      success: true,
-      dashboardId,
-      visualizationId: id
-    };
+    revalidatePath(`/dashboard/${dashboardId}`)
+    return { success: true, visualization: result[0] }
   } catch (error) {
-    console.error('Error adding visualization to dashboard:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
+    console.error('Failed to add to dashboard:', error)
+    return { success: false, error: 'Failed to add to dashboard' }
   }
 }
 

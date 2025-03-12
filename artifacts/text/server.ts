@@ -1,136 +1,170 @@
-import { smoothStream, streamText } from 'ai';
-import { myProvider } from '@/lib/ai/providers';
-import { createDocumentHandler } from '@/lib/artifacts/server';
+import { StreamingTextResponse } from 'ai';
+import { OpenAI } from 'openai';
+import { env } from '@/lib/env';
 import { updateDocumentPrompt } from '@/lib/ai/prompts';
 
-export const textDocumentHandler = createDocumentHandler<'text'>({
-  kind: 'text',
-  onCreateDocument: async ({ title, dataStream }) => {
+// Type definitions
+interface DocumentInput {
+  title: string;
+  dataStream: WritableStream;
+}
+
+interface DocumentUpdate {
+  document: {
+    title: string;
+    content: string;
+  };
+  description: string;
+  dataStream: WritableStream;
+}
+
+// Create helper functions to handle document operations
+const createDocumentHandler = {
+  kind: 'text' as const,
+  
+  async onCreateDocument({ title, dataStream }: DocumentInput) {
     let draftContent = '';
-
+    
     try {
-      // Try to use a model that's guaranteed to exist in your environment
-      // Replace 'gpt-3.5-turbo' with a model you know is available
-      const model = (() => {
-        try {
-          return myProvider.languageModel('artifact-model');
-        } catch (error) {
-          console.warn('artifact-model not found, using specific fallback model instead');
-          // Specify a known available model explicitly
-          try {
-            return myProvider.languageModel('gpt-3.5-turbo'); // Try a common model first
-          } catch (fallbackError) {
-            try {
-              return myProvider.languageModel('claude-3-haiku-20240307'); // Try another common model
-            } catch (secondFallbackError) {
-              // Final fallback - manually create content without using a model
-              console.error('No available language models found');
-              throw new Error('No available language models for document creation');
-            }
-          }
-        }
-      })();
-
-      // Only attempt to use the model if one was successfully found
-      const { fullStream } = streamText({
-        model,
-        system:
-          'Write about the given topic. Markdown is supported. Use headings wherever appropriate.',
-        experimental_transform: smoothStream({ chunking: 'word' }),
-        prompt: title,
+      // Initialize OpenAI client
+      const openai = new OpenAI({
+        apiKey: env.OPENAI_API_KEY
       });
-
-      for await (const delta of fullStream) {
-        const { type } = delta;
-
-        if (type === 'text-delta') {
-          const { textDelta } = delta;
-
-          draftContent += textDelta;
-
-          dataStream.writeData({
-            type: 'text-delta',
-            content: textDelta,
-          });
+      
+      // Create streaming response
+      const response = await openai.chat.completions.create({
+        model: env.OPENAI_MODEL || 'gpt-4o',
+        stream: true,
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert at creating well formatted, structured documents on any topic.
+            The user has asked you to create a document with this title: "${title}".
+            Create a detailed, informative document covering this topic.
+            Focus on providing valuable, accurate information that would be useful for someone wanting to learn about this topic.
+            Use markdown formatting to structure your document nicely, including headings, subheadings, bullet points, and emphasis where appropriate.
+            For complex topics, include examples to help illustrate key points.
+            Aim for a comprehensive document that covers the main aspects of the topic in depth.`
+          },
+          {
+            role: 'user',
+            content: `Create a detailed document about ${title}.`
+          }
+        ],
+        temperature: 0.7,
+        top_p: 0.95,
+      });
+      
+      // Create a text encoder
+      const encoder = new TextEncoder();
+      
+      // Create a TransformStream to handle the response
+      const transformStream = new TransformStream({
+        async transform(chunk, controller) {
+          // Append the chunk to the draft content
+          draftContent += chunk;
+          // Send the complete draft through the controller
+          controller.enqueue(encoder.encode(draftContent));
+        }
+      });
+      
+      // Pipe the response to the transform stream
+      const writer = transformStream.writable.getWriter();
+      
+      for await (const chunk of response) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          await writer.write(content);
         }
       }
-
-      return draftContent;
+      
+      await writer.close();
+      
+      // Pipe the transform stream to the data stream
+      const readableStream = transformStream.readable;
+      readableStream.pipeTo(dataStream);
+      
+      return {
+        content: draftContent,
+        title,
+      };
     } catch (error) {
       console.error('Error creating document:', error);
-      // Always generate fallback content when model fails
-      const fallbackContent = `# ${title}\n\nContent generation is currently unavailable due to a configuration issue. Please try again later.\n\n## Document Details\n\nThis is an automatically generated placeholder for your requested document titled "${title}".`;
-      
-      // Send the fallback content through the data stream
-      dataStream.writeData({
-        type: 'text-delta',
-        content: fallbackContent,
-      });
-      
-      return fallbackContent;
+      throw new Error(`Failed to create document: ${error instanceof Error ? error.message : String(error)}`);
     }
   },
   
-  onUpdateDocument: async ({ document, description, dataStream }) => {
+  async onUpdateDocument({ document, description, dataStream }: DocumentUpdate) {
     let draftContent = '';
-
+    
     try {
-      // Try to use a model that's guaranteed to exist in your environment
-      const model = (() => {
-        try {
-          return myProvider.languageModel('artifact-model');
-        } catch (error) {
-          console.warn('artifact-model not found, using specific fallback model instead');
-          // Specify a known available model explicitly
-          try {
-            return myProvider.languageModel('gpt-3.5-turbo'); // Try a common model first
-          } catch (fallbackError) {
-            try {
-              return myProvider.languageModel('claude-3-haiku-20240307'); // Try another common model
-            } catch (secondFallbackError) {
-              // Final fallback - just return the existing content
-              console.error('No available language models found');
-              throw new Error('No available language models for document update');
-            }
-          }
-        }
-      })();
-
-      const { fullStream } = streamText({
-        model,
-        system: updateDocumentPrompt(document.content, 'text'),
-        experimental_transform: smoothStream({ chunking: 'word' }),
-        prompt: description,
-        experimental_providerMetadata: {
-          openai: {
-            prediction: {
-              type: 'content',
-              content: document.content,
-            },
-          },
-        },
+      // Initialize OpenAI client
+      const openai = new OpenAI({
+        apiKey: env.OPENAI_API_KEY
       });
+      
+      // Create streaming response
+      const response = await openai.chat.completions.create({
+        model: env.OPENAI_MODEL || 'gpt-4o',
+        stream: true,
+        messages: [
+          {
+            role: 'system',
+            content: updateDocumentPrompt
+          },
+          {
+            role: 'user',
+            content: `Update the document as requested.
+Current title: ${document.title}
+Current content:
+${document.content}
 
-      for await (const delta of fullStream) {
-        const { type } = delta;
-
-        if (type === 'text-delta') {
-          const { textDelta } = delta;
-
-          draftContent += textDelta;
-          dataStream.writeData({
-            type: 'text-delta',
-            content: textDelta,
-          });
+Update instructions: ${description}`
+          }
+        ],
+        temperature: 0.7,
+        top_p: 0.95,
+      });
+      
+      // Create a text encoder
+      const encoder = new TextEncoder();
+      
+      // Create a TransformStream to handle the response
+      const transformStream = new TransformStream({
+        async transform(chunk, controller) {
+          // Append the chunk to the draft content
+          draftContent += chunk;
+          // Send the complete draft through the controller
+          controller.enqueue(encoder.encode(draftContent));
+        }
+      });
+      
+      // Pipe the response to the transform stream
+      const writer = transformStream.writable.getWriter();
+      
+      for await (const chunk of response) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          await writer.write(content);
         }
       }
-
-      return draftContent;
+      
+      await writer.close();
+      
+      // Pipe the transform stream to the data stream
+      const readableStream = transformStream.readable;
+      readableStream.pipeTo(dataStream);
+      
+      return {
+        content: draftContent,
+        title: document.title,
+      };
     } catch (error) {
       console.error('Error updating document:', error);
-      // Return the original content if update fails, plus a note
-      const errorMessage = "\n\n---\n\n*Note: Document update failed due to a configuration issue.*";
-      return document.content + errorMessage;
+      throw new Error(`Failed to update document: ${error instanceof Error ? error.message : String(error)}`);
     }
-  },
-});
+  }
+};
+
+// Export the document handler
+export const textDocumentHandler = createDocumentHandler;

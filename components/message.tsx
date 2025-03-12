@@ -27,6 +27,13 @@ import { useArtifactSelector } from '@/hooks/use-artifact';
 import ReactMarkdown from 'react-markdown';
 import { DocumentToolResult as NewDocumentToolResult } from './document-tool-result';
 import { ChatInput } from './chat-input';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import { CodeBlock } from '@/components/ui/codeblock';
+import { MemoizedReactMarkdown } from '@/components/markdown';
+import { IconBot, IconUser } from '@/components/ui/icons';
+import { ChatMessageActions } from '@/components/chat-message-actions';
+import { VisualizationResult } from './visualization-result';
 
 interface MessageProps {
   message: Message;
@@ -113,20 +120,57 @@ export const MessageComponent = memo(function MessageComponent({
               </div>
             ) : (
               <div className="prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown
+                <MemoizedReactMarkdown
+                  className="prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0"
+                  remarkPlugins={[remarkGfm, remarkMath]}
                   components={{
-                    pre: ({ node, ...props }) => (
-                      <pre className="p-2 rounded bg-muted overflow-auto" {...props} />
-                    ),
-                    code: ({ node, inline, ...props }) => (
-                      inline 
-                        ? <code className="px-1 py-0.5 rounded bg-muted" {...props} />
-                        : <code {...props} />
-                    )
+                    p({ children }) {
+                      return <p className="mb-2 last:mb-0">{children}</p>
+                    },
+                    code({ node, inline, className, children, ...props }) {
+                      if (children.length) {
+                        if (children[0] == '▍') {
+                          return (
+                            <span className="mt-1 animate-pulse cursor-default">▍</span>
+                          )
+                        }
+
+                        children[0] = (children[0] as string).replace('`▍`', '▍')
+                      }
+
+                      const match = /language-(\w+)/.exec(className || '')
+
+                      if (inline) {
+                        return (
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
+                        )
+                      }
+
+                      return (
+                        <CodeBlock
+                          key={Math.random()}
+                          language={(match && match[1]) || ''}
+                          value={String(children).replace(/\n$/, '')}
+                          {...props}
+                        />
+                      )
+                    },
+                    // Custom component for visualizations
+                    VisualizationResult: ({ data, title, type }) => {
+                      return (
+                        <VisualizationResult 
+                          data={data} 
+                          title={title} 
+                          type={type}
+                        />
+                      )
+                    }
                   }}
                 >
                   {message.content as string}
-                </ReactMarkdown>
+                </MemoizedReactMarkdown>
               </div>
             )}
           </div>

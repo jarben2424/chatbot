@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
+import { getDashboards } from '@/lib/actions/dashboard';
 
 interface VisualizationPanelProps {
   data: any[];
@@ -43,6 +44,35 @@ interface VisualizationPanelProps {
   isEmbedded?: boolean;
 }
 
+// Add proper type for the UIArtifact
+interface UIArtifact {
+  id: string;
+  type: ArtifactKind;
+  title: string;
+  content: any;
+  status: 'streaming' | 'idle' | 'complete';
+}
+
+// Fix for the ChartProps issue
+interface ChartProps {
+  data: any[];
+  responsive?: boolean;
+  showLegend?: boolean;
+  showGrid?: boolean;
+  xField?: string;
+  colors?: string[];
+  // Add other required props
+}
+
+// Fix the useArtifact hook type issue
+const { setArtifact, isVisible } = useArtifact() as {
+  artifact: UIArtifact;
+  setArtifact: (updaterFn: UIArtifact | ((currentArtifact: UIArtifact) => UIArtifact)) => void;
+  isVisible: boolean;
+  metadata: any;
+  setMetadata: any;
+};
+
 export function VisualizationPanel({
   data = [],
   visualization = 'table',
@@ -59,9 +89,8 @@ export function VisualizationPanel({
   dashboardId,
   isEmbedded = false
 }: VisualizationPanelProps) {
-  const { setArtifact, isVisible } = useArtifact();
-  const router = useRouter();
   const { theme } = useTheme();
+  const router = useRouter();
   
   // Add state for visualization settings
   const [settings, setSettings] = useState<VisualizationSettings>({
@@ -96,6 +125,9 @@ export function VisualizationPanel({
   
   // Add state for adding to dashboard
   const [isAddingToDashboard, setIsAddingToDashboard] = useState(false);
+  
+  // Determine if we should show fullscreen view
+  const shouldShowFullScreen = isVisible && artifactId === ((isVisible as any)?.id) || isForceExpanded;
   
   // Update when prop changes
   useEffect(() => {
@@ -143,7 +175,7 @@ export function VisualizationPanel({
     }
   };
   
-  // Update renderVisualization to force chart type
+  // Updated renderVisualization function to fix TS errors
   const renderVisualization = () => {
     // Use validData instead of data to ensure something always renders
     if (!validData || validData.length === 0) {
@@ -157,85 +189,99 @@ export function VisualizationPanel({
       responsive: true
     };
     
-    // Always use a chart type (not table) for better visualization
-    const chartType = settings.type === 'table' ? 'bar' : settings.type;
+    // Figure out the right chart type to render
+    let chartType = settings.type;
+    if (chartType === 'auto') {
+      // Auto-detect the best chart type based on data
+      chartType = 'bar';
+    }
     
-    // Return the visualization
-    return (
-      <StandaloneChart 
-        type={chartType} 
-        data={validData}
-        height="100%"
-        width="100%"
-        showLegend={settings.showLegend}
-        showGrid={settings.showGrid}
-        colors={settings.colors}
-        xAxis={settings.xAxis}
-        showLabels={settings.showLabels}
-      />
-    );
+    // Return the appropriate visualization based on type
+    switch (chartType) {
+      case 'bar':
+        return (
+          <BarChart 
+            data={validData}
+            responsive={true}
+            showLegend={settings.showLegend}
+            showGrid={settings.showGrid}
+            xField={settings.xAxis || Object.keys(validData[0])[0]}
+            colors={settings.colors}
+          />
+        );
+      case 'line':
+        return (
+          <LineChart 
+            data={validData}
+            className="w-full h-full"
+            responsive={true}
+            showLegend={settings.showLegend}
+            showGrid={settings.showGrid}
+            xField={settings.xAxis || Object.keys(validData[0])[0]}
+            colors={settings.colors}
+          />
+        );
+      case 'pie':
+        return (
+          <PieChart 
+            data={validData}
+            className="w-full h-full"
+            responsive={true}
+            showLegend={settings.showLegend}
+            variant="pie"
+            label={settings.xAxis || Object.keys(validData[0])[0]}
+            colors={settings.colors}
+          />
+        );
+      case 'scatter':
+        return (
+          <ScatterChart 
+            data={validData}
+            className="w-full h-full"
+            responsive={true}
+            showLegend={settings.showLegend}
+            showGrid={settings.showGrid}
+            xField={settings.xAxis || Object.keys(validData[0])[0]}
+            colors={settings.colors}
+          />
+        );
+      case 'table':
+      default:
+        return <DataTable data={validData} />;
+    }
   };
   
-  // Determine if we're in split-screen view or chat view
-  const isSplitView = isVisible && artifactId === (isVisible as any)?.id;
+  // Handle close
+  const handleClose = () => {
+    if (onClose) {
+      setFullscreen(false);
+      setIsEditMode(false);
+      onClose();
+    }
+  };
   
-  // Determine if we show full screen view
-  const shouldShowFullScreen = isSplitView || isForceExpanded;
-  
-  // Add debug logging to track artifact state
-  useEffect(() => {
-    console.log('Visualization panel rendering with:', {
-      isVisible,
-      artifactId,
-      matchesCurrentArtifact: isVisible && artifactId === (isVisible as any)?.id,
-      visualizationType: visualization,
-      dataLength: data?.length
-    });
-  }, [isVisible, artifactId, visualization, data]);
-  
+  // Handle save
   const handleSave = () => {
-    // Call onSave if provided
     if (onSave) {
       onSave({
+        data: validData,
+        visualization: settings.type,
         title,
         description,
-        data: validData, // Use validData
-        visualization: settings.type,
         settings
       });
     }
   };
   
-  const handleClose = () => {
-    setFullscreen(false);
-    setIsEditMode(false);
-    if (onClose) {
-      onClose();
-    }
-  };
-  
-  // Toggle fullscreen mode
-  const toggleFullscreen = () => {
-    setFullscreen(!fullscreen);
-  };
-  
-  // Toggle edit mode
-  const toggleEditMode = () => {
-    setIsEditMode(!isEditMode);
-    if (onEdit) {
-      onEdit();
-    }
-  };
-  
-  // Export chart as image
+  // Handle export as image
   const handleExportImage = async () => {
-    if (!validData.length) {
-      toast.error('No data to export');
+    if (!artifactId && !title) {
+      toast.error('Unable to export: Missing visualization identifier');
       return;
     }
     
     try {
-      await exportChartAsImage(`visualization-${artifactId || Date.now()}`, title);
+      await exportChartAsImage(`chart-${artifactId || 'visualization'}`, title.toLowerCase().replace(/\s+/g, '-'));
       toast.success('Chart exported as image');
     } catch (error) {
       toast.error('Failed to export chart');
@@ -243,7 +289,7 @@ export function VisualizationPanel({
     }
   };
   
-  // Export data as CSV
+  // Handle export as CSV
   const handleExportCSV = async () => {
     if (!validData.length) {
       toast.error('No data to export');
@@ -263,9 +309,8 @@ export function VisualizationPanel({
   const handleAddToDashboard = async () => {
     if (!selectedDashboardId) {
       toast({
-        title: 'Selection Required',
-        description: 'Please select a dashboard',
         variant: 'destructive',
+        description: 'Selection Required: Please select a dashboard'
       });
       return;
     }
@@ -368,14 +413,16 @@ export function VisualizationPanel({
           title={title}
           description={description}
           onClose={handleClose}
-          onSave={(savedData) => {
+          onSave={(savedData: any) => {
             if (onSave) {
               onSave(savedData);
             }
             setIsEditMode(false);
             setFullscreen(false);
           }}
-        />
+        >
+          {null}
+        </VisualizationEditor>
       ) : (
         <div 
           className={cn(

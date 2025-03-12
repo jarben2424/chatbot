@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { IconProps } from './types'
+import { cn } from '@/lib/utils'
 
 // Generic icon component wrapper
 export function Icon({
@@ -205,6 +206,61 @@ export function IconExpand({ className, ...props }: IconProps) {
       <path d="M9 21 3 15m0 6 6-6" />
       <path d="M3 9V3h6" />
       <path d="M21 15v6h-6" />
+    </Icon>
+  )
+}
+
+// Add icons needed for our custom features
+export function IconDashboard({ className, ...props }: IconProps) {
+  return (
+    <Icon className={className} {...props}>
+      <rect width="7" height="9" x="3" y="3" rx="1" />
+      <rect width="7" height="5" x="14" y="3" rx="1" />
+      <rect width="7" height="9" x="14" y="12" rx="1" />
+      <rect width="7" height="5" x="3" y="16" rx="1" />
+    </Icon>
+  )
+}
+
+// Original Vercel icons
+export function IconEdit({ className, ...props }: React.ComponentProps<'svg'>) {
+  return (
+    <Icon className={className} {...props}>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+      />
+    </Icon>
+  )
+}
+
+// Add any missing icons to your existing icons file
+export function IconArrowDown({ className, ...props }: React.ComponentProps<'svg'>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M12 5v14" />
+      <path d="m19 12-7 7-7-7" />
+    </svg>
+  );
+}
+
+// Add this to your existing icons.tsx file
+export function IconClose({ className, ...props }: React.ComponentProps<'svg'>) {
+  return (
+    <Icon className={className} {...props}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
     </Icon>
   )
 } 

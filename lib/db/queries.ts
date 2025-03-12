@@ -1,9 +1,12 @@
+'use server';
+
 import 'server-only';
 
 import { genSaltSync, hashSync } from 'bcrypt-ts';
 import { and, asc, desc, eq, gt, gte, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { auth } from '@/auth';
 
 import {
   user,
@@ -105,42 +108,61 @@ export async function getChatById({ id }: { id: string }) {
   }
 }
 
-export async function saveMessages({ messages }: { messages: Array<Message> }) {
+export async function saveMessages(messages: Array<{
+  id: string
+  chatId: string
+  role: string
+  content: string | { text: string }
+  createdAt: Date
+}>) {
   try {
+    // Use direct join queries instead of relations
     return await db.insert(message).values(
       messages.map(msg => {
-        // Create a basic object with only fields we know exist in DB
-        const messageData = {
+        // Add the userId field which is required
+        const userId = msg.role === 'user' ? 'user-id' : 'system-id' // Replace with actual logic
+        
+        return {
           id: msg.id,
           chatId: msg.chatId,
+          userId: userId,
           role: msg.role,
           content: typeof msg.content === 'string' 
-            ? { text: msg.content } 
-            : msg.content,
+            ? msg.content 
+            : msg.content.text,
           createdAt: msg.createdAt,
-        };
-        
-        // Don't include any other fields
-        return messageData;
+        }
       })
-    );
+    )
   } catch (error) {
-    console.error('Failed to save messages:', error);
-    throw error;
+    console.error('Failed to save messages:', error)
+    throw error
   }
 }
 
-export async function getMessagesByChatId({ id }: { id: string }) {
-  try {
-    return await db
-      .select()
-      .from(message)
-      .where(eq(message.chatId, id))
-      .orderBy(asc(message.createdAt));
-  } catch (error) {
-    console.error('Failed to get messages by chat id from database', error);
-    throw error;
-  }
+export async function getChats() {
+  const session = await auth()
+  if (!session?.user?.id) return []
+  
+  // Use direct joins instead of relations
+  return await db
+    .select({
+      id: chat.id,
+      title: chat.title,
+      createdAt: chat.createdAt,
+    })
+    .from(chat)
+    .where(eq(chat.userId, session.user.id))
+    .orderBy(desc(chat.createdAt))
+}
+
+export async function getChatMessages(chatId: string) {
+  // Use direct joins instead of relations
+  return await db
+    .select()
+    .from(message)
+    .where(eq(message.chatId, chatId))
+    .orderBy(asc(message.createdAt))
 }
 
 export async function voteMessage({

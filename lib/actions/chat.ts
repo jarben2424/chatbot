@@ -3,11 +3,16 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
-import { type Chat } from '@/lib/db/schema'
 import { db } from '@/lib/db'
-import { chats, messages as dbMessages } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
-import { nanoid } from '@/lib/utils'
+import { customAlphabet } from 'nanoid'
+
+import { Chat, chat, message } from '@/lib/db/schema'
+
+const nanoid = customAlphabet(
+  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
+  7
+)
 
 export async function getChats() {
   const session = await auth()
@@ -17,13 +22,13 @@ export async function getChats() {
 
   const result = await db
     .select({
-      id: chats.id,
-      title: chats.title,
-      createdAt: chats.createdAt
+      id: chat.id,
+      title: chat.title,
+      createdAt: chat.createdAt
     })
-    .from(chats)
-    .where(eq(chats.userId, session.user.id))
-    .orderBy(chats.createdAt)
+    .from(chat)
+    .where(eq(chat.userId, session.user.id))
+    .orderBy(chat.createdAt)
 
   return result
 }
@@ -36,8 +41,8 @@ export async function getChatById(id: string) {
 
   const chat = await db
     .select()
-    .from(chats)
-    .where(eq(chats.id, id))
+    .from(chat)
+    .where(eq(chat.id, id))
     .then(res => res[0] || null)
 
   if (!chat) {
@@ -46,9 +51,9 @@ export async function getChatById(id: string) {
 
   const messages = await db
     .select()
-    .from(dbMessages)
-    .where(eq(dbMessages.chatId, chat.id))
-    .orderBy(dbMessages.createdAt)
+    .from(message)
+    .where(eq(message.chatId, chat.id))
+    .orderBy(message.createdAt)
 
   return {
     ...chat,
@@ -63,7 +68,7 @@ export async function createChat() {
   }
 
   const id = nanoid()
-  await db.insert(chats).values({
+  await db.insert(chat).values({
     id,
     userId: session.user.id,
     title: 'New Chat'
@@ -81,29 +86,26 @@ export async function removeChat(id: string) {
     }
   }
 
-  // Check if the chat exists and belongs to the user
-  const chat = await db
+  const chatRecord = await db
     .select()
-    .from(chats)
-    .where(eq(chats.id, id))
+    .from(chat)
+    .where(eq(chat.id, id))
     .then(res => res[0] || null)
 
-  if (!chat || chat.userId !== session.user.id) {
+  if (!chatRecord || chatRecord.userId !== session.user.id) {
     return {
       error: 'Chat not found'
     }
   }
 
-  // Delete messages first (foreign key constraint)
-  await db.delete(dbMessages).where(eq(dbMessages.chatId, id))
+  await db.delete(message).where(eq(message.chatId, id))
   
-  // Then delete the chat
-  await db.delete(chats).where(eq(chats.id, id))
+  await db.delete(chat).where(eq(chat.id, id))
 
   revalidatePath('/')
   return {}
 }
 
-export function isChatOwner(chat: Chat, userId: string) {
+export async function isChatOwner(chat: Chat, userId: string) {
   return chat.userId === userId
 } 

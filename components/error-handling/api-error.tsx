@@ -5,7 +5,7 @@ import { AlertTriangle, RefreshCw, ServerCrash, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { motion } from 'framer-ui/motion';
+import { motion } from 'framer-motion';
 
 interface ApiErrorProps {
   error: Error | unknown;

@@ -1,85 +1,55 @@
-import { ChatRequestOptions, Message } from 'ai';
-import { PreviewMessage, ThinkingMessage } from './message';
-import { useScrollToBottom } from './use-scroll-to-bottom';
-import { Overview } from './overview';
-import { memo } from 'react';
-import { Vote } from '@/lib/db/schema';
-import equal from 'fast-deep-equal';
+'use client'
 
-interface MessagesProps {
-  chatId: string;
-  isLoading: boolean;
-  votes: Array<Vote> | undefined;
-  messages: Array<Message>;
-  setMessages: (
-    messages: Message[] | ((messages: Message[]) => Message[]),
-  ) => void;
-  reload: (
-    chatRequestOptions?: ChatRequestOptions,
-  ) => Promise<string | null | undefined>;
-  isReadonly: boolean;
-  isArtifactVisible: boolean;
-  renderMessage?: (message: Message) => React.ReactNode;
+import { Message } from 'ai'
+import { useInView } from 'react-intersection-observer'
+import { useEffect, useRef } from 'react'
+
+import { cn } from '@/lib/utils'
+import { Message as MessageComponent } from './message'
+import { Welcome } from './welcome'
+
+export interface MessagesProps {
+  messages: Message[]
+  isLoading?: boolean
+  showWelcome?: boolean
 }
 
-function PureMessages({
-  chatId,
-  isLoading,
-  votes,
+export function Messages({
   messages,
-  setMessages,
-  reload,
-  isReadonly,
-  renderMessage,
+  isLoading,
+  showWelcome = true
 }: MessagesProps) {
-  const [messagesContainerRef, messagesEndRef] =
-    useScrollToBottom<HTMLDivElement>();
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const { ref, inView } = useInView()
+
+  useEffect(() => {
+    if (scrollRef.current && messages.length > 0) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [messages.length])
+
+  const isEmpty = messages.length === 0
 
   return (
     <div
-      ref={messagesContainerRef}
-      className="flex flex-col min-w-0 gap-6 flex-1 overflow-y-scroll pt-4"
+      ref={scrollRef}
+      className={cn(
+        'flex flex-col gap-4 h-full overflow-y-auto px-4',
+        isEmpty ? 'justify-center' : 'justify-start pb-[80px] pt-4'
+      )}
     >
-      {messages.length === 0 && <Overview />}
-
-      {messages.map((message, index) => (
-        <PreviewMessage
-          key={message.id}
-          index={index}
-          chatId={chatId}
-          message={message}
-          isLoading={isLoading && messages.length - 1 === index}
-          vote={
-            votes
-              ? votes.find((vote) => vote.messageId === message.id)
-              : undefined
-          }
-          setMessages={setMessages}
-          reload={reload}
-          isReadonly={isReadonly}
-        />
-      ))}
-
-      {isLoading &&
-        messages.length > 0 &&
-        messages[messages.length - 1].role === 'user' && <ThinkingMessage />}
-
-      <div
-        ref={messagesEndRef}
-        className="shrink-0 min-w-[24px] min-h-[24px]"
-      />
+      {isEmpty && !isLoading && showWelcome ? (
+        <Welcome />
+      ) : (
+        messages.map((message, i) => {
+          const isLastMessage = i === messages.length - 1
+          return (
+            <div key={message.id} ref={isLastMessage ? ref : undefined}>
+              <MessageComponent message={message} />
+            </div>
+          )
+        })
+      )}
     </div>
-  );
+  )
 }
-
-export const Messages = memo(PureMessages, (prevProps, nextProps) => {
-  if (prevProps.isArtifactVisible && nextProps.isArtifactVisible) return true;
-
-  if (prevProps.isLoading !== nextProps.isLoading) return false;
-  if (prevProps.isLoading && nextProps.isLoading) return false;
-  if (prevProps.messages.length !== nextProps.messages.length) return false;
-  if (!equal(prevProps.messages, nextProps.messages)) return false;
-  if (!equal(prevProps.votes, nextProps.votes)) return false;
-
-  return true;
-});

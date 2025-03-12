@@ -9,7 +9,6 @@ import {
   primaryKey,
   foreignKey,
   boolean,
-  relations,
   integer,
 } from 'drizzle-orm/pg-core';
 
@@ -22,12 +21,10 @@ export const user = pgTable('User', {
 export type User = InferSelectModel<typeof user>;
 
 export const chat = pgTable('Chat', {
-  id: uuid('id').primaryKey().notNull().defaultRandom(),
-  createdAt: timestamp('createdAt').notNull(),
-  title: text('title').notNull(),
-  userId: uuid('userId')
-    .notNull()
-    .references(() => user.id),
+  id: text('id').primaryKey(),
+  userId: text('userId').notNull(),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  title: text('title'),
   visibility: varchar('visibility', { enum: ['public', 'private'] })
     .notNull()
     .default('private'),
@@ -36,13 +33,14 @@ export const chat = pgTable('Chat', {
 export type Chat = InferSelectModel<typeof chat>;
 
 export const message = pgTable('Message', {
-  id: uuid('id').primaryKey().notNull(),
-  chatId: uuid('chatId')
+  id: text('id').primaryKey(),
+  chatId: text('chatId')
     .notNull()
-    .references(() => chat.id),
-  role: varchar('role').notNull(),
-  content: json('content').notNull(),
-  createdAt: timestamp('createdAt').notNull(),
+    .references(() => chat.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  content: text('content').notNull(),
+  role: text('role').notNull(),
 });
 
 export type Message = InferSelectModel<typeof message>;
@@ -145,20 +143,24 @@ export const visualizations = pgTable('visualizations', {
 });
 
 // Define relations
-export const chatsRelations = relations(chat, ({ one, many }) => ({
-  user: one(user, {
-    fields: [chat.userId],
-    references: [user.id]
-  }),
-  messages: many(message)
-}));
+// export const chatsRelations = relations(chat, ({ one, many }) => ({
+//   user: one(user, {
+//     fields: [chat.userId],
+//     references: [user.id]
+//   }),
+//   messages: many(message)
+// }));
 
-export const messagesRelations = relations(message, ({ one }) => ({
-  chat: one(chat, {
-    fields: [message.chatId],
-    references: [chat.id]
-  })
-}));
+// export const messagesRelations = relations(message, ({ one }) => ({
+//   chat: one(chat, {
+//     fields: [message.chatId],
+//     references: [chat.id]
+//   }),
+//   user: one(user, {
+//     fields: [message.userId],
+//     references: [user.id]
+//   })
+// }));
 
 export const documentsRelations = relations(document, ({ one }) => ({
   user: one(user, {

@@ -1,101 +1,96 @@
-import { OpenAIStream, StreamingTextResponse } from 'ai';
+import { StreamingTextResponse, OpenAIStream } from 'ai';
+import { OpenAI } from 'openai';
 import { auth } from '@/auth';
-import { createAIStreamWriter } from '@/lib/ai/stream-writer';
-import { createDocument } from '@/lib/ai/tools/create-document';
+import { nanoid } from '@/lib/utils';
+import { env } from '@/lib/env';
 import { queryDataTool } from '@/lib/ai/tools/query-data';
 import { visualizeDataTool } from '@/lib/ai/tools/visualize-data';
-import { openai } from '@/lib/ai/providers';
-import { checkRateLimit } from '@/lib/rate-limit';
-import { saveChat, saveMessages, getChatById } from '@/lib/db/chat';
-import { generateUUID } from '@/lib/utils';
+import { saveChatMessage } from '@/lib/db/actions';
+
+export const runtime = 'edge';
+
+const openai = new OpenAI({
+  apiKey: env.OPENAI_API_KEY
+});
 
 export async function POST(req: Request) {
-  try {
-    const session = await auth();
-    
-    if (!session?.user) {
-      return new Response('Unauthorized', { status: 401 });
-    }
-    
-    // Check rate limiting
-    const rate = await checkRateLimit(session.user.id);
-    if (!rate.allowed) {
-      return new Response(JSON.stringify({
-        error: 'Rate limit exceeded',
-        details: `You have ${rate.remaining} requests remaining today.`
-      }), { 
-        status: 429,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    
-    const { messages, id: chatId } = await req.json();
-    
-    // Create a stream writer for handling document content
-    const dataStream = createAIStreamWriter();
-    
-    // Create or get chat
-    const chatIdentifier = chatId || generateUUID();
-    
-    if (!chatId) {
-      await saveChat({
-        id: chatIdentifier,
-        title: messages[0]?.content.substring(0, 100) || 'New Chat',
-        userId: session.user.id,
-        createdAt: new Date()
-      });
-    }
-    
-    // Save the user message
-    if (messages[messages.length - 1]?.role === 'user') {
-      await saveMessages({
-        messages: [{
-          id: generateUUID(),
-          chatId: chatIdentifier,
-          role: 'user',
-          content: messages[messages.length - 1].content,
-          createdAt: new Date()
-        }]
-      });
-    }
-    
-    // Create a response stream with all our tools
-    const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o',
-      messages,
-      stream: true,
-      tools: [
-        createDocument({ session, dataStream }),
-        queryDataTool,
-        visualizeDataTool
-      ]
-    });
+  const json = await req.json();
+  const { messages, id } = json;
+  const userId = (await auth())?.user.id;
 
-    // Create a streaming response
-    const stream = OpenAIStream(response, {
-      onCompletion: async (completion) => {
-        // Save the assistant message
-        await saveMessages({
-          messages: [{
-            id: generateUUID(),
-            chatId: chatIdentifier,
-            role: 'assistant',
-            content: completion,
-            createdAt: new Date()
-          }]
-        });
-      }
-    });
-
-    // Return the streaming response
-    return new StreamingTextResponse(stream, {
-      headers: { 'X-Chat-Id': chatIdentifier }
-    });
-  } catch (error) {
-    console.error('Error in chat API:', error);
-    return new Response(JSON.stringify({ error: 'An error occurred' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+  if (!userId) {
+    return new Response('Unauthorized', { status: 401 });
   }
+
+  // Convert our custom tools to OpenAI format
+  const tools = [
+    {
+      type: 'function',
+      function: {
+        name: visualizeDataTool.name,
+        description: visualizeDataTool.description,
+        parameters: visualizeDataTool.schema
+      }
+    },
+    {
+      type: 'function',
+      function: {
+        name: queryDataTool.name,
+        description: queryDataTool.description,
+        parameters: queryDataTool.schema
+      }
+    }
+  ];
+
+  // Request the OpenAI API for the response
+  const response = await openai.chat.completions.create({
+    model: env.OPENAI_MODEL || 'gpt-4o',
+    stream: true,
+    messages,
+    tools
+  });
+
+  // Create an executor map for our tools
+  const toolExecutors = {
+    [visualizeDataTool.name]: visualizeDataTool.runToolAction,
+    [queryDataTool.name]: queryDataTool.runToolAction
+  };
+
+  // Convert the response into a friendly text-stream
+  const stream = OpenAIStream(response, {
+    async experimental_onToolCall({ name, args }) {
+      // Execute the appropriate tool based on the name
+      if (name in toolExecutors) {
+        try {
+          return await toolExecutors[name](args);
+        } catch (error) {
+          console.error(`Error executing tool ${name}:`, error);
+          return { error: `Failed to execute ${name}: ${error.message}` };
+        }
+      }
+      
+      return { error: `Unknown tool: ${name}` };
+    },
+    async onCompletion(completion) {
+      // Save the chat to the database
+      const title = json.messages[0].content.substring(0, 100);
+      const chatId = id ?? nanoid();
+      
+      try {
+        await saveChatMessage({
+          chatId,
+          content: completion,
+          role: 'assistant',
+          userId
+        });
+      } catch (error) {
+        console.error('Failed to save chat message:', error);
+      }
+    }
+  });
+
+  // Respond with the stream
+  return new StreamingTextResponse(stream, {
+    headers: id ? {} : { 'x-chat-id': nanoid() }
+  });
 } 

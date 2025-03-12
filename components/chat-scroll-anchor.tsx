@@ -1,30 +1,22 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import * as React from 'react'
 import { useInView } from 'react-intersection-observer'
 
-interface ChatScrollAnchorProps {
-  trackVisibility?: boolean
-}
-
-export function ChatScrollAnchor({ trackVisibility }: ChatScrollAnchorProps) {
+export function ChatScrollAnchor({ trackVisibility }: { trackVisibility?: boolean }) {
   const { ref, inView, entry } = useInView({
     trackVisibility,
     delay: 100,
     rootMargin: '0px 0px -150px 0px'
   })
-  const hasScrolledToBottom = useRef(false)
 
-  useEffect(() => {
-    if (trackVisibility && !hasScrolledToBottom.current && entry?.isVisible) {
-      setTimeout(() => {
-        entry?.target.scrollIntoView({
-          block: 'start'
-        })
-        hasScrolledToBottom.current = true
-      }, 100)
+  React.useEffect(() => {
+    if (inView && entry?.target) {
+      entry.target.scrollIntoView({
+        block: 'start'
+      })
     }
-  }, [entry?.isVisible, trackVisibility, entry])
+  }, [inView, entry])
 
   return <div ref={ref} className="h-px w-full" />
 } 

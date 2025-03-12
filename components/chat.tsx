@@ -1,124 +1,74 @@
 'use client'
 
-import { useChat, type Message } from 'ai/react'
-import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useChat } from 'ai/react'
+import { useRef, useState } from 'react'
 
+import { cn } from '@/lib/utils'
 import { ChatList } from '@/components/chat-list'
 import { ChatPanel } from '@/components/chat-panel'
-import { ChatScrollAnchor } from '@/components/chat-scroll-anchor'
 import { EmptyScreen } from '@/components/empty-screen'
-import { ChatMessage } from '@/components/chat-message'
+import { ChatScrollAnchor } from '@/components/chat-scroll-anchor'
+import { useLocalStorage } from '@/lib/hooks/use-local-storage'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
 import { toast } from 'sonner'
-import { useArtifact } from '@/hooks/use-artifact'
-import { extractFunctionCall } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
 
 export interface ChatProps extends React.ComponentProps<'div'> {
+  initialMessages?: any[]
   id?: string
-  initialMessages?: Message[]
 }
 
-export function Chat({ id, initialMessages = [] }: ChatProps) {
+export function Chat({ id, initialMessages, className }: ChatProps) {
   const router = useRouter()
-  const pathname = usePathname()
-  const formRef = useRef<HTMLFormElement>(null)
+  const [previewToken, setPreviewToken] = useLocalStorage<string | null>(
+    'ai-token',
+    null
+  )
+  const [previewTokenDialog, setPreviewTokenDialog] = useState(false)
+  const [previewTokenInput, setPreviewTokenInput] = useState(previewToken ?? '')
+  const { messages, append, reload, stop, isLoading, input, setInput } =
+    useChat({
+      initialMessages,
+      id,
+      body: {
+        id,
+        previewToken
+      },
+      onResponse(response) {
+        if (response.status === 401) {
+          setPreviewTokenDialog(true)
+        }
+      },
+      onFinish() {
+        if (!id) {
+          router.refresh()
+          router.push('/chat', { scroll: false })
+        }
+      }
+    })
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const [attachments, setAttachments] = useState<Array<any>>([])
-  const { isVisible } = useArtifact()
-
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    isLoading,
-    error,
-    append,
-    reload,
-    stop,
-    setMessages,
-    setInput
-  } = useChat({
-    api: '/api/chat',
-    id,
-    initialMessages,
-    onResponse(response) {
-      if (response.status === 401) {
-        toast.error('Please sign in to continue.')
-      }
-      
-      // Handle function calls for document creation
-      const reader = response.body?.getReader();
-      if (!reader) return;
-      
-      const decoder = new TextDecoder();
-      let content = '';
-      
-      (async () => {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          content += decoder.decode(value);
-        }
-        
-        // Handle function calls
-        const functionCall = extractFunctionCall(content);
-        if (functionCall?.name === 'create_document' && functionCall.arguments) {
-          const { title, kind } = functionCall.arguments;
-          
-          if (title && kind) {
-            console.log(`Created document: ${title} (${kind})`);
-          }
-        }
-      })();
-    },
-    onFinish() {
-      if (!id) {
-        const newId = response.headers.get('x-chat-id')
-        if (newId && pathname === '/') {
-          router.push(`/${newId}`)
-        }
-      }
-    },
-    onError(error) {
-      toast.error('An error occurred during the chat.')
-      console.error(error)
-    }
-  })
-
-  // Focus on input when messages change
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus()
-    }
-  }, [messages])
+  const isEmpty = messages.length === 0
 
   return (
-    <div className={`flex flex-col h-full ${isVisible ? 'chat-with-artifact' : ''}`}>
-      {messages.length ? (
-        <div className="flex-1 overflow-auto">
-          <div className="pb-[200px] pt-4 md:pt-10">
-            {messages.map((message, index) => (
-              <ChatMessage key={index} message={message} />
-            ))}
-            {isLoading && (
-              <div className="thinking-indicator">
-                <div className="dots">
-                  <span className="dot"></span>
-                  <span className="dot"></span>
-                  <span className="dot"></span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        <EmptyScreen
-          setInput={handleInputChange}
-          setMessages={setMessages}
-          append={append}
-        />
-      )}
+    <>
+      <div className={cn('pb-[200px] pt-4 md:pt-10', className)}>
+        {isEmpty && <EmptyScreen setInput={setInput} />}
+        {!isEmpty && (
+          <>
+            <ChatList messages={messages} />
+            <ChatScrollAnchor trackVisibility={isLoading} />
+          </>
+        )}
+      </div>
       <ChatPanel
         id={id}
         isLoading={isLoading}
@@ -127,13 +77,37 @@ export function Chat({ id, initialMessages = [] }: ChatProps) {
         reload={reload}
         messages={messages}
         input={input}
-        handleInputChange={handleInputChange}
-        handleSubmit={handleSubmit}
-        formRef={formRef}
+        setInput={setInput}
         inputRef={inputRef}
-        attachments={attachments}
-        setAttachments={setAttachments}
       />
-    </div>
+
+      <Dialog open={previewTokenDialog} onOpenChange={setPreviewTokenDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enter your OpenAI Key</DialogTitle>
+            <DialogDescription>
+              Your API key is stored locally on your browser and never sent to our servers.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={previewTokenInput}
+            placeholder="sk-..."
+            onChange={e => setPreviewTokenInput(e.target.value)}
+          />
+          <DialogFooter className="items-center">
+            <Button
+              onClick={() => {
+                setPreviewToken(previewTokenInput)
+                setPreviewTokenDialog(false)
+                toast.success('API key saved')
+                router.refresh()
+              }}
+            >
+              Save API Key
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
