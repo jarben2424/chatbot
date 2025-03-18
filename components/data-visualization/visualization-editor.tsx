@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Save, ChevronDown, Edit2, Send } from 'lucide-react';
+import { X, Save, ChevronDown, Edit2, Send, Undo, Redo } from 'lucide-react';
 import { toast } from 'sonner';
 import { VisualizationControls } from './visualization-controls';
 import { StandaloneChart } from './charts/standalone-chart';
@@ -66,6 +66,15 @@ export function VisualizationEditor({
     { role: 'user', content: 'Can you show me the monthly revenue data?' },
     { role: 'assistant', content: 'Here\'s the total monthly revenue for the past 5 months.' }
   ]);
+  
+  // State for undo/redo functionality
+  const [versionHistory, setVersionHistory] = useState([{
+    settings: settings
+  }]);
+  const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
+  const isCurrentVersion = currentVersionIndex === versionHistory.length - 1;
+  const [showChatPanel, setShowChatPanel] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   
   // Ensure data is properly formatted for visualization
   const parsedData = React.useMemo(() => {
@@ -158,6 +167,34 @@ export function VisualizationEditor({
     setTitleEditing(false);
   };
   
+  // Handle settings change with version history
+  const handleSettingsChange = (newSettings) => {
+    setSettings(newSettings);
+    // Add to version history if different from current version
+    if (JSON.stringify(newSettings) !== JSON.stringify(versionHistory[currentVersionIndex].settings)) {
+      // Remove future versions if we're not at the latest version
+      const updatedHistory = versionHistory.slice(0, currentVersionIndex + 1);
+      setVersionHistory([...updatedHistory, { settings: newSettings }]);
+      setCurrentVersionIndex(updatedHistory.length);
+    }
+  };
+
+  // Undo function
+  const handleUndo = () => {
+    if (currentVersionIndex > 0) {
+      setCurrentVersionIndex(currentVersionIndex - 1);
+      setSettings(versionHistory[currentVersionIndex - 1].settings);
+    }
+  };
+
+  // Redo function
+  const handleRedo = () => {
+    if (currentVersionIndex < versionHistory.length - 1) {
+      setCurrentVersionIndex(currentVersionIndex + 1);
+      setSettings(versionHistory[currentVersionIndex + 1].settings);
+    }
+  };
+
   const handleSendMessage = () => {
     if (!chatInput.trim()) return;
     
@@ -170,77 +207,259 @@ export function VisualizationEditor({
     // Clear input
     setChatInput('');
     
-    // Simulate AI response
+    // Handle analyze data command
+    if (chatInput.toLowerCase().includes('analyze') || 
+        chatInput.toLowerCase().includes('insights') ||
+        chatInput.toLowerCase().includes('commentary')) {
+      
+      setTimeout(() => {
+        let analysisText = '';
+        const chartType = settings.type;
+        
+        // Generate analysis based on the chart type and data
+        if (chartType === 'line') {
+          const dataPoints = parsedData.map(item => Object.values(item)[1]);
+          const trend = dataPoints[dataPoints.length - 1] > dataPoints[0] ? 'upward' : 'downward';
+          const growth = dataPoints[dataPoints.length - 1] > dataPoints[0] 
+            ? ((dataPoints[dataPoints.length - 1] - dataPoints[0]) / dataPoints[0] * 100).toFixed(1)
+            : ((dataPoints[0] - dataPoints[dataPoints.length - 1]) / dataPoints[0] * 100).toFixed(1);
+            
+          analysisText = `Looking at this ${chartType} chart, I can see a clear ${trend} trend with approximately ${growth}% ${trend === 'upward' ? 'growth' : 'decline'} from beginning to end. `;
+          
+          // Check for volatility
+          const volatility = Math.max(...dataPoints) - Math.min(...dataPoints);
+          if (volatility > (Math.max(...dataPoints) * 0.3)) {
+            analysisText += `There's significant volatility in the data, suggesting potential instability or seasonal factors. `;
+          } else {
+            analysisText += `The trend appears relatively stable without major fluctuations. `;
+          }
+          
+          // Check for latest movement
+          if (dataPoints[dataPoints.length - 1] > dataPoints[dataPoints.length - 2]) {
+            analysisText += `The most recent period shows continued growth, which is a positive sign. `;
+          } else {
+            analysisText += `The most recent period shows a decline, which might be worth investigating. `;
+          }
+        } else if (chartType === 'bar') {
+          const keys = Object.keys(parsedData[0]);
+          const numericKey = Object.keys(parsedData[0]).find(key => typeof parsedData[0][key] === 'number');
+          const categoryKey = keys.find(k => k !== numericKey);
+          
+          // Find highest and lowest values
+          let highest = parsedData[0];
+          let lowest = parsedData[0];
+          parsedData.forEach(item => {
+            if (item[numericKey] > highest[numericKey]) highest = item;
+            if (item[numericKey] < lowest[numericKey]) lowest = item;
+          });
+          
+          analysisText = `The bar chart shows ${keys[1]} by ${keys[0]}. ${highest[categoryKey]} has the highest value at ${highest[numericKey].toLocaleString()}, while ${lowest[categoryKey]} has the lowest at ${lowest[numericKey].toLocaleString()}. `;
+          
+          // Check distribution
+          const sum = parsedData.reduce((acc, item) => acc + item[numericKey], 0);
+          const average = sum / parsedData.length;
+          const aboveAverage = parsedData.filter(item => item[numericKey] > average).length;
+          
+          analysisText += `${aboveAverage} out of ${parsedData.length} categories are above the average value of ${average.toLocaleString()}. `;
+          
+          // Check if values are concentrated
+          if (highest[numericKey] > sum * 0.4) {
+            analysisText += `There appears to be a significant concentration, with ${highest[categoryKey]} representing a large portion of the total. This suggests potential areas for deeper analysis. `;
+          } else {
+            analysisText += `The distribution appears relatively balanced across categories. `;
+          }
+        } else if (chartType === 'pie') {
+          const keys = Object.keys(parsedData[0]);
+          const numericKey = Object.keys(parsedData[0]).find(key => typeof parsedData[0][key] === 'number');
+          const categoryKey = keys.find(k => k !== numericKey);
+          
+          // Total and percentages
+          const total = parsedData.reduce((sum, item) => sum + item[numericKey], 0);
+          const segments = parsedData.map(item => ({
+            category: item[categoryKey],
+            value: item[numericKey],
+            percentage: ((item[numericKey] / total) * 100).toFixed(1)
+          }));
+          
+          // Sort by highest percentage
+          segments.sort((a, b) => b.value - a.value);
+          
+          analysisText = `This pie chart shows the distribution of ${title.toLowerCase()}. The largest segment is ${segments[0].category} at ${segments[0].percentage}% of the total. `;
+          
+          // Check if there's dominance
+          if (segments[0].percentage > 50) {
+            analysisText += `This segment represents more than half of the total, showing a clear dominance. `;
+          } else if (segments[0].percentage > 30) {
+            analysisText += `While significant, no single segment completely dominates the chart. `;
+          } else {
+            analysisText += `The distribution is fairly balanced, with no single segment dominating. `;
+          }
+          
+          // Mention smallest segment
+          analysisText += `The smallest segment is ${segments[segments.length - 1].category} at ${segments[segments.length - 1].percentage}%. `;
+          
+          // Top categories
+          if (segments.length > 2) {
+            const topThree = segments.slice(0, Math.min(3, segments.length));
+            const topThreeSum = topThree.reduce((sum, segment) => sum + parseFloat(segment.percentage), 0);
+            analysisText += `The top ${topThree.length} categories (${topThree.map(s => s.category).join(', ')}) account for ${topThreeSum.toFixed(1)}% of the total. `;
+          }
+        } else {
+          analysisText = `This ${settings.type} visualization shows the data for ${title}. Based on the patterns visible, there are variations across the different categories or time periods shown. For more specific insights, I'd need to analyze the specific data points in detail.`;
+        }
+        
+        analysisText += `\n\nTo gain more insights, you could ask about specific patterns, comparisons between categories, or potential factors affecting these trends.`;
+        
+        setChatMessages(prevMessages => [...prevMessages, {
+          role: 'assistant',
+          content: analysisText
+        }]);
+      }, 1000);
+    } else {
+      // Default response
+      setTimeout(() => {
+        setChatMessages(prevMessages => [...prevMessages, {
+          role: 'assistant',
+          content: "I'm continuing to show the visualization you requested. You can edit it using the controls on the right or ask me to analyze the data for insights."
+        }]);
+      }, 500);
+    }
+  };
+
+  // Custom close handler to restore card in chat view
+  const handleClose = () => {
+    setIsClosing(true);
+    
+    // Add a slight delay for animations
     setTimeout(() => {
-      setChatMessages(prevMessages => [...prevMessages, {
-        role: 'assistant',
-        content: "I'm continuing to show the visualization you requested. You can edit it using the controls on the right."
-      }]);
-    }, 500);
+      if (onClose) {
+        // Call the original onClose
+        onClose();
+        
+        // Dispatch a custom event to restore the visualization card
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('restoreVisualization', {
+            detail: { 
+              data: parsedData,
+              settings,
+              type: settings.type,
+              title
+            }
+          }));
+        }
+      }
+      setIsClosing(false);
+    }, 150);
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/10 backdrop-blur-sm animate-in fade-in-0 zoom-in-95 duration-300">
+    <div className={cn(
+      "fixed inset-0 z-50 bg-black/10 backdrop-blur-sm",
+      "transition-all duration-300",
+      isClosing ? "opacity-0" : "opacity-100 animate-in fade-in-0 zoom-in-95 duration-300"
+    )}>
       <div className="absolute inset-0 overflow-hidden">
         <div className="flex h-full w-full flex-col">
           {/* Main content area */}
           <div className="flex-1 overflow-hidden">
             <PanelGroup direction="horizontal" className="h-full">
-              {/* Chat panel (20% width) */}
-              <Panel defaultSize={20} minSize={15} maxSize={25} className="h-full flex flex-col">
-                <div className="border-r h-full flex flex-col bg-background">
-                  <div className="p-3 border-b bg-muted/20">
-                    <h3 className="text-sm font-medium">Chat</h3>
-                  </div>
-                  <div className="flex-1 overflow-auto p-4">
-                    <div className="flex flex-col space-y-4">
-                      {chatMessages.map((message, index) => (
-                        <div 
-                          key={index} 
-                          className={`p-3 rounded-lg ${
-                            message.role === 'user' 
-                              ? 'bg-muted/20' 
-                              : 'bg-primary/10'
-                          }`}
+              {/* Chat panel (20% width) - only shown when toggle is active */}
+              {showChatPanel && (
+                <>
+                  <Panel defaultSize={20} minSize={15} maxSize={25} className="h-full flex flex-col">
+                    <div className="border-r h-full flex flex-col bg-background">
+                      <div className="p-3 border-b bg-muted/20 flex justify-between items-center">
+                        <h3 className="text-sm font-medium">Chat</h3>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 w-7 p-0" 
+                          onClick={() => setShowChatPanel(false)}
                         >
-                          <p className="text-sm font-medium mb-1">
-                            {message.role === 'user' ? 'You:' : 'AI Assistant:'}
-                          </p>
-                          <p className="text-sm">{message.content}</p>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex-1 overflow-auto p-4">
+                        <div className="flex flex-col space-y-4">
+                          {chatMessages.map((message, index) => (
+                            <div 
+                              key={index} 
+                              className={`p-3 rounded-lg ${
+                                message.role === 'user' 
+                                  ? 'bg-muted/20' 
+                                  : 'bg-primary/10'
+                              }`}
+                            >
+                              <p className="text-sm font-medium mb-1">
+                                {message.role === 'user' ? 'You:' : 'AI Assistant:'}
+                              </p>
+                              <p className="text-sm whitespace-pre-line">{message.content}</p>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </div>
+                      
+                      {/* Chat input */}
+                      <div className="p-3 border-t">
+                        <div className="flex gap-2">
+                          <Input
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            placeholder="Type a message..."
+                            className="flex-1"
+                            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                          />
+                          <Button 
+                            size="icon" 
+                            onClick={handleSendMessage}
+                            disabled={!chatInput.trim()}
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  </Panel>
                   
-                  {/* Chat input */}
-                  <div className="p-3 border-t">
-                    <div className="flex gap-2">
-                      <Input
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        placeholder="Type a message..."
-                        className="flex-1"
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                      />
-                      <Button 
-                        size="icon" 
-                        onClick={handleSendMessage}
-                        disabled={!chatInput.trim()}
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </Panel>
+                  <PanelResizeHandle className="w-1.5 bg-muted/30 hover:bg-muted transition" />
+                </>
+              )}
               
-              <PanelResizeHandle className="w-1.5 bg-muted/30 hover:bg-muted transition" />
-              
-              {/* Visualization panel (80% width) */}
-              <Panel defaultSize={80} className="h-full flex flex-col">
+              {/* Visualization panel */}
+              <Panel defaultSize={showChatPanel ? 80 : 100} className="h-full flex flex-col">
                 <div className="h-full flex flex-col">
                   <div className="p-3 border-b bg-muted/20 flex-shrink-0 flex justify-between items-center">
-                    <h3 className="text-sm font-medium">Editor</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-medium">Editor</h3>
+                      <div className="flex items-center ml-4 gap-1">
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          onClick={handleUndo} 
+                          disabled={currentVersionIndex === 0}
+                          className="h-7 w-7"
+                        >
+                          <Undo className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          onClick={handleRedo} 
+                          disabled={isCurrentVersion}
+                          className="h-7 w-7"
+                        >
+                          <Redo className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowChatPanel(!showChatPanel)}
+                        className="ml-2"
+                      >
+                        {showChatPanel ? "Hide Chat" : "Show Chat"}
+                      </Button>
+                    </div>
                     <div className="flex items-center gap-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -270,13 +489,13 @@ export function VisualizationEditor({
                         </DropdownMenuContent>
                       </DropdownMenu>
                       
-                      <Button variant="ghost" size="icon" onClick={onClose} className="ml-2">
+                      <Button variant="ghost" size="icon" onClick={handleClose} className="ml-2">
                         <X className="h-5 w-5" />
                       </Button>
                     </div>
                   </div>
                   
-                  <div className="flex-1 flex">
+                  <div className="flex-1 flex overflow-hidden">
                     {/* Main visualization area */}
                     <div className="flex-1 p-6 overflow-auto bg-background">
                       <div className="bg-card p-6 rounded-lg border shadow-sm">
@@ -305,6 +524,8 @@ export function VisualizationEditor({
                             </h2>
                           )}
                         </div>
+                        
+                        {/* Main chart area */}
                         {parsedData && parsedData.length > 0 ? (
                           <div className="mx-auto max-w-4xl h-[400px] flex items-center justify-center">
                             <StandaloneChart 

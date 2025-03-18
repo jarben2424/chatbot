@@ -246,7 +246,7 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
           
           // Convert to CSV
           const headers = Object.keys(data[0]).join(',');
-          const rows = data.map(row => 
+          const rows = data.map((row: any) => 
             Object.values(row).map(value => 
               typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value
             ).join(',')
@@ -280,7 +280,7 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
       onClick: ({ appendMessage }) => {
         appendMessage({
           role: 'user',
-          content: 'Can you analyze this data and provide key insights?',
+          content: 'Can you analyze this data and provide key insights about trends, patterns, or notable features shown in the chart? Please provide a detailed explanation of what this visualization is showing and what it might imply.',
         });
       },
     },
