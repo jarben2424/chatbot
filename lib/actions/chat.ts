@@ -104,6 +104,6 @@ export async function removeChat(id: string) {
   return {}
 }
 
-export function isChatOwner(chat: Chat, userId: string) {
+export async function isChatOwner(chat: Chat, userId: string) {
   return chat.userId === userId
 } 
