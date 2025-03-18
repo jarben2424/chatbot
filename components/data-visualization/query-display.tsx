@@ -9,7 +9,6 @@ import { VisualizationPanel } from './visualization-panel';
 import { generateUUID } from '@/lib/utils';
 import { useArtifact } from '@/hooks/use-artifact';
 import { ArtifactKind } from '@/components/artifact';
-import { VisualizationEditor } from './visualization-editor';
 
 export interface QueryDisplayProps {
   data: any[];
@@ -28,15 +27,12 @@ export function QueryDisplay({
 }: QueryDisplayProps) {
   const { setArtifact } = useArtifact();
   const [showSql, setShowSql] = useState(false);
-  const [isVisualizing, setIsVisualizing] = useState(false);
   const [isFlipping, setIsFlipping] = useState(false);
-  const [visualizationResult, setVisualizationResult] = useState(null);
+  const [visualizationResult, setVisualizationResult] = useState<{data: any[], type: string} | null>(null);
   const [showVisualizationPanel, setShowVisualizationPanel] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [savedVisualizations, setSavedVisualizations] = useState([]);
-
-  // Move determineBestVisualization out of visualizeData function to component level
-  function determineBestVisualization(data) {
+  
+  // Function to determine best visualization type based on data structure
+  function determineBestVisualization(data: any[]): string {
     if (!data || data.length === 0) return 'table';
     
     // Look for date columns and numeric columns
@@ -98,8 +94,6 @@ export function QueryDisplay({
   };
 
   const visualizeData = () => {
-    setIsVisualizing(true);
-    
     try {
       if (!data || !Array.isArray(data) || data.length === 0) {
         // Provide fallback data for monthly revenue query
@@ -112,55 +106,100 @@ export function QueryDisplay({
             { month: 'May', revenue: 94200 }
           ];
           
-          setShowVisualizationPanel(true);
+          // Set visualization result with the appropriate type
+          setVisualizationResult({
+            data: fallbackData,
+            type: 'line' // Explicitly set line chart for time series
+          });
+
+          // Create an artifact in fullscreen mode
+          const artifactId = generateUUID();
           
-          // Auto-expand after a short delay to split-screen editor
-          setTimeout(() => {
-            setIsExpanded(true);
-          }, 500);
+          setArtifact({
+            documentId: artifactId,
+            title: title,
+            kind: 'visualization' as ArtifactKind,
+            content: JSON.stringify({
+              data: fallbackData,
+              visualization: 'line',
+              description,
+              settings: {
+                type: 'line',
+                colors: ['hsl(var(--chart-1, 221 83% 53%))', 'hsl(var(--chart-2, 358 84% 56%))', 
+                       'hsl(var(--chart-3, 160 84% 39%))', 'hsl(var(--chart-4, 45 93% 47%))',
+                       'hsl(var(--chart-5, 262 80% 63%))'],
+                showLegend: true,
+                showDataLabels: false,
+                showTitle: true,
+                showLabels: true,
+                title: title
+              }
+            }),
+            isVisible: true,
+            status: 'idle',
+            boundingBox: {
+              top: 0,
+              left: 0,
+              width: 0,
+              height: 0,
+            },
+          });
           
           toast.success('Visualization created');
           return;
         }
         
         toast.error('No data available to visualize');
-        setIsVisualizing(false);
         return;
       }
       
-      // Determine best visualization type
+      // Determine best visualization type based on data structure
       const bestVisualizationType = determineBestVisualization(data);
       
-      // Show the preview panel in regular chat
-      setShowVisualizationPanel(true);
+      // Set the visualization result with the determined type
+      setVisualizationResult({
+        data: data,
+        type: bestVisualizationType
+      });
       
-      // Auto-expand after a short delay to split-screen editor
-      setTimeout(() => {
-        setIsExpanded(true);
-      }, 500);
+      // Create an artifact in fullscreen mode
+      const artifactId = generateUUID();
+      
+      setArtifact({
+        documentId: artifactId,
+        title: title,
+        kind: 'visualization' as ArtifactKind,
+        content: JSON.stringify({
+          data: data,
+          visualization: bestVisualizationType,
+          description,
+          settings: {
+            type: bestVisualizationType,
+            colors: ['hsl(var(--chart-1, 221 83% 53%))', 'hsl(var(--chart-2, 358 84% 56%))', 
+                   'hsl(var(--chart-3, 160 84% 39%))', 'hsl(var(--chart-4, 45 93% 47%))',
+                   'hsl(var(--chart-5, 262 80% 63%))'],
+            showLegend: true,
+            showDataLabels: false,
+            showTitle: true,
+            showLabels: true,
+            title: title
+          }
+        }),
+        isVisible: true,
+        status: 'idle',
+        boundingBox: {
+          top: 0,
+          left: 0,
+          width: 0,
+          height: 0,
+        },
+      });
       
       toast.success('Visualization created');
     } catch (error) {
       console.error('Visualization error:', error);
       toast.error('Error creating visualization');
-    } finally {
-      setIsVisualizing(false);
     }
-  };
-
-  // Add a function to handle saving visualizations
-  const handleSaveVisualization = (vizData) => {
-    // Here you would save to your database
-    console.log('Saving visualization to dashboard:', vizData);
-    
-    // For demo, just add to local state
-    setSavedVisualizations([...savedVisualizations, vizData]);
-    
-    // Show success toast
-    toast.success('Visualization saved to dashboard');
-    
-    // Close the expanded view
-    setIsExpanded(false);
   };
 
   function formatSql(sql: string) {
@@ -231,32 +270,34 @@ export function QueryDisplay({
                   <Button size="sm" variant="outline" onClick={downloadCSV}>
                     Download CSV
                   </Button>
-                  {!visualization && (
-                    <Button 
-                      size="sm" 
-                      onClick={visualizeData} 
-                      disabled={isVisualizing}
-                    >
-                      {isVisualizing ? 'Creating...' : 'Visualize'}
-                    </Button>
-                  )}
                   <Button 
                     size="sm" 
                     variant="outline" 
                     onClick={() => setShowSql(true)}
-                    className="ml-2"
                   >
                     Show SQL
                   </Button>
+                  {!visualization && (
+                    <Button 
+                      size="sm" 
+                      variant="default"
+                      onClick={visualizeData} 
+                    >
+                      Visualize
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
-            <div className="max-h-96 overflow-auto">
+            <div 
+              className={cn("transition-all duration-300", { 
+                "opacity-50 transform scale-95": isFlipping 
+              })}
+            >
               <DataTable data={data} />
             </div>
           </div>
         ) : (
-          // SQL view
           <div>
             <div className="bg-muted p-4">
               <div className="flex items-center justify-between">
@@ -278,53 +319,6 @@ export function QueryDisplay({
           </div>
         )}
       </div>
-
-      {/* Add visualization panel */}
-      {showVisualizationPanel && !isExpanded && (
-        <div className="mt-6">
-          <VisualizationPanel
-            data={data}
-            visualization={visualization || 'auto'}
-            title={title}
-            expandable={true}
-            onClose={() => setShowVisualizationPanel(false)}
-            onExpand={() => setIsExpanded(true)}
-          />
-        </div>
-      )}
-
-      {isExpanded && (
-        <VisualizationEditor
-          data={data}
-          visualization={visualization || determineBestVisualization(data)}
-          title={title}
-          onClose={() => {
-            setIsExpanded(false);
-            setShowVisualizationPanel(true);
-          }}
-          onSave={(savedViz) => {
-            // Save the visualization to the dashboard
-            console.log('Saving visualization:', savedViz);
-            
-            // Close the editor after saving
-            setIsExpanded(false);
-            setShowVisualizationPanel(false);
-            toast.success('Saved to Dashboard');
-          }}
-        >
-          <div className="text-muted-foreground">
-            <h3 className="font-medium mb-2">Current Query</h3>
-            <p className="text-sm mb-4">
-              {title}
-            </p>
-            {sql && (
-              <div className="text-xs mt-2 p-2 bg-muted/30 rounded">
-                <code>{sql.substring(0, 80)}...</code>
-              </div>
-            )}
-          </div>
-        </VisualizationEditor>
-      )}
     </>
   );
 } 

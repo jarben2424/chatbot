@@ -14,7 +14,6 @@ interface ChatPageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ 
     model?: string;
-    visibility?: string;
   }>;
 }
 
@@ -23,7 +22,7 @@ export default async function ChatPage({
   searchParams,
 }: ChatPageProps) {
   const { id } = await params;
-  const { model = DEFAULT_CHAT_MODEL, visibility = 'private' } = await searchParams;
+  const { model = DEFAULT_CHAT_MODEL } = await searchParams;
   
   const session = await auth();
 
@@ -39,19 +38,21 @@ export default async function ChatPage({
         id={id}
         initialMessages={[]}
         selectedChatModel={model}
-        selectedVisibilityType={visibility}
         isReadonly={false}
       />
     );
   }
 
+  // Get messages for this chat
+  const dbMessages = await getMessagesByChatId({ id });
+  const messages = convertToUIMessages(dbMessages);
+
   if (chat.userId !== session.user.id) {
     return (
       <ChatWrapper
         id={id}
-        initialMessages={chat.messages}
+        initialMessages={messages}
         selectedChatModel={model}
-        selectedVisibilityType={visibility}
         isReadonly={true}
       />
     );
@@ -60,9 +61,8 @@ export default async function ChatPage({
   return (
     <ChatWrapper
       id={id}
-      initialMessages={chat.messages}
+      initialMessages={messages}
       selectedChatModel={model}
-      selectedVisibilityType={visibility}
       isReadonly={false}
     />
   );

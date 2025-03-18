@@ -10,7 +10,6 @@ import { fetcher, generateUUID } from '@/lib/utils';
 import { Artifact } from './artifact';
 import { MultimodalInput } from './multimodal-input';
 import { Messages } from './messages';
-import { VisibilityType } from './visibility-selector';
 import { useArtifactSelector } from '@/hooks/use-artifact';
 import { toast } from 'sonner';
 import { QueryResult } from '@/components/data-visualization/query-result';
@@ -21,7 +20,6 @@ interface ChatProps {
   id: string;
   initialMessages: Array<Message>;
   selectedChatModel: string;
-  selectedVisibilityType: VisibilityType;
   isReadonly: boolean;
   children?: React.ReactNode;
 }
@@ -30,7 +28,6 @@ export function Chat({
   id,
   initialMessages,
   selectedChatModel,
-  selectedVisibilityType,
   isReadonly,
   children
 }: ChatProps) {
@@ -75,7 +72,6 @@ export function Chat({
       <ChatHeader
         chatId={id}
         selectedModelId={selectedChatModel}
-        selectedVisibilityType={selectedVisibilityType}
         isReadonly={isReadonly}
       />
 
