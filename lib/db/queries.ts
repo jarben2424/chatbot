@@ -247,15 +247,17 @@ export async function saveDocument({
 
 export async function getDocumentsById({ id }: { id: string }) {
   try {
-    const documents = await db
-      .select()
-      .from(document)
-      .where(eq(document.id, id))
-      .orderBy(asc(document.createdAt));
-
+    // Use parameterized query for safety
+    const documents = await client`
+      SELECT "id", "createdAt", "title", "content", "kind", "userId"
+      FROM "Document" 
+      WHERE "id" = ${id}
+      ORDER BY "createdAt" ASC
+    `;
+    
     return documents;
   } catch (error) {
-    console.error('Failed to get document by id from database');
+    console.error('Failed to get documents by id from database', error);
     throw error;
   }
 }

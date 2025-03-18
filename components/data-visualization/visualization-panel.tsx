@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { toast } from 'sonner';
 import { formatDistance } from 'date-fns';
+import { FloatingAnalysisButton } from './floating-analysis-button';
 
 // Import the VisualizationSettings interface from visualization-controls.tsx
 interface VisualizationSettings {
@@ -230,9 +231,27 @@ export function VisualizationPanel({
         const timestamp = new Date().toISOString();
         setDocumentTimestamp(timestamp); // Update local timestamp immediately
         
+        // Ensure we have data to display
+        console.log('Expanding visualization with data:', {
+          dataLength: data?.length,
+          data: data?.slice(0, 2), // First 2 items for debugging
+          settings
+        });
+        
         // Create reference to the rendered visualization (if any) to get its position
         const vizElement = document.querySelector('.chart-container') || document.querySelector('.border.rounded-lg');
         const rect = vizElement ? vizElement.getBoundingClientRect() : null;
+        
+        // Parse any existing content from the artifact if available
+        let existingContent;
+        if (artifact && artifact.content) {
+          try {
+            existingContent = JSON.parse(artifact.content);
+            console.log('Existing artifact content:', existingContent);
+          } catch (e) {
+            console.error('Error parsing artifact content:', e);
+          }
+        }
         
         // Create the artifact with reference to the document
         setArtifact({
@@ -240,7 +259,7 @@ export function VisualizationPanel({
           kind: 'visualization' as ArtifactKind,
           title,
           content: JSON.stringify({
-            data, 
+            data: data, // Use the current data directly
             visualization: settings.type,
             description,
             timestamp,
@@ -324,59 +343,175 @@ export function VisualizationPanel({
   
   // Update renderVisualization to use settings
   const renderVisualization = () => {
-    // Ensure we have data
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      // Provide fallback data for monthly revenue query
-      if (title.toLowerCase().includes('monthly revenue')) {
-        const fallbackData = [
-          { month: 'January', revenue: 75000 },
-          { month: 'February', revenue: 82500 },
-          { month: 'March', revenue: 79800 },
-          { month: 'April', revenue: 88000 },
-          { month: 'May', revenue: 94200 }
-        ];
-        
-        return (
-          <StandaloneChart 
-            type={settings.type === 'auto' ? 'line' : settings.type}
-            data={fallbackData}
-            height={isForceExpanded ? 400 : 215}
-            width="100%"
-            startYAxisFromZero={true}
-            formatNumbers={true}
-            colors={settings.colors}
-          />
-        );
-      }
+    console.log('Rendering visualization with settings:', {
+      shouldShowFullScreen,
+      hasData: !!data && Array.isArray(data) && data.length > 0,
+      hasFormattedData: !!formattedData && formattedData.length > 0,
+      dataLength: data?.length,
+      formattedDataLength: formattedData?.length,
+      type: settings.type,
+      artifact: artifact?.content ? 'Has artifact content' : 'No artifact content',
+      title
+    });
+
+    // First, always prefer the data passed directly to the component
+    if (data && Array.isArray(data) && data.length > 0) {
+      const chartType = settings.type === 'auto' ? determineBestVisualizationType(data) : settings.type;
       
-      return <div className="text-center text-muted-foreground">No data available</div>;
+      console.log('Using data from props:', {
+        dataLength: data.length,
+        formattedDataLength: formattedData.length,
+        chartType
+      });
+
+      return (
+        <StandaloneChart 
+          type={chartType}
+          data={formattedData}
+          height={shouldShowFullScreen ? 650 : 215}
+          width="100%"
+          startYAxisFromZero={true}
+          formatNumbers={true}
+          colors={settings.colors}
+          showLegend={settings.showLegend}
+          showDataLabels={settings.showDataLabels}
+          title={settings.showTitle ? settings.title : undefined}
+        />
+      );
     }
     
-    // Get a specific chart type, never using 'auto'
-    const chartType = settings.type === 'auto' ? determineBestVisualizationType(data) : settings.type;
+    // Then try to get data from the artifact if available
+    if (shouldShowFullScreen && artifact && artifact.content) {
+      try {
+        // Try to get data from the artifact content
+        const parsedContent = JSON.parse(artifact.content);
+        console.log('Using data from artifact:', {
+          artifactId: artifact.documentId,
+          title: artifact.title,
+          contentDataLength: parsedContent.data?.length
+        });
+        
+        // Use artifact data if available
+        let chartData = parsedContent.data;
+        
+        // If we have valid data from the artifact, use it
+        if (chartData && Array.isArray(chartData) && chartData.length > 0) {
+          // Format the data
+          const formattedChartData = chartData.map(item => {
+            const result = { ...item };
+            // Format numeric values properly
+            Object.keys(result).forEach(key => {
+              if (typeof result[key] === 'number') {
+                // Round to whole numbers
+                result[key] = Math.round(result[key]);
+              } else if (typeof result[key] === 'string' && !isNaN(parseFloat(result[key]))) {
+                // Try to convert string numbers to actual numbers and round
+                result[key] = Math.round(parseFloat(result[key]));
+              }
+            });
+            return result;
+          });
+          
+          const chartType = settings.type === 'auto' ? determineBestVisualizationType(chartData) : settings.type;
+          
+          return (
+            <StandaloneChart 
+              type={chartType}
+              data={formattedChartData}
+              height={650}
+              width="100%"
+              startYAxisFromZero={true}
+              formatNumbers={true}
+              colors={settings.colors}
+              showLegend={settings.showLegend}
+              showDataLabels={settings.showDataLabels}
+              title={settings.showTitle ? settings.title : undefined}
+            />
+          );
+        }
+      } catch (e) {
+        console.error('Error parsing artifact content:', e);
+      }
+    }
     
-    // Return the visualization
-    return (
-      <StandaloneChart 
-        type={chartType}
-        data={formattedData}
-        height={shouldShowFullScreen ? 400 : 215}
-        width="100%"
-        startYAxisFromZero={true}
-        formatNumbers={true}
-        colors={settings.colors}
-        showLegend={settings.showLegend}
-        showDataLabels={settings.showDataLabels}
-        title={settings.showTitle ? settings.title : undefined}
-      />
-    );
+    // If we still don't have data, use fallback for monthly revenue or display no data
+    if (title.toLowerCase().includes('monthly revenue')) {
+      const fallbackData = [
+        { month: 'January', revenue: 75000 },
+        { month: 'February', revenue: 82500 },
+        { month: 'March', revenue: 79800 },
+        { month: 'April', revenue: 88000 },
+        { month: 'May', revenue: 94200 }
+      ];
+      
+      console.log('Rendering fallback data chart, fullscreen:', shouldShowFullScreen);
+      
+      return (
+        <StandaloneChart 
+          type={settings.type === 'auto' ? 'line' : settings.type}
+          data={fallbackData}
+          height={shouldShowFullScreen ? 650 : 215}
+          width="100%"
+          startYAxisFromZero={true}
+          formatNumbers={true}
+          colors={settings.colors}
+          showLegend={settings.showLegend}
+          showDataLabels={settings.showDataLabels}
+          title={settings.showTitle ? settings.title : undefined}
+        />
+      );
+    }
+    
+    // Last resort - no data available
+    return <div className="text-center text-muted-foreground">No data available</div>;
   };
   
   // Determine if we're in split-screen view or chat view
   const isSplitView = artifactId && artifact && artifact.documentId === artifactId && artifact.isVisible;
   
-  // Determine if we show full screen view
-  const shouldShowFullScreen = isSplitView || isForceExpanded;
+  // Get settings from artifact if available
+  const artifactSettings = useMemo(() => {
+    if (artifact?.content) {
+      try {
+        const content = JSON.parse(artifact.content);
+        console.log('Parsed artifact content:', {
+          content,
+          hasForceExpanded: !!content.forceExpanded,
+          hasSettingsObj: !!content.settings,
+          settingsForceExpanded: content.settings?.forceExpanded,
+          fullContentStr: artifact.content.substring(0, 200) + '...' // First 200 chars for debugging
+        });
+        return content;
+      } catch (e) {
+        console.error('Error parsing artifact settings:', e);
+        return {};
+      }
+    }
+    return {};
+  }, [artifact?.content]);
+  
+  // Determine if we show full screen view - check all possible locations of forceExpanded
+  const shouldShowFullScreen = useMemo(() => {
+    // First check props
+    if (isSplitView || isForceExpanded) {
+      return true;
+    }
+    
+    // Then check artifact content
+    if (artifactSettings) {
+      // Check direct property
+      if (artifactSettings.forceExpanded) {
+        return true;
+      }
+      
+      // Check in nested settings object (this is where it's actually set in query-display.tsx)
+      if (artifactSettings.settings && artifactSettings.settings.forceExpanded) {
+        return true;
+      }
+    }
+    
+    return false;
+  }, [isSplitView, isForceExpanded, artifactSettings]);
   
   // Add debug logging to track artifact state
   useEffect(() => {
@@ -384,9 +519,27 @@ export function VisualizationPanel({
       artifactId,
       visualizationType: visualization,
       dataLength: data?.length,
-      artifactState: artifact
+      hasData: !!data && Array.isArray(data) && data.length > 0,
+      formattedDataLength: formattedData?.length,
+      data: data?.slice(0, 2), // Log first 2 items for debugging
+      shouldShowFullScreen,
+      shouldShowFullScreenChecks: {
+        isSplitView,
+        isForceExpanded,
+        artifactSettingsForceExpanded: artifactSettings?.forceExpanded,
+        nestedSettingsForceExpanded: artifactSettings?.settings?.forceExpanded
+      },
+      artifactState: artifact?.status,
+      isSplitView,
+      isForceExpanded,
+      artifactSettings: {
+        forceExpanded: artifactSettings.forceExpanded,
+        type: artifactSettings.type,
+        hasSettings: !!artifactSettings.settings,
+        settingsForceExpanded: artifactSettings.settings?.forceExpanded
+      }
     });
-  }, [artifactId, visualization, data, artifact]);
+  }, [artifactId, visualization, data, artifact, shouldShowFullScreen, formattedData, isSplitView, isForceExpanded, artifactSettings]);
   
   // Add effect to fetch the document timing information
   const [documentTimestamp, setDocumentTimestamp] = useState<string | null>(null);
@@ -594,29 +747,30 @@ export function VisualizationPanel({
             </div>
             
             {/* Main content area with editor and controls in resizable panels */}
-            <div className="flex-1 overflow-hidden">
-              <PanelGroup direction="horizontal">
-                {/* Visualization panel */}
-                <Panel defaultSize={70} minSize={50}>
-                  <div className="h-full p-3 bg-card">
-                    <div className="border rounded-lg p-3 h-full flex items-center justify-center overflow-hidden">
-                      <div className="w-full h-full flex items-center justify-center">
-                        {renderVisualization()}
-                      </div>
-                    </div>
+            <div className="flex-1 overflow-hidden border-t border-border">
+              <div className="relative h-full">
+                {/* Full-width visualization panel */}
+                <div className="h-full w-full p-3 bg-card overflow-hidden">
+                  <div className="border rounded-lg h-full flex justify-center items-center p-2">
+                    {renderVisualization()}
                   </div>
-                </Panel>
+                </div>
                 
-                {/* Resize handle - standard handle with no visual styling */}
-                <PanelResizeHandle className="w-0 opacity-0" />
-                
-                {/* Controls panel */}
-                <Panel defaultSize={30} minSize={25}>
-                  <div className="h-full flex flex-col border-l">
-                    <div className="p-4 border-b bg-background flex-shrink-0">
-                      <h3 className="text-sm font-medium">Visualization Controls</h3>
+                {/* Floating controls panel - positioned absolutely */}
+                <div className="absolute top-6 right-6 w-72 z-10">
+                  <div className="rounded-lg border bg-card shadow-lg">
+                    <div className="p-3 flex justify-end items-center border-b">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSave}
+                        className="flex items-center gap-1"
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                        <span>Save</span>
+                      </Button>
                     </div>
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="p-4">
                       <VisualizationControls
                         type={settings.type}
                         data={data}
@@ -625,11 +779,98 @@ export function VisualizationPanel({
                       />
                     </div>
                   </div>
-                </Panel>
-              </PanelGroup>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+        
+        {/* Floating Analysis Button */}
+        <FloatingAnalysisButton 
+          onClick={() => {
+            // Generate analysis text based on the chart type and data
+            let analysisText = '';
+            
+            try {
+              if (formattedData && formattedData.length > 0) {
+                if (settings.type === 'line') {
+                  // Safely extract numeric values with type checking
+                  const firstItem = formattedData[0];
+                  const keys = Object.keys(firstItem);
+                  const numericKey = keys.find(key => typeof firstItem[key] === 'number') || keys[1];
+                  
+                  // Create strongly typed array of numbers
+                  const dataPoints: number[] = formattedData.map(item => {
+                    const value = item[numericKey];
+                    return typeof value === 'number' ? value : 0;
+                  });
+                  
+                  const trend = dataPoints[dataPoints.length - 1] > dataPoints[0] ? 'upward' : 'downward';
+                  const startValue = dataPoints[0] || 0;
+                  const endValue = dataPoints[dataPoints.length - 1] || 0;
+                  
+                  // Avoid division by zero
+                  const growth = startValue !== 0 
+                    ? ((endValue - startValue) / Math.abs(startValue) * 100).toFixed(1)
+                    : '0.0';
+                  
+                  analysisText = `Looking at this line chart, I can see a ${trend} trend with approximately ${growth}% ${endValue > startValue ? 'growth' : 'decline'} from beginning to end. `;
+                  
+                  // Check for volatility
+                  const max = Math.max(...dataPoints);
+                  const min = Math.min(...dataPoints);
+                  const volatility = max - min;
+                  
+                  if (max > 0 && volatility > (max * 0.3)) {
+                    analysisText += `There's significant volatility in the data, suggesting potential instability or seasonal factors. `;
+                  } else {
+                    analysisText += `The trend appears relatively stable without major fluctuations. `;
+                  }
+                } else if (settings.type === 'bar') {
+                  analysisText = `This bar chart shows ${title} data. `;
+                  
+                  // Find some basic metrics with type safety
+                  const firstItem = formattedData[0];
+                  const numericKey = Object.keys(firstItem).find(key => typeof firstItem[key] === 'number');
+                  
+                  if (numericKey) {
+                    // Create a strongly typed array of numbers
+                    const values: number[] = formattedData.map(item => {
+                      const value = item[numericKey];
+                      return typeof value === 'number' ? value : 0;
+                    });
+                    
+                    const max = Math.max(...values);
+                    const min = Math.min(...values);
+                    const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+                    
+                    analysisText += `The values range from ${min} to ${max}, with an average of ${avg.toFixed(1)}. `;
+                  }
+                } else {
+                  analysisText = `This ${settings.type} chart displays ${title} data. Based on the visualization, there are patterns and relationships that could be explored further. `;
+                }
+              } else {
+                analysisText = `There is insufficient data to perform a detailed analysis of this visualization. Please ensure the chart has valid data to analyze.`;
+              }
+            } catch (error) {
+              console.error('Error generating chart analysis:', error);
+              analysisText = `I encountered an error while analyzing this chart. This could be due to unexpected data formats or missing values.`;
+            }
+            
+            // Display a toast with the analysis
+            toast.info(
+              <div className="max-w-md">
+                <h3 className="font-medium mb-1">Chart Analysis</h3>
+                <p className="text-sm text-muted-foreground">{analysisText}</p>
+              </div>,
+              {
+                duration: 8000,
+              }
+            );
+          }}
+          position="bottom-right"
+          label="Analyze chart"
+        />
       </div>
     );
   }

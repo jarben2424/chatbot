@@ -23,7 +23,7 @@ const fallbackData = [
 interface StandaloneChartProps {
   type?: string;
   data: Record<string, any>[];
-  height?: number;
+  height?: number | string;
   width?: string | number;
   colors?: string[];
   startYAxisFromZero?: boolean;
@@ -58,8 +58,11 @@ export function StandaloneChart({
       type,
       dataLength: data.length,
       sampleRow: data[0],
+      showLegend,
+      showDataLabels,
+      height
     });
-  }, [type, data]);
+  }, [type, data, showLegend, showDataLabels, height]);
 
   // Get all keys and determine the first string and first number
   const allKeys = Object.keys(data[0]);
@@ -92,8 +95,49 @@ export function StandaloneChart({
   let sortedData = [...data];
   if (isTimeSeries) {
     sortedData = sortedData.sort((a, b) => {
-      if (a[dateOrMonthKey] < b[dateOrMonthKey]) return -1;
-      if (a[dateOrMonthKey] > b[dateOrMonthKey]) return 1;
+      // Get the string values
+      const aVal = String(a[dateOrMonthKey]);
+      const bVal = String(b[dateOrMonthKey]);
+      
+      // Check if values contain month and year format (e.g., "Dec 2024")
+      if (aVal.match(/[A-Za-z]{3,}\s+\d{4}/) && bVal.match(/[A-Za-z]{3,}\s+\d{4}/)) {
+        // Parse month-year strings into Date objects for proper comparison
+        const parseMonthYear = (str: string): Date | null => {
+          const parts = str.split(' ');
+          const monthStr = parts[0];
+          const year = parseInt(parts[1]);
+          
+          // Convert month name to month number (0-11)
+          const months: Record<string, number> = {
+            'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+            'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11,
+            'january': 0, 'february': 1, 'march': 2, 'april': 3, 'june': 5,
+            'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11
+          };
+          
+          const monthKey = monthStr.toLowerCase();
+          // Handle both short and full month names
+          const monthIdx = months[monthKey];
+          if (monthIdx !== undefined) {
+            return new Date(year, monthIdx);
+          } else if (monthKey === 'may') {
+            // Special case for 'may' which appears in both short and full lists
+            return new Date(year, 4);
+          }
+          return null;
+        };
+        
+        const aDate = parseMonthYear(aVal);
+        const bDate = parseMonthYear(bVal);
+        
+        if (aDate && bDate) {
+          return aDate.getTime() - bDate.getTime();
+        }
+      }
+      
+      // Fallback to string comparison if not in month-year format
+      if (aVal < bVal) return -1;
+      if (aVal > bVal) return 1;
       return 0;
     });
   }
@@ -174,15 +218,24 @@ export function StandaloneChart({
     
     // For dates, show only month or month+year
     if (isTimeSeries) {
-      // If it contains both month and year, may need to format
-      if (strValue.includes(' ') && strValue.length > 10) {
+      // If it contains both month and year, format consistently
+      if (strValue.match(/[A-Za-z]{3,}\s+\d{4}/)) {
         const parts = strValue.split(' ');
-        // Likely month and year
+        // Format as "MMM YYYY" (e.g., "Jan 2025")
         if (parts.length === 2) {
-          const month = parts[0].substring(0, 3); // First 3 chars of month
+          const monthStr = parts[0];
           const year = parts[1];
-          return `${month} ${year}`;
+          
+          // Ensure consistent capitalization: first letter cap, rest lowercase
+          const formattedMonth = monthStr.substring(0, 1).toUpperCase() + 
+                                 monthStr.substring(1, 3).toLowerCase();
+          
+          return `${formattedMonth} ${year}`;
         }
+      }
+      
+      // For other date formats
+      if (strValue.includes(' ') && strValue.length > 10) {
         return strValue.substring(0, 10) + '...'; // Truncate if too long
       }
     }
@@ -204,11 +257,13 @@ export function StandaloneChart({
   switch (type) {
     case 'bar':
       return (
-        <ResponsiveContainer width={width} height={height}>
+        <ResponsiveContainer width={width} height={height as number}>
           <BarChart 
             data={sortedData}
             margin={chartMargins}
-            barSize={20}
+            barSize={50}
+            barGap={2}
+            barCategoryGap={5}
           >
             <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
             <XAxis 
@@ -251,7 +306,7 @@ export function StandaloneChart({
       
     case 'line':
       return (
-        <ResponsiveContainer width={width} height={height}>
+        <ResponsiveContainer width={width} height={height as number}>
           <LineChart 
             data={sortedData}
             margin={chartMargins}
@@ -307,7 +362,7 @@ export function StandaloneChart({
       }));
       
       return (
-        <ResponsiveContainer width={width} height={height}>
+        <ResponsiveContainer width={width} height={height as number}>
           <PieChart margin={chartMargins}>
             <Pie
               data={pieData}
@@ -343,7 +398,7 @@ export function StandaloneChart({
       // Auto choose best visualization
       if (isTimeSeries) {
         return (
-          <ResponsiveContainer width={width} height={height}>
+          <ResponsiveContainer width={width} height={height as number}>
             <LineChart 
               data={sortedData}
               margin={chartMargins}
@@ -392,11 +447,13 @@ export function StandaloneChart({
         );
       } else {
         return (
-          <ResponsiveContainer width={width} height={height}>
+          <ResponsiveContainer width={width} height={height as number}>
             <BarChart 
               data={sortedData}
               margin={chartMargins}
-              barSize={20}
+              barSize={50}
+              barGap={2}
+              barCategoryGap={5}
             >
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
               <XAxis 

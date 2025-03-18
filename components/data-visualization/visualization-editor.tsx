@@ -22,6 +22,7 @@ import {
   TabsList, 
   TabsTrigger 
 } from '@/components/ui/tabs';
+import { FloatingAnalysisButton } from './floating-analysis-button';
 
 // List of demo dashboards
 const DEMO_DASHBOARDS = [
@@ -195,6 +196,7 @@ export function VisualizationEditor({
     }
   };
 
+  // Send a chat message
   const handleSendMessage = () => {
     if (!chatInput.trim()) return;
     
@@ -248,55 +250,44 @@ export function VisualizationEditor({
           // Find highest and lowest values
           let highest = parsedData[0];
           let lowest = parsedData[0];
+          let total = 0;
+          
           parsedData.forEach(item => {
+            total += item[numericKey];
             if (item[numericKey] > highest[numericKey]) highest = item;
             if (item[numericKey] < lowest[numericKey]) lowest = item;
           });
           
-          analysisText = `The bar chart shows ${keys[1]} by ${keys[0]}. ${highest[categoryKey]} has the highest value at ${highest[numericKey].toLocaleString()}, while ${lowest[categoryKey]} has the lowest at ${lowest[numericKey].toLocaleString()}. `;
+          const average = (total / parsedData.length).toFixed(1);
           
-          // Check distribution
-          const sum = parsedData.reduce((acc, item) => acc + item[numericKey], 0);
-          const average = sum / parsedData.length;
-          const aboveAverage = parsedData.filter(item => item[numericKey] > average).length;
+          analysisText = `This ${chartType} chart shows ${categoryKey} data for ${title}. `;
+          analysisText += `The highest value is ${highest[categoryKey]} at ${highest[numericKey]}, while the lowest is ${lowest[categoryKey]} at ${lowest[numericKey]}. `;
+          analysisText += `The average across all categories is ${average}. `;
           
-          analysisText += `${aboveAverage} out of ${parsedData.length} categories are above the average value of ${average.toLocaleString()}. `;
+          // Check for outliers
+          const stdDev = Math.sqrt(parsedData.reduce((sum, item) => sum + Math.pow(item[numericKey] - average, 2), 0) / parsedData.length);
+          const outliers = parsedData.filter(item => Math.abs(item[numericKey] - average) > stdDev * 2);
           
-          // Check if values are concentrated
-          if (highest[numericKey] > sum * 0.4) {
-            analysisText += `There appears to be a significant concentration, with ${highest[categoryKey]} representing a large portion of the total. This suggests potential areas for deeper analysis. `;
+          if (outliers.length > 0) {
+            analysisText += `There are ${outliers.length} notable outliers: ${outliers.map(o => o[categoryKey]).join(', ')}. `;
           } else {
-            analysisText += `The distribution appears relatively balanced across categories. `;
+            analysisText += `The data is fairly consistent without major outliers. `;
           }
         } else if (chartType === 'pie') {
-          const keys = Object.keys(parsedData[0]);
+          // For pie charts, calculate percentages
           const numericKey = Object.keys(parsedData[0]).find(key => typeof parsedData[0][key] === 'number');
-          const categoryKey = keys.find(k => k !== numericKey);
+          const categoryKey = Object.keys(parsedData[0]).find(key => typeof parsedData[0][key] === 'string');
           
-          // Total and percentages
           const total = parsedData.reduce((sum, item) => sum + item[numericKey], 0);
+          
+          // Create segments with percentages
           const segments = parsedData.map(item => ({
             category: item[categoryKey],
             value: item[numericKey],
             percentage: ((item[numericKey] / total) * 100).toFixed(1)
-          }));
+          })).sort((a, b) => b.value - a.value);
           
-          // Sort by highest percentage
-          segments.sort((a, b) => b.value - a.value);
-          
-          analysisText = `This pie chart shows the distribution of ${title.toLowerCase()}. The largest segment is ${segments[0].category} at ${segments[0].percentage}% of the total. `;
-          
-          // Check if there's dominance
-          if (segments[0].percentage > 50) {
-            analysisText += `This segment represents more than half of the total, showing a clear dominance. `;
-          } else if (segments[0].percentage > 30) {
-            analysisText += `While significant, no single segment completely dominates the chart. `;
-          } else {
-            analysisText += `The distribution is fairly balanced, with no single segment dominating. `;
-          }
-          
-          // Mention smallest segment
-          analysisText += `The smallest segment is ${segments[segments.length - 1].category} at ${segments[segments.length - 1].percentage}%. `;
+          analysisText = `This ${chartType} chart breaks down ${title} by ${categoryKey}. `;
           
           // Top categories
           if (segments.length > 2) {
@@ -310,6 +301,7 @@ export function VisualizationEditor({
         
         analysisText += `\n\nTo gain more insights, you could ask about specific patterns, comparisons between categories, or potential factors affecting these trends.`;
         
+        // Don't include any visualization in the response - text analysis only
         setChatMessages(prevMessages => [...prevMessages, {
           role: 'assistant',
           content: analysisText
@@ -820,6 +812,53 @@ export function VisualizationEditor({
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* Floating Analysis Button */}
+      <FloatingAnalysisButton 
+        onClick={() => {
+          // Directly trigger analysis without changing input
+          setTimeout(() => {
+            let analysisText = '';
+            const chartType = settings.type;
+            
+            // Generate analysis based on the chart type and data
+            if (chartType === 'line') {
+              const dataPoints = parsedData.map(item => Object.values(item)[1]);
+              const trend = dataPoints[dataPoints.length - 1] > dataPoints[0] ? 'upward' : 'downward';
+              const growth = dataPoints[dataPoints.length - 1] > dataPoints[0] 
+                ? ((dataPoints[dataPoints.length - 1] - dataPoints[0]) / dataPoints[0] * 100).toFixed(1)
+                : ((dataPoints[0] - dataPoints[dataPoints.length - 1]) / dataPoints[0] * 100).toFixed(1);
+                
+              analysisText = `Looking at this ${chartType} chart, I can see a clear ${trend} trend with approximately ${growth}% ${trend === 'upward' ? 'growth' : 'decline'} from beginning to end. `;
+              
+              // Check for volatility
+              const volatility = Math.max(...dataPoints) - Math.min(...dataPoints);
+              if (volatility > (Math.max(...dataPoints) * 0.3)) {
+                analysisText += `There's significant volatility in the data, suggesting potential instability or seasonal factors. `;
+              } else {
+                analysisText += `The trend appears relatively stable without major fluctuations. `;
+              }
+              
+              // Check for latest movement
+              if (dataPoints[dataPoints.length - 1] > dataPoints[dataPoints.length - 2]) {
+                analysisText += `The most recent period shows continued growth, which is a positive sign. `;
+              } else {
+                analysisText += `The most recent period shows a decline, which might be worth investigating. `;
+              }
+            } else {
+              analysisText = `This ${settings.type} visualization shows the data for ${title}. Based on the patterns visible, there are variations across the different categories or time periods shown. For more specific insights, you could ask about specific patterns or trends.`;
+            }
+            
+            // Add user "question" and AI response
+            setChatMessages(prev => [
+              ...prev, 
+              { role: 'user', content: 'Analyze this chart' },
+              { role: 'assistant', content: analysisText }
+            ]);
+          }, 300);
+        }}
+        label="Analyze chart"
+      />
     </div>
   );
 }
