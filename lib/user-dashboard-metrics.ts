@@ -1,3 +1,5 @@
+'use client'
+
 import { createClient } from '@/utils/supabase/client';
 
 export interface UserDashboardMetric {
@@ -19,34 +21,36 @@ export interface UserDashboardMetric {
  */
 export async function getUserDashboardMetrics(): Promise<UserDashboardMetric[]> {
   try {
-    const supabase = createClient();
-
-    // First try to authenticate the user
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // If no user, return empty array
-    if (!user) {
-      console.warn('No authenticated user found for getUserDashboardMetrics');
+    console.log('Fetching dashboard metrics from API...');
+    
+    // Call the API endpoint with credentials to ensure cookies are sent
+    const response = await fetch('/api/user-dashboard-metrics', {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        console.warn('Authentication failed for getUserDashboardMetrics');
+        return getUserDashboardMetricsFromLocalStorage();
+      }
+      
+      console.error('Error response from dashboard metrics API:', response.status, response.statusText);
       return getUserDashboardMetricsFromLocalStorage();
     }
-
-    // Get metrics for the current user
-    const { data, error } = await supabase
-      .from('UserDashboardMetrics')
-      .select('*')
-      .eq('userId', user.id)
-      .eq('isActive', true)
-      .order('displayOrder', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching user dashboard metrics:', error);
-      return getUserDashboardMetricsFromLocalStorage();
+    
+    const metrics = await response.json();
+    console.log(`Received ${metrics.length} dashboard metrics from API`);
+    
+    // Save to localStorage as a fallback for offline/error scenarios
+    if (metrics && Array.isArray(metrics)) {
+      saveUserDashboardMetricsToLocalStorage(metrics);
     }
-
-    // Save to localStorage as a fallback
-    saveUserDashboardMetricsToLocalStorage(data || []);
-
-    return data || [];
+    
+    return metrics || [];
   } catch (error) {
     console.error('Error in getUserDashboardMetrics:', error);
     return getUserDashboardMetricsFromLocalStorage();
@@ -54,72 +58,59 @@ export async function getUserDashboardMetrics(): Promise<UserDashboardMetric[]> 
 }
 
 /**
- * Create a new dashboard metric for the current user
+ * Add a metric to the user's dashboard
  */
-export async function createUserDashboardMetric(metric: Omit<UserDashboardMetric, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'isActive' | 'displayOrder'>): Promise<UserDashboardMetric | null> {
+export async function addMetricToDashboard({
+  sourceType,
+  sourceId,
+  customTitle,
+  customDescription,
+  customVisualizationType,
+  parameters = {}
+}: {
+  sourceType: 'dashboard_metric' | 'chat_generated_metric';
+  sourceId: string;
+  customTitle?: string;
+  customDescription?: string;
+  customVisualizationType?: string;
+  parameters?: Record<string, any>;
+}): Promise<boolean> {
   try {
-    const supabase = createClient();
-
-    // First try to authenticate the user
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // If no user, save to localStorage and return
-    if (!user) {
-      console.warn('No authenticated user found for createUserDashboardMetric');
-      return createUserDashboardMetricInLocalStorage(metric);
+    console.log(`Adding metric to dashboard via API: ${sourceType} ${sourceId.substring(0, 8)}...`);
+    
+    // Call the API endpoint with credentials to ensure cookies are sent
+    const response = await fetch('/api/user-dashboard-metrics', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sourceType,
+        sourceId,
+        customTitle,
+        customDescription,
+        customVisualizationType,
+        parameters
+      }),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        console.warn('Authentication failed for addMetricToDashboard');
+        return false;
+      }
+      
+      console.error('Error response from dashboard metrics API:', response.status, response.statusText);
+      return false;
     }
-
-    // Get current highest order value to place new metric at the end
-    const { data: existingMetrics, error: queryError } = await supabase
-      .from('UserDashboardMetrics')
-      .select('displayOrder')
-      .eq('userId', user.id)
-      .eq('isActive', true)
-      .order('displayOrder', { ascending: false })
-      .limit(1);
-
-    if (queryError) {
-      console.error('Error querying existing metrics:', queryError);
-      return createUserDashboardMetricInLocalStorage(metric);
-    }
-
-    const highestOrder = existingMetrics && existingMetrics.length > 0 
-      ? existingMetrics[0].displayOrder + 1 
-      : 0;
-
-    const now = new Date().toISOString();
-
-    // Insert the new metric
-    const { data: newMetric, error } = await supabase
-      .from('UserDashboardMetrics')
-      .insert({
-        userId: user.id,
-        title: metric.title,
-        description: metric.description || `Data for ${metric.title}`,
-        question: metric.question,
-        sqlQuery: metric.sqlQuery,
-        visualizationType: metric.visualizationType,
-        displayOrder: highestOrder,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating user dashboard metric:', error);
-      return createUserDashboardMetricInLocalStorage(metric);
-    }
-
-    // Update local storage with the new metric
-    const existingMetricsFromStorage = getUserDashboardMetricsFromLocalStorage();
-    saveUserDashboardMetricsToLocalStorage([...existingMetricsFromStorage, newMetric]);
-
-    return newMetric;
+    
+    const result = await response.json();
+    console.log('Successfully added metric to dashboard:', result.metricId);
+    return true;
   } catch (error) {
-    console.error('Error in createUserDashboardMetric:', error);
-    return createUserDashboardMetricInLocalStorage(metric);
+    console.error('Error in addMetricToDashboard:', error);
+    return false;
   }
 }
 
@@ -128,35 +119,28 @@ export async function createUserDashboardMetric(metric: Omit<UserDashboardMetric
  */
 export async function updateUserDashboardMetricOrder(id: string, newOrder: number): Promise<boolean> {
   try {
-    const supabase = createClient();
-
-    // First try to authenticate the user
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // If no user, update in localStorage and return
-    if (!user) {
-      console.warn('No authenticated user found for updateUserDashboardMetricOrder');
+    console.log(`Updating metric order via API: ${id} to ${newOrder}`);
+    
+    // Call the API endpoint with credentials to ensure cookies are sent
+    const response = await fetch('/api/user-dashboard-metrics', {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ id, newOrder }),
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        console.warn('Authentication failed for updateUserDashboardMetricOrder');
+        return updateUserDashboardMetricOrderInLocalStorage(id, newOrder);
+      }
+      
+      console.error('Error response from dashboard metrics API:', response.status, response.statusText);
       return updateUserDashboardMetricOrderInLocalStorage(id, newOrder);
     }
-
-    // Update the metric order
-    const { error } = await supabase
-      .from('UserDashboardMetrics')
-      .update({
-        displayOrder: newOrder,
-        updatedAt: new Date().toISOString()
-      })
-      .eq('id', id)
-      .eq('userId', user.id);
-
-    if (error) {
-      console.error('Error updating metric order:', error);
-      return updateUserDashboardMetricOrderInLocalStorage(id, newOrder);
-    }
-
-    // Update the order in localStorage as well
-    updateUserDashboardMetricOrderInLocalStorage(id, newOrder);
-
+    
     return true;
   } catch (error) {
     console.error('Error in updateUserDashboardMetricOrder:', error);
@@ -169,35 +153,30 @@ export async function updateUserDashboardMetricOrder(id: string, newOrder: numbe
  */
 export async function deleteUserDashboardMetric(id: string): Promise<boolean> {
   try {
-    const supabase = createClient();
-
-    // First try to authenticate the user
-    const { data: { user } } = await supabase.auth.getUser();
-
-    // If no user, delete from localStorage and return
-    if (!user) {
-      console.warn('No authenticated user found for deleteUserDashboardMetric');
+    console.log(`Deleting metric via API: ${id}`);
+    
+    // Call the API endpoint with credentials to ensure cookies are sent
+    const response = await fetch(`/api/user-dashboard-metrics?id=${id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        console.warn('Authentication failed for deleteUserDashboardMetric');
+        return deleteUserDashboardMetricFromLocalStorage(id);
+      }
+      
+      console.error('Error response from dashboard metrics API:', response.status, response.statusText);
       return deleteUserDashboardMetricFromLocalStorage(id);
     }
-
-    // Soft delete the metric by setting isActive to false
-    const { error } = await supabase
-      .from('UserDashboardMetrics')
-      .update({
-        isActive: false,
-        updatedAt: new Date().toISOString()
-      })
-      .eq('id', id)
-      .eq('userId', user.id);
-
-    if (error) {
-      console.error('Error deleting dashboard metric:', error);
-      return deleteUserDashboardMetricFromLocalStorage(id);
-    }
-
-    // Remove from localStorage as well
+    
+    // Remove from localStorage as well for consistency
     deleteUserDashboardMetricFromLocalStorage(id);
-
+    
     return true;
   } catch (error) {
     console.error('Error in deleteUserDashboardMetric:', error);
@@ -210,20 +189,22 @@ export async function deleteUserDashboardMetric(id: string): Promise<boolean> {
  */
 export async function executeUserDashboardMetricQuery(sqlQuery: string): Promise<any> {
   try {
+    // Call the API endpoint to execute the query
     const response = await fetch('/api/run-query', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sqlQuery })
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ sqlQuery }),
     });
 
     if (!response.ok) {
-      throw new Error(`Query failed with status ${response.status}`);
+      throw new Error(`Failed to execute query: ${response.statusText}`);
     }
 
-    const data = await response.json();
-    return data.results && data.results.length > 0 ? data.results[0] : null;
+    return await response.json();
   } catch (error) {
-    console.error('Error executing metric query:', error);
+    console.error('Error executing dashboard metric query:', error);
     throw error;
   }
 }
@@ -254,37 +235,6 @@ function saveUserDashboardMetricsToLocalStorage(metrics: UserDashboardMetric[]):
   } catch (error) {
     console.error('Error saving metrics to localStorage:', error);
   }
-}
-
-function createUserDashboardMetricInLocalStorage(metric: Omit<UserDashboardMetric, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'isActive' | 'displayOrder'>): UserDashboardMetric {
-  const existingMetrics = getUserDashboardMetricsFromLocalStorage();
-  
-  // Generate a temp ID and calculate next display order
-  const id = `local-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-  const highestOrder = existingMetrics.length > 0 
-    ? Math.max(...existingMetrics.map(m => m.displayOrder)) + 1 
-    : 0;
-  
-  const now = new Date().toISOString();
-  
-  const newMetric: UserDashboardMetric = {
-    id,
-    userId: 'local-user',
-    title: metric.title,
-    description: metric.description || `Data for ${metric.title}`,
-    question: metric.question,
-    sqlQuery: metric.sqlQuery,
-    visualizationType: metric.visualizationType,
-    displayOrder: highestOrder,
-    isActive: true,
-    createdAt: now,
-    updatedAt: now
-  };
-  
-  // Save to localStorage
-  saveUserDashboardMetricsToLocalStorage([...existingMetrics, newMetric]);
-  
-  return newMetric;
 }
 
 function updateUserDashboardMetricOrderInLocalStorage(id: string, newOrder: number): boolean {

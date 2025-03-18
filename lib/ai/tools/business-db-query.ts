@@ -2,6 +2,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import snowflake from 'snowflake-sdk';
 import { OpenAI } from 'openai';
+import { createClient } from '@/utils/supabase/server';
 
 // Define types for Snowflake results and connections
 type SnowflakeConnection = snowflake.Connection;
@@ -23,8 +24,9 @@ export const businessDbQuery = tool({
   description: 'Generate and execute SQL queries against business data based on natural language questions',
   parameters: z.object({
     question: z.string().describe('The natural language question about business data to convert to SQL'),
+    conversationId: z.string().optional().describe('The ID of the conversation this query is part of'),
   }),
-  execute: async ({ question }): Promise<QueryResult | ErrorResult> => {
+  execute: async ({ question, conversationId }): Promise<QueryResult | ErrorResult> => {
     // Validate environment variables
     const account = process.env.SNOWFLAKE_ACCOUNT;
     const username = process.env.SNOWFLAKE_USERNAME;
@@ -69,6 +71,15 @@ export const businessDbQuery = tool({
       
       // Execute the query with a timeout
       const results = await executeQuery(connection, sqlQuery);
+      
+      // Save the query and results to ChatGeneratedMetrics
+      await saveChatGeneratedMetric({
+        question,
+        sqlQuery,
+        conversationId,
+        category: detectQueryCategory(question, sqlQuery),
+        visualizationType: suggestVisualizationType(results),
+      });
       
       // Format and return results
       return {
@@ -290,4 +301,161 @@ function formatResults(results: SnowflakeRow[]): SnowflakeRow[] | { data: Snowfl
   }
   
   return results;
+}
+
+/**
+ * Determines the category for a query (sales, customers, skus, or general)
+ */
+function detectQueryCategory(question: string, sqlQuery: string): string {
+  const lowerQuestion = question.toLowerCase();
+  const lowerQuery = sqlQuery.toLowerCase();
+  
+  // Check for sales/revenue related terms
+  if (
+    lowerQuestion.includes('sales') || 
+    lowerQuestion.includes('revenue') || 
+    lowerQuestion.includes('transaction') ||
+    lowerQuery.includes('sum(amount)')
+  ) {
+    return 'sales';
+  }
+  
+  // Check for customer related terms
+  if (
+    lowerQuestion.includes('customer') || 
+    lowerQuestion.includes('user') || 
+    lowerQuestion.includes('client') ||
+    lowerQuery.includes('hang_loyalty_public.users')
+  ) {
+    return 'customers';
+  }
+  
+  // Check for product/SKU related terms
+  if (
+    lowerQuestion.includes('product') || 
+    lowerQuestion.includes('item') || 
+    lowerQuestion.includes('sku') ||
+    lowerQuestion.includes('menu item') ||
+    lowerQuery.includes('menu_items')
+  ) {
+    return 'skus';
+  }
+  
+  // Default to general
+  return 'general';
+}
+
+/**
+ * Suggests a visualization type based on the query results
+ */
+function suggestVisualizationType(results: SnowflakeRow[]): string {
+  if (!results || !Array.isArray(results) || results.length === 0) {
+    return 'table';
+  }
+  
+  // If there's only one row with one or two values, suggest highlight
+  if (results.length === 1 && Object.keys(results[0]).length <= 2) {
+    return 'highlight';
+  }
+  
+  // Check for date/time columns for time series data
+  const firstRow = results[0];
+  const columns = Object.keys(firstRow);
+  const hasDateColumn = columns.some(col => 
+    col.toLowerCase().includes('date') || 
+    col.toLowerCase().includes('time') ||
+    col.toLowerCase().includes('year') ||
+    col.toLowerCase().includes('month')
+  );
+  
+  const hasNumericColumn = columns.some(col => {
+    const value = firstRow[col];
+    return typeof value === 'number';
+  });
+  
+  // If there's a date column and numeric column, suggest chart for time series
+  if (hasDateColumn && hasNumericColumn) {
+    return 'chart';
+  }
+  
+  // If there are categorical columns with numeric values, suggest chart
+  if (columns.length >= 2 && hasNumericColumn) {
+    return 'chart';
+  }
+  
+  // Default to table view
+  return 'table';
+}
+
+/**
+ * Saves a chat-generated metric to the database
+ */
+async function saveChatGeneratedMetric({
+  question,
+  sqlQuery,
+  conversationId,
+  category,
+  visualizationType,
+}: {
+  question: string;
+  sqlQuery: string;
+  conversationId?: string;
+  category: string;
+  visualizationType: string;
+}): Promise<void> {
+  try {
+    console.log('Starting to save chat generated metric directly to database...');
+    
+    // Import the createClient function and auth at runtime
+    const { createClient } = await import('@/utils/supabase/server');
+    const { auth } = await import('@/app/(auth)/auth');
+    
+    // Get the authenticated user's session - using exact approach from chat route
+    console.log('Getting authentication session...');
+    const session = await auth();
+    
+    // Use the same check pattern as the chat route
+    if (!session || !session.user || !session.user.id) {
+      console.log('No authenticated user found when trying to save chat generated metric');
+      return;
+    }
+    
+    console.log('Found authenticated user ID:', session.user.id);
+    
+    // Create Supabase client directly (like the chat route does)
+    const supabase = await createClient();
+    
+    // Generate a title from the question
+    const title = question.length > 50 
+      ? question.substring(0, 47) + '...' 
+      : question;
+    
+    console.log('Inserting metric into database with user ID:', session.user.id);
+    
+    // Insert directly into Supabase with the user's ID explicitly set
+    const { data, error } = await supabase
+      .from('ChatGeneratedMetrics')
+      .insert({
+        userid: session.user.id, // Explicitly set the user ID from the session
+        title,
+        description: question,
+        question,
+        sqlquery: sqlQuery,
+        visualizationtype: visualizationType || 'table',
+        category: category || 'general',
+        conversationid: conversationId || null,
+        createdat: new Date().toISOString(),
+        updatedat: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Failed to save chat generated metric:', error);
+    } else {
+      console.log('Successfully saved chat generated metric with ID:', data?.id);
+    }
+  } catch (error) {
+    console.error('Error in saveChatGeneratedMetric:', error);
+  }
 }

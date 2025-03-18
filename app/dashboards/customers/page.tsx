@@ -1,15 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DashboardQueriesList } from '@/app/dashboards/_components/dashboard-queries-list';
 import { getSystemDashboardMetricsByCategory, DashboardMetric } from '@/lib/dashboard-metrics';
-import { RefreshCw } from 'lucide-react';
-import { ShadcnVisualization } from '../_components/visualizations/shadcn-visualization';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
-import { VisualizationType } from '@/lib/local-storage';
 import { DashboardHeader } from '../_components/dashboard-header';
+import { toast } from 'sonner';
+import { DashboardHighlightCard } from '../_components/dashboard-highlight-card';
+import { RefreshCw } from 'lucide-react';
+import { VisualizationType } from '@/lib/local-storage';
 
 export default function CustomersDashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetric[]>([]);
@@ -74,19 +73,20 @@ export default function CustomersDashboardPage() {
 
   // Helper function to map database visualization type to VisualizationType enum
   const mapVisualizationType = (type: string): VisualizationType => {
-    switch (type) {
+    switch (type?.toLowerCase() || 'highlight') {
       case 'highlight':
         return 'highlight';
       case 'chart':
-        return 'line-chart'; // Map 'chart' to line-chart for time series
+      case 'line':
       case 'line-chart':
         return 'line-chart';
+      case 'bar':
       case 'bar-chart':
         return 'bar-chart';
       case 'table':
         return 'table';
       default:
-        return 'table'; // Default to table visualization
+        return 'highlight';
     }
   };
 
@@ -124,46 +124,27 @@ export default function CustomersDashboardPage() {
         isLoading={runningQueries.size > 0}
       />
       
-      <div className="flex-1 p-6">
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold">Customers Dashboard</h1>
-          <p className="text-muted-foreground">View customer metrics and performance data</p>
-        </div>
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        <DashboardHeader 
+          title="Customers Dashboard" 
+          description="Track customer engagement and retention metrics"
+          isLoading={runningQueries.size > 0}
+        />
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {metrics.length === 0 ? (
-            <div className="col-span-full flex items-center justify-center p-6 bg-muted rounded-md">
-              <p className="text-muted-foreground">No customer metrics available. Contact your administrator to add metrics.</p>
+        <div className="flex flex-wrap gap-4">
+          {metrics.map((metric) => (
+            <div key={metric.id} className="w-full md:w-[calc(33.333%-1rem)]">
+              <DashboardHighlightCard
+                id={metric.id}
+                title={metric.title || 'Customer Metric'}
+                description={metric.description || ''}
+                visualizationType={mapVisualizationType(metric.visualizationtype)}
+                isLoading={runningQueries.has(metric.id)}
+                data={results[metric.id]?.results || []}
+                onRunQuery={() => runQuery(metric)}
+              />
             </div>
-          ) : (
-            metrics.map(metric => (
-              <Card key={metric.id} className="overflow-hidden shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
-                  <CardDescription>{metric.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {runningQueries.has(metric.id) ? (
-                    <div className="flex items-center justify-center h-52">
-                      <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : results[metric.id] ? (
-                    <ShadcnVisualization 
-                      data={results[metric.id].results} 
-                      type={mapVisualizationType(metric.visualizationtype)}
-                      title={metric.title}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-52">
-                      <Button size="sm" onClick={() => runQuery(metric)} variant="outline">
-                        Run Query
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
+          ))}
         </div>
       </div>
     </div>

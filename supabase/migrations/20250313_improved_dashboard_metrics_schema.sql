@@ -1,28 +1,11 @@
 -- Drop existing tables if they exist
 DROP TABLE IF EXISTS "UserDashboardMetrics";
 DROP TABLE IF EXISTS "ChatGeneratedMetrics";
-DROP TABLE IF EXISTS "DashboardMetrics";
-
--- 1. Create DashboardMetrics table (pre-defined system metrics)
-CREATE TABLE "DashboardMetrics" (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title TEXT NOT NULL,
-  description TEXT,
-  category TEXT NOT NULL CHECK (category IN ('sales', 'customers', 'skus', 'general')),
-  visualizationType TEXT NOT NULL CHECK (visualizationType IN ('highlight', 'chart', 'table')),
-  queryTemplate TEXT NOT NULL, -- Parameterized query template
-  isSystem BOOLEAN DEFAULT TRUE, -- Indicates if this is a system-provided metric
-  createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create index for faster category filtering
-CREATE INDEX idx_dashboard_metrics_category ON "DashboardMetrics" (category);
 
 -- 2. Create ChatGeneratedMetrics table (metrics created via AI chat)
 CREATE TABLE "ChatGeneratedMetrics" (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  userId TEXT NOT NULL,
+  userId UUID NOT NULL, -- Changed from TEXT to UUID for consistency
   title TEXT NOT NULL,
   description TEXT,
   question TEXT NOT NULL, -- The original question that generated this metric
@@ -41,7 +24,7 @@ CREATE INDEX idx_chat_generated_metrics_category ON "ChatGeneratedMetrics" (cate
 -- 3. Create UserDashboardMetrics table (dashboard configuration)
 CREATE TABLE "UserDashboardMetrics" (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  userId TEXT NOT NULL,
+  userId UUID NOT NULL, -- Changed from TEXT to UUID for consistency
   sourceType TEXT NOT NULL CHECK (sourceType IN ('dashboard_metric', 'chat_generated_metric')),
   sourceId UUID NOT NULL, -- ID from either DashboardMetrics or ChatGeneratedMetrics
   displayOrder INTEGER NOT NULL DEFAULT 0,
@@ -113,65 +96,47 @@ CREATE POLICY "Authenticated users can manage DashboardMetrics"
 CREATE POLICY "Users can view their own ChatGeneratedMetrics"
   ON "ChatGeneratedMetrics"
   FOR SELECT
-  USING (userId = auth.uid()::TEXT);
+  USING (userId = auth.uid());
 
 -- Users can insert their own chat-generated metrics
 CREATE POLICY "Users can insert their own ChatGeneratedMetrics"
   ON "ChatGeneratedMetrics"
   FOR INSERT
-  WITH CHECK (userId = auth.uid()::TEXT);
+  WITH CHECK (userId = auth.uid());
 
 -- Users can update their own chat-generated metrics
 CREATE POLICY "Users can update their own ChatGeneratedMetrics"
   ON "ChatGeneratedMetrics"
   FOR UPDATE
-  USING (userId = auth.uid()::TEXT);
+  USING (userId = auth.uid());
 
 -- Users can delete their own chat-generated metrics
 CREATE POLICY "Users can delete their own ChatGeneratedMetrics"
   ON "ChatGeneratedMetrics"
   FOR DELETE
-  USING (userId = auth.uid()::TEXT);
+  USING (userId = auth.uid());
 
 -- UserDashboardMetrics policies
 -- Users can view their own dashboard metrics
 CREATE POLICY "Users can view their own UserDashboardMetrics"
   ON "UserDashboardMetrics"
   FOR SELECT
-  USING (userId = auth.uid()::TEXT);
+  USING (userId = auth.uid());
 
 -- Users can insert their own dashboard metrics
 CREATE POLICY "Users can insert their own UserDashboardMetrics"
   ON "UserDashboardMetrics"
   FOR INSERT
-  WITH CHECK (userId = auth.uid()::TEXT);
+  WITH CHECK (userId = auth.uid());
 
 -- Users can update their own dashboard metrics
 CREATE POLICY "Users can update their own UserDashboardMetrics"
   ON "UserDashboardMetrics"
   FOR UPDATE
-  USING (userId = auth.uid()::TEXT);
+  USING (userId = auth.uid());
 
 -- Users can delete their own dashboard metrics
 CREATE POLICY "Users can delete their own UserDashboardMetrics"
   ON "UserDashboardMetrics"
   FOR DELETE
-  USING (userId = auth.uid()::TEXT);
-
--- Insert some sample system metrics to get started
-INSERT INTO "DashboardMetrics" (title, description, category, visualizationType, queryTemplate) VALUES
-('Monthly Revenue', 'Total revenue over the past 30 days', 'sales', 'chart', 
- 'SELECT date_trunc(''day'', created_at) as day, SUM(amount) as revenue FROM sales WHERE created_at > NOW() - INTERVAL ''30 days'' GROUP BY day ORDER BY day'),
-('Today''s Transactions', 'Count of transactions for today', 'sales', 'highlight',
- 'SELECT COUNT(*) AS transaction_count
-  FROM hang_loyalty_public.transactions
-  WHERE CONVERT_TIMEZONE(''UTC'', ''America/Los_Angeles'', transaction_timestamp)::date = CURRENT_DATE
-    AND program_id = 1614
-    AND _FIVETRAN_DELETED = false'),
-('This Week''s Transactions', 'Count of transactions for the current week', 'sales', 'highlight',
- 'SELECT COUNT(*) AS transaction_count
-  FROM hang_loyalty_public.transactions
-  WHERE CONVERT_TIMEZONE(''UTC'', ''America/Los_Angeles'', transaction_timestamp)::date >= DATE_TRUNC(''week'', CURRENT_DATE)
-    AND CONVERT_TIMEZONE(''UTC'', ''America/Los_Angeles'', transaction_timestamp)::date <= CURRENT_DATE
-    AND program_id = 1614
-    AND _FIVETRAN_DELETED = false');
+  USING (userId = auth.uid());

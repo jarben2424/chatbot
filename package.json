@@ -17,7 +17,8 @@
     "db:pull": "drizzle-kit pull",
     "db:check": "drizzle-kit check",
     "db:up": "drizzle-kit up",
-    "test": "export PLAYWRIGHT=True && pnpm exec playwright test --workers=4"
+    "test": "export PLAYWRIGHT=True && pnpm exec playwright test --workers=4",
+    "test:api": "node scripts/test-api.js"
   },
   "dependencies": {
     "@ai-sdk/fireworks": "0.1.12",
@@ -115,6 +116,7 @@
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.19.1",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "node-fetch": "^2.6.9"
   }
 }

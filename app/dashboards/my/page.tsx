@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { DashboardQueriesList } from '@/app/dashboards/_components/dashboard-queries-list';
 import { EmailSubscriptionsList } from '@/app/dashboards/_components/email-subscriptions-list';
 import { Button } from '@/components/ui/button';
-import { Bell, PlusCircle, BarChart, LineChart } from 'lucide-react';
-import { getEmailSubscriptions, LocalDashboardQuery, getLocalDashboardQueries } from '@/lib/local-storage';
+import { Bell, PlusCircle, BarChart, LineChart, RefreshCw, Trash2, MoreHorizontal } from 'lucide-react';
+import { getEmailSubscriptions } from '@/lib/local-storage';
 import {
   Sheet,
   SheetContent,
@@ -15,7 +15,7 @@ import {
   SheetTrigger,
   SheetFooter,
 } from '@/components/ui/sheet';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   DndContext,
   closestCenter,
@@ -35,6 +35,31 @@ import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
 import { DashboardHeader } from '../_components/dashboard-header';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { 
+  getUserDashboardMetrics, 
+  updateUserDashboardMetricOrder, 
+  deleteUserDashboardMetric
+} from '@/lib/user-dashboard-metrics';
+import { ShadcnVisualization } from '../_components/visualizations/shadcn-visualization';
+import { VisualizationType } from '@/lib/local-storage';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
+import { DashboardHighlightCard } from '../_components/dashboard-highlight-card';
+
+// Interface for user dashboard metrics
+interface UserMetric {
+  id: string;
+  title: string;
+  description?: string;
+  sqlQuery: string;
+  visualizationType: 'highlight' | 'chart' | 'table';
+  displayOrder: number;
+}
 
 interface SortableCardProps {
   id: string;
@@ -64,7 +89,7 @@ function SortableCard({ id, children, className }: SortableCardProps) {
       ref={setNodeRef}
       style={style}
       className={cn(
-        "rounded-lg cursor-grab touch-manipulation",
+        "touch-manipulation",
         isDragging ? "shadow-lg" : "",
         className
       )}
@@ -79,8 +104,11 @@ function SortableCard({ id, children, className }: SortableCardProps) {
 export default function MyDashboardPage() {
   const [activeSubscriptionCount, setActiveSubscriptionCount] = useState(0);
   const [isAddingSubscription, setIsAddingSubscription] = useState(false);
-  const [items, setItems] = useState<LocalDashboardQuery[]>([]);
-  const [orderMap, setOrderMap] = useState<Record<string, number>>({});
+  const [items, setItems] = useState<UserMetric[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [results, setResults] = useState<Record<string, any>>({});
+  const [runningQueries, setRunningQueries] = useState<Set<string>>(new Set());
+  const [deletingMetric, setDeletingMetric] = useState<string | null>(null);
   
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -93,39 +121,112 @@ export default function MyDashboardPage() {
     })
   );
 
-  // Load the number of active subscriptions and dashboard queries
+  // Load the number of active subscriptions and dashboard metrics
   useEffect(() => {
+    // Load email subscriptions (from localStorage for now)
     const subscriptions = getEmailSubscriptions();
     const activeCount = subscriptions.filter(sub => sub.active).length;
     setActiveSubscriptionCount(activeCount);
     
-    const dashboardQueries = getLocalDashboardQueries();
-    setItems(dashboardQueries);
-    
-    // Initialize order map from localStorage or create a new one
-    const savedOrderMap = localStorage.getItem('dashboard_order');
-    if (savedOrderMap) {
-      try {
-        setOrderMap(JSON.parse(savedOrderMap));
-      } catch (e) {
-        console.error("Failed to parse saved dashboard order", e);
-        createInitialOrderMap(dashboardQueries);
-      }
-    } else {
-      createInitialOrderMap(dashboardQueries);
-    }
+    // Load user dashboard metrics from Supabase
+    loadUserDashboardMetrics();
   }, []);
   
-  function createInitialOrderMap(queries: LocalDashboardQuery[]) {
-    const newOrderMap: Record<string, number> = {};
-    queries.forEach((query, index) => {
-      newOrderMap[query.id] = index;
-    });
-    setOrderMap(newOrderMap);
-    localStorage.setItem('dashboard_order', JSON.stringify(newOrderMap));
+  async function loadUserDashboardMetrics() {
+    try {
+      console.log('Loading user dashboard metrics...');
+      setLoading(true);
+      const userMetrics = await getUserDashboardMetrics();
+      console.log(`Loaded ${userMetrics.length} metrics from the dashboard`);
+      
+      // Convert to local format
+      const formattedMetrics = userMetrics.map(metric => ({
+        id: metric.id,
+        title: metric.title,
+        description: metric.description,
+        sqlQuery: metric.sqlQuery,
+        visualizationType: metric.visualizationType,
+        displayOrder: metric.displayOrder
+      }));
+      
+      setItems(formattedMetrics);
+      
+      // Run all metrics queries automatically
+      if (formattedMetrics.length > 0) {
+        console.log('Running queries for all metrics...');
+        formattedMetrics.forEach(metric => {
+          runQuery(metric);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading user dashboard metrics:', error);
+    } finally {
+      setLoading(false);
+    }
   }
   
-  function handleDragEnd(event: DragEndEvent) {
+  const runQuery = async (metric: UserMetric) => {
+    try {
+      console.log(`[My Dashboard] Starting query for metric: ${metric.title} (${metric.id})`);
+      console.log(`[My Dashboard] SQL query: ${metric.sqlQuery}`);
+      setRunningQueries(prev => new Set(prev).add(metric.id));
+      
+      // Execute query directly via API instead of using the helper function
+      console.log(`[My Dashboard] Sending request to API for metric: ${metric.title}`);
+      const startTime = performance.now();
+      
+      const response = await fetch('/api/run-query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sqlQuery: metric.sqlQuery }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to execute query: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      const endTime = performance.now();
+      console.log(`[My Dashboard] Query execution time: ${(endTime - startTime).toFixed(2)}ms`);
+      
+      // Check the structure of the result
+      console.log(`[My Dashboard] Query result structure:`, Object.keys(result));
+      if (result.results) {
+        console.log(`[My Dashboard] Results count: ${result.results.length}`);
+      } else {
+        console.log(`[My Dashboard] No results array in response:`, result);
+      }
+      
+      setResults(prev => ({
+        ...prev,
+        [metric.id]: { query: metric.sqlQuery, data: result.results || [] }
+      }));
+      
+      console.log(`[My Dashboard] Query completed and stored for metric: ${metric.title}`);
+    } catch (error) {
+      console.error(`[My Dashboard] Failed to run query for metric ${metric.title}:`, error);
+    } finally {
+      setRunningQueries(prev => {
+        const updated = new Set(prev);
+        updated.delete(metric.id);
+        return updated;
+      });
+    }
+  };
+  
+  const refreshAllMetrics = () => {
+    if (items.length === 0) return;
+    
+    console.log('Refreshing all metrics...');
+    items.forEach(metric => {
+      runQuery(metric);
+    });
+  };
+  
+  async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     
     if (over && active.id !== over.id) {
@@ -135,32 +236,80 @@ export default function MyDashboardPage() {
         
         const newItems = arrayMove(items, oldIndex, newIndex);
         
-        // Update order map
-        const newOrderMap: Record<string, number> = {};
-        newItems.forEach((item, index) => {
-          newOrderMap[item.id] = index;
-        });
+        // Update display orders
+        const updatedItems = newItems.map((item, index) => ({
+          ...item,
+          displayOrder: index
+        }));
         
-        setOrderMap(newOrderMap);
-        localStorage.setItem('dashboard_order', JSON.stringify(newOrderMap));
+        // Update the database with new order
+        updateMetricOrders(updatedItems);
         
-        return newItems;
+        return updatedItems;
       });
     }
   }
   
-  // Sort items based on the order map
-  const sortedItems = [...items].sort((a, b) => {
-    const orderA = orderMap[a.id] !== undefined ? orderMap[a.id] : 999;
-    const orderB = orderMap[b.id] !== undefined ? orderMap[b.id] : 999;
-    return orderA - orderB;
-  });
+  async function updateMetricOrders(metrics: UserMetric[]) {
+    // Update each metric's order in the database
+    for (const metric of metrics) {
+      try {
+        console.log(`Updating order for metric ${metric.id} to ${metric.displayOrder}`);
+        await updateUserDashboardMetricOrder(metric.id, metric.displayOrder);
+      } catch (error) {
+        console.error(`Failed to update order for metric ${metric.id}:`, error);
+      }
+    }
+  }
+  
+  async function handleDeleteMetric(id: string, title: string) {
+    try {
+      setDeletingMetric(id);
+      console.log(`Deleting metric: ${id} (${title})`);
+      
+      const success = await deleteUserDashboardMetric(id);
+      
+      if (success) {
+        // Remove the metric from the UI
+        setItems(items.filter(item => item.id !== id));
+        toast.success(`"${title}" has been removed from your dashboard`);
+      } else {
+        toast.error("Failed to remove metric. Please try again.");
+      }
+    } catch (error) {
+      console.error(`Error deleting metric ${id}:`, error);
+      toast.error("Failed to remove metric. Please try again.");
+    } finally {
+      setDeletingMetric(null);
+    }
+  }
+  
+  // Helper function to map database visualization type to VisualizationType enum
+  const mapVisualizationType = (type: string): VisualizationType => {
+    switch (type?.toLowerCase() || 'highlight') {
+      case 'highlight':
+        return 'highlight';
+      case 'chart':
+      case 'line':
+      case 'line-chart':
+        return 'line-chart';
+      case 'bar':
+      case 'bar-chart':
+        return 'bar-chart';
+      case 'table':
+        return 'table';
+      default:
+        return 'highlight';
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
       <DashboardHeader
         title="My Dashboard"
         description="Customize your personal dashboard with metrics that matter to you"
+        onRefresh={refreshAllMetrics}
+        isLoading={runningQueries.size > 0}
         customActions={
           <Sheet>
             <SheetTrigger asChild>
@@ -168,8 +317,7 @@ export default function MyDashboardPage() {
                 <TooltipTrigger asChild>
                   <Button 
                     variant="outline"
-                    size="sm" 
-                    className="md:px-2 md:h-fit relative ml-auto" 
+                    className="md:px-2 md:h-fit relative" 
                     aria-label="Email Subscriptions"
                   >
                     <Bell className="h-4 w-4" />
@@ -218,23 +366,30 @@ export default function MyDashboardPage() {
         }
       />
       
-      <div className="flex-1 p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="space-y-4 p-6">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">My Dashboard</h1>
-            <p className="text-muted-foreground">Drag and drop to reorder your metrics</p>
+            <h2 className="text-2xl font-bold tracking-tight">My Dashboard</h2>
+            <p className="text-muted-foreground">
+              View your custom metrics and personalized insights.
+            </p>
           </div>
         </div>
-        
-        {items.length === 0 ? (
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-64">
+            <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground mb-2" />
+            <p className="text-muted-foreground">Loading dashboard metrics...</p>
+          </div>
+        ) : items.length === 0 ? (
           <div className="flex justify-center items-center w-full h-[400px]">
             <div className="border-2 border-dashed border-muted rounded-lg p-12 max-w-2xl w-full flex flex-col items-center justify-center text-center">
               <p className="text-muted-foreground mb-6">
                 Create metrics to visualize your business data. You can add metrics directly or by asking in the chat.
               </p>
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => window.location.href = '/chat'}>
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Add Metric
+                Add Metric from Chat
               </Button>
             </div>
           </div>
@@ -244,49 +399,46 @@ export default function MyDashboardPage() {
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext items={sortedItems.map(item => item.id)}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                {sortedItems.map((item) => (
-                  <SortableCard key={item.id} id={item.id}>
-                    <div className="h-full">
-                      <Card className="h-full">
-                        <CardHeader className="handle cursor-grab bg-accent/30 pb-2">
-                          <CardTitle className="text-sm font-medium truncate">{item.title}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          {/* This content will be populated by DashboardQueriesList */}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </SortableCard>
+            <SortableContext items={items.map(item => item.id)}>
+              <div className="flex flex-wrap gap-4">
+                {items.map((item) => (
+                  <div key={item.id} className="w-full md:w-[calc(33.333%-1rem)]">
+                    <SortableCard 
+                      id={item.id}
+                    >
+                      <DashboardHighlightCard 
+                        id={item.id}
+                        title={item.title || 'Custom Metric'}
+                        description={item.description || ''}
+                        visualizationType={mapVisualizationType(item.visualizationType)}
+                        isLoading={loading || !results[item.id]?.data}
+                        data={results[item.id]?.data || []}
+                        onRunQuery={() => runQuery(item)}
+                        showActions={true}
+                        onDelete={() => handleDeleteMetric(item.id, item.title)}
+                      />
+                    </SortableCard>
+                  </div>
                 ))}
-                <AddMetricCard />
+                
+                <div className="w-full md:w-[calc(33.333%-1rem)]">
+                  <Card 
+                    className="border-2 border-dashed border-muted bg-transparent flex flex-col items-center justify-center p-6 hover:border-primary/40 transition-colors cursor-pointer"
+                    onClick={() => window.location.href = '/chat'}
+                  >
+                    <div className="flex flex-col items-center text-muted-foreground">
+                      <h3 className="text-lg font-medium">Add Metric</h3>
+                      <p className="text-center text-sm">
+                        Create metrics to visualize your business data
+                      </p>
+                    </div>
+                  </Card>
+                </div>
               </div>
             </SortableContext>
           </DndContext>
         )}
-        
-        <div className="hidden">
-          <DashboardQueriesList />
-        </div>
       </div>
     </div>
-  );
-}
-
-function AddMetricCard() {
-  return (
-    <Card className="border-2 border-dashed border-muted bg-transparent h-64 flex flex-col items-center justify-center p-6 hover:border-primary/40 transition-colors cursor-pointer">
-      <div className="flex flex-col items-center text-muted-foreground">
-        <h3 className="text-lg font-medium mb-2">Add Metric</h3>
-        <p className="text-center text-sm">
-          Create metrics to visualize your business data
-        </p>
-        <Button variant="outline" className="mt-4" size="sm">
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add Metric
-        </Button>
-      </div>
-    </Card>
   );
 }

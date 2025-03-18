@@ -70,10 +70,33 @@ export function AppSidebar({ user }: { user: User | undefined }) {
       shortcut: '⌘S'
     },
     {
-      name: 'Campaigns',
+      name: 'View Campaigns',
       href: '/campaigns',
       icon: Megaphone,
-      shortcut: '⌘C'
+      disabled: true,
+      tag: 'Coming Soon'
+    },
+    {
+      name: 'Open AI Tools',
+      href: '/ai-tools',
+      icon: () => (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4"
+        >
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+          <polyline points="3.29 7 12 12 20.71 7" />
+          <line x1="12" y1="22" x2="12" y2="12" />
+        </svg>
+      ),
+      disabled: true,
+      tag: 'Coming Soon'
     }
   ];
 
@@ -153,30 +176,55 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                 href={item.href}
                 className={cn(
                   "flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent",
-                  pathname === item.href && "bg-accent/80 font-medium"
+                  pathname === item.href && "bg-accent/80 font-medium",
+                  item.disabled && "pointer-events-none"
                 )}
-                onClick={() => setOpenMobile(false)}
+                style={{
+                  opacity: item.disabled ? 0.8 : 1
+                }}
+                onClick={(e) => {
+                  if (item.disabled) {
+                    e.preventDefault();
+                  }
+                  setOpenMobile(false);
+                }}
               >
-                <div className="flex items-center gap-3">
-                  <item.icon className="h-4 w-4" />
-                  {item.name === 'Customers' ? 'View Segments' : item.name}
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-3" style={{ opacity: item.disabled ? 0.6 : 1 }}>
+                    <item.icon className="h-4 w-4" />
+                    {item.name === 'Customers' ? 'View Segments' : item.name}
+                  </div>
+                  <div className="flex items-center">
+                    {item.tag && (
+                      <span className={cn(
+                        "rounded px-1.5 py-0.5 font-medium text-[7px] leading-tight ml-auto tracking-tight flex items-center h-4", 
+                        item.tag === 'Coming Soon' 
+                          ? "bg-black text-zinc-100" 
+                          : "bg-primary text-primary-foreground"
+                      )}>
+                        {item.tag}
+                      </span>
+                    )}
+                    {item.shortcut && (
+                      <span className="text-xs text-muted-foreground ml-2">{item.shortcut}</span>
+                    )}
+                  </div>
                 </div>
-                {item.shortcut && (
-                  <span className="text-xs text-muted-foreground">{item.shortcut}</span>
-                )}
               </Link>
             )}
           </div>
         ))}
       </div>
       
-      <div className="mt-8 flex-grow overflow-auto">
-        <SidebarContent>
-          <SidebarHistory user={user} />
-        </SidebarContent>
+      <div className="mt-8 flex-grow overflow-hidden">
+        <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 350px)" }}>
+          <SidebarContent>
+            <SidebarHistory user={user} />
+          </SidebarContent>
+        </div>
       </div>
       
-      <div className="mt-auto">
+      <div className="mt-auto pt-4">
         <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>
       </div>
     </Sidebar>

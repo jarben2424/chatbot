@@ -346,11 +346,16 @@ export function HighlightCard({
         }).format(value)
       : value;
       
+  const metricTitle = title || 'Metric';
+  const lowerCaseTitle = metricTitle.toLowerCase().replace(/s$/, '');
+  
   return (
-    <div className={cn("p-6 rounded-lg border bg-card text-card-foreground shadow-sm flex flex-col justify-center items-center", className)}>
-      <h3 className="text-sm font-medium leading-none tracking-tight text-center mb-3">{title}</h3>
-      <div className="text-3xl font-bold text-center">{formattedValue}</div>
-      {description && <p className="text-xs text-muted-foreground mt-2 text-center">{description}</p>}
+    <div className={cn("h-full", className)}>
+      <h3 className="text-base font-medium text-muted-foreground mb-1">{metricTitle}</h3>
+      <div className="text-3xl font-bold mb-1">{formattedValue}</div>
+      <p className="text-sm text-muted-foreground">
+        {description || `Count of ${lowerCaseTitle}s for today`}
+      </p>
     </div>
   )
 }

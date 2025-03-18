@@ -6,9 +6,10 @@ import { LayoutDashboard, Check, BarChart, LineChart, AlertCircle } from 'lucide
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from './ui/input';
 import { toast } from 'sonner';
-import { saveLocalDashboardQuery, VisualizationType } from '@/lib/local-storage';
+import { VisualizationType } from '@/lib/local-storage';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { createClient } from '@/utils/supabase/client';
 
 interface AddToDashboardButtonProps {
   question: string;
@@ -62,6 +63,19 @@ export function AddToDashboardButton({ question, sqlQuery, result }: AddToDashbo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
   const [visualizationType, setVisualizationType] = useState<VisualizationType>('table');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+  
+  // Check authentication status on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsAuthenticated(!!user);
+    };
+    
+    checkAuth();
+  }, []);
   
   // Suggest visualization type when dialog opens or result changes
   useEffect(() => {
@@ -70,17 +84,148 @@ export function AddToDashboardButton({ question, sqlQuery, result }: AddToDashbo
     }
   }, [open, result]);
 
+  // Get the base URL for API calls
+  const getBaseUrl = () => {
+    return typeof window !== 'undefined'
+      ? window.location.origin
+      : process.env.NEXT_PUBLIC_BASE_URL || '';
+  };
+
+  const handleButtonClick = async () => {
+    try {
+      setApiError(null);
+      
+      // Check authentication through the server-side API
+      const authResponse = await fetch(`${getBaseUrl()}/api/auth/check`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      if (!authResponse.ok) {
+        console.error('Authentication check failed:', authResponse.status);
+        toast.error('You must be logged in to add metrics to your dashboard');
+        return;
+      }
+      
+      const authData = await authResponse.json();
+      console.log('Authentication successful: User ID =', authData.userId);
+      
+      // User is authenticated, open the dialog
+      setOpen(true);
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+      setApiError(`Authentication check failed: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error('You must be logged in to add metrics to your dashboard');
+    }
+  };
+
   const handleAddToDashboard = async () => {
     try {
       setIsSubmitting(true);
+      setApiError(null);
       
-      // Save to localStorage with visualization type
-      saveLocalDashboardQuery({
-        title: title || question.substring(0, 50),
-        question,
-        sqlQuery,
-        visualizationType,
+      // First, check if the user is authenticated using our server API
+      const authResponse = await fetch(`${getBaseUrl()}/api/auth/check`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
       });
+
+      if (!authResponse.ok) {
+        console.error('Authentication check failed:', authResponse.status);
+        toast.error('You must be logged in to add metrics to your dashboard');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const authData = await authResponse.json();
+      console.log('Authentication successful: User ID =', authData.userId);
+      
+      // First check if there's an existing metric with this SQL query
+      const searchResponse = await fetch(`${getBaseUrl()}/api/chat-generated-metrics/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sqlQuery,
+        }),
+        credentials: 'include',
+      });
+      
+      if (!searchResponse.ok) {
+        console.error('Error searching for metrics:', searchResponse.status);
+        toast.error('Failed to add to dashboard');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const searchResult = await searchResponse.json();
+      let chatMetricId: string;
+      
+      if (searchResult.existingMetric) {
+        // Use the existing metric
+        chatMetricId = searchResult.existingMetric.id;
+        console.log('Using existing metric:', chatMetricId);
+      } else {
+        // Create a new metric
+        const createResponse = await fetch(`${getBaseUrl()}/api/chat-generated-metrics`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: title || undefined,
+            question,
+            sqlQuery,
+            visualizationType,
+            category: 'general',
+          }),
+          credentials: 'include',
+        });
+        
+        if (!createResponse.ok) {
+          console.error('Error creating metric:', createResponse.status);
+          toast.error('Failed to add to dashboard');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        const newMetric = await createResponse.json();
+        chatMetricId = newMetric.id;
+        console.log('Created new metric:', chatMetricId);
+      }
+      
+      // Add the metric to the user's dashboard
+      const addResponse = await fetch(`${getBaseUrl()}/api/user-dashboard-metrics`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sourceType: 'chat_generated_metric',
+          sourceId: chatMetricId,
+          customTitle: title || null,
+          customVisualizationType: visualizationType !== 'table' ? visualizationType : null,
+          category: 'general',
+        }),
+        credentials: 'include',
+      });
+      
+      if (!addResponse.ok) {
+        console.error('Error adding to dashboard:', addResponse.status);
+        toast.error('Failed to add to dashboard');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const dashboardData = await addResponse.json();
+      console.log('Added to dashboard successfully:', dashboardData.id);
       
       setIsAdded(true);
       toast.success('Added to My Dashboard');
@@ -89,9 +234,9 @@ export function AddToDashboardButton({ question, sqlQuery, result }: AddToDashbo
         setOpen(false);
         setIsAdded(false);
       }, 1500);
-      
     } catch (error) {
       console.error('Error adding to dashboard:', error);
+      setApiError(`Unexpected error: ${error instanceof Error ? error.message : String(error)}`);
       toast.error('Failed to add to dashboard');
     } finally {
       setIsSubmitting(false);
@@ -104,7 +249,7 @@ export function AddToDashboardButton({ question, sqlQuery, result }: AddToDashbo
         variant="outline"
         size="sm"
         className="h-7 gap-1"
-        onClick={() => setOpen(true)}
+        onClick={handleButtonClick}
       >
         <LayoutDashboard className="h-3.5 w-3.5" />
         <span className="text-xs">Add to Dashboard</span>
@@ -183,6 +328,14 @@ export function AddToDashboardButton({ question, sqlQuery, result }: AddToDashbo
                 {sqlQuery}
               </pre>
             </div>
+            
+            {/* Display API errors if any */}
+            {apiError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                <p className="font-medium">Error occurred:</p>
+                <p>{apiError}</p>
+              </div>
+            )}
           </div>
           
           <DialogFooter>
