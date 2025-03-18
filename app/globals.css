@@ -19,6 +19,17 @@
 }
 
 @layer utilities {
+    /* Hide scrollbar but allow scrolling */
+    .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;     /* Firefox */
+    }
+    
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    
     .text-balance {
         text-wrap: balance;
     }

@@ -12,6 +12,7 @@ import { StandaloneChart } from './charts/standalone-chart';
 import { cn } from '@/lib/utils';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { toast } from 'sonner';
+import { formatDistance } from 'date-fns';
 
 // Import the VisualizationSettings interface from visualization-controls.tsx
 interface VisualizationSettings {
@@ -52,6 +53,46 @@ export function VisualizationPanel({
 }: VisualizationPanelProps) {
   const { setArtifact, artifact } = useArtifact();
   
+  // Global CSS to prevent scrollbars and pulsating elements
+  useEffect(() => {
+    // Create a style element
+    const style = document.createElement('style');
+    style.id = 'visualization-editor-styles';
+    style.textContent = `
+      /* Hide scrollbars while allowing scrolling */
+      .visualization-editor-container .controls-wrapper::-webkit-scrollbar,
+      .visualization-editor-container *::-webkit-scrollbar {
+        width: 0 !important;
+        height: 0 !important;
+        display: none !important;
+      }
+      
+      .visualization-editor-container .controls-wrapper,
+      .visualization-editor-container * {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+      }
+      
+      /* Prevent animations that might cause pulsating effects */
+      .visualization-editor-container *::after,
+      .visualization-editor-container *::before {
+        animation: none !important;
+        transition: none !important;
+      }
+    `;
+    
+    // Add the style to the document
+    document.head.appendChild(style);
+    
+    // Clean up on unmount
+    return () => {
+      const existingStyle = document.getElementById('visualization-editor-styles');
+      if (existingStyle) {
+        document.head.removeChild(existingStyle);
+      }
+    };
+  }, []);
+  
   // App theme colors optimized for visualizations
   const themeColors = [
     'hsl(var(--chart-1, 221 83% 53%))',  // Primary blue
@@ -77,8 +118,14 @@ export function VisualizationPanel({
   const [isForceExpanded, setIsForceExpanded] = useState(forceExpanded);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
-  const [versionHistory, setVersionHistory] = useState([{data, settings}]);
+  const [versionHistory, setVersionHistory] = useState([{
+    data, 
+    settings,
+    timestamp: new Date().toISOString() // Add timestamp to version history
+  }]);
   const isCurrentVersion = currentVersionIndex === versionHistory.length - 1;
+  // Track if we have any version history
+  const hasVersionHistory = versionHistory.length > 1;
   
   // Format data properly for better visualization
   const formattedData = useMemo(() => {
@@ -149,7 +196,11 @@ export function VisualizationPanel({
     
     // Only add to history if at latest version
     if (isCurrentVersion) {
-      setVersionHistory([...versionHistory, {data, settings: newSettings}]);
+      setVersionHistory([...versionHistory, {
+        data, 
+        settings: newSettings,
+        timestamp: new Date().toISOString() // Add timestamp to version history
+      }]);
       setCurrentVersionIndex(versionHistory.length);
     }
   };
@@ -157,27 +208,89 @@ export function VisualizationPanel({
   // Update the handleExpand function to include settings and add transition
   const handleExpand = () => {
     setIsTransitioning(true);
+    
+    try {
+      // Dispatch an event to notify that visualization is being expanded
+      const expandEvent = new CustomEvent('visualizationExpanded', {
+        detail: { 
+          artifactId: artifactId,
+          isFullScreen: true
+        }
+      });
+      
+      window.dispatchEvent(expandEvent);
+    } catch (error) {
+      console.error('Error dispatching visualization expansion event:', error);
+    }
+    
     setTimeout(() => {
       if (onExpand) {
         onExpand();
       } else if (artifactId) {
-        setArtifact((current: UIArtifact) => ({
-          ...current,
+        const timestamp = new Date().toISOString();
+        setDocumentTimestamp(timestamp); // Update local timestamp immediately
+        
+        // Create reference to the rendered visualization (if any) to get its position
+        const vizElement = document.querySelector('.chart-container') || document.querySelector('.border.rounded-lg');
+        const rect = vizElement ? vizElement.getBoundingClientRect() : null;
+        
+        // Create the artifact with reference to the document
+        setArtifact({
           documentId: artifactId,
-          kind: 'text' as ArtifactKind, // Using 'text' as a fallback since 'visualization' might not be registered
+          kind: 'visualization' as ArtifactKind,
           title,
           content: JSON.stringify({
             data, 
             visualization: settings.type,
             description,
-            settings
+            timestamp,
+            settings,
+            lastModified: timestamp
           }),
           status: 'idle',
-          isVisible: true
-        }));
-      } else {
-        console.error('No artifactId provided for visualization expansion');
+          isVisible: true,
+          boundingBox: rect ? {
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height
+          } : {
+            top: 0,
+            left: 0,
+            width: 400,
+            height: 300
+          }
+        });
+        
+        // Create a document record to ensure timestamp works
+        fetch(`/api/document?id=${artifactId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            title,
+            content: JSON.stringify({
+              data,
+              visualization: settings.type,
+              description,
+              settings,
+              timestamp,
+              lastModified: timestamp
+            }),
+            kind: 'visualization',
+            createdAt: timestamp // This ensures the timestamp is stored correctly
+          }),
+        }).catch(error => {
+          console.error('Error creating document:', error);
+        });
+        
+        // Force a revalidation of the document
+        setTimeout(() => {
+          fetch(`/api/document?id=${artifactId}`).catch(console.error);
+        }, 100);
       }
+      
       setIsTransitioning(false);
     }, 150);
   };
@@ -227,7 +340,7 @@ export function VisualizationPanel({
           <StandaloneChart 
             type={settings.type === 'auto' ? 'line' : settings.type}
             data={fallbackData}
-            height={isForceExpanded ? 350 : 215}
+            height={isForceExpanded ? 400 : 215}
             width="100%"
             startYAxisFromZero={true}
             formatNumbers={true}
@@ -247,11 +360,14 @@ export function VisualizationPanel({
       <StandaloneChart 
         type={chartType}
         data={formattedData}
-        height={isForceExpanded ? 350 : 215}
+        height={shouldShowFullScreen ? 400 : 215}
         width="100%"
         startYAxisFromZero={true}
         formatNumbers={true}
         colors={settings.colors}
+        showLegend={settings.showLegend}
+        showDataLabels={settings.showDataLabels}
+        title={settings.showTitle ? settings.title : undefined}
       />
     );
   };
@@ -267,13 +383,104 @@ export function VisualizationPanel({
     console.log('Visualization panel rendering with:', {
       artifactId,
       visualizationType: visualization,
-      dataLength: data?.length
+      dataLength: data?.length,
+      artifactState: artifact
     });
-  }, [artifactId, visualization, data]);
+  }, [artifactId, visualization, data, artifact]);
+  
+  // Add effect to fetch the document timing information
+  const [documentTimestamp, setDocumentTimestamp] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (artifactId) {
+      console.log('Fetching document with ID:', artifactId);
+      fetch(`/api/document?id=${artifactId}`)
+        .then(response => response.json())
+        .then(documents => {
+          console.log('Document fetch response:', documents);
+          if (documents && documents.length > 0) {
+            const latestDoc = documents[documents.length - 1];
+            console.log('Latest document:', latestDoc);
+            if (latestDoc.createdAt) {
+              const timestamp = new Date(latestDoc.createdAt).toISOString();
+              console.log('Setting document timestamp:', timestamp);
+              setDocumentTimestamp(timestamp);
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching document timestamp:', error);
+        });
+    }
+  }, [artifactId]);
   
   const handleSave = () => {
-    // Call onSave if provided
-    if (onSave) {
+    // Create a timestamp for this update
+    const timestamp = new Date().toISOString();
+    console.log('Saving document with timestamp:', timestamp);
+    setDocumentTimestamp(timestamp); // Update local timestamp state immediately
+    
+    // First save to the document
+    if (artifactId) {
+      const documentBody = {
+        title,
+        content: JSON.stringify({
+          data,
+          visualization: settings.type,
+          description,
+          settings,
+          timestamp,
+          lastModified: timestamp
+        }),
+        kind: 'visualization',
+        createdAt: timestamp // This ensures the timestamp is updated
+      };
+      
+      console.log('Document save request body:', documentBody);
+      
+      fetch(`/api/document?id=${artifactId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(documentBody)
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(documents => {
+        console.log('Document save response:', documents);
+        
+        // Force a revalidation to ensure timestamp updates
+        fetch(`/api/document?id=${artifactId}`)
+          .then(resp => resp.json())
+          .then(docs => {
+            console.log('Document fetch after save:', docs);
+          })
+          .catch(console.error);
+        
+        // Call onSave if provided
+        if (onSave) {
+          onSave({
+            title,
+            description,
+            data: data,
+            visualization: settings.type,
+            settings
+          });
+        }
+        
+        toast.success('Visualization saved successfully');
+      })
+      .catch(error => {
+        console.error('Error saving document:', error);
+        toast.error('Failed to save visualization');
+      });
+    } else if (onSave) {
+      // If no artifactId, just call onSave
       onSave({
         title,
         description,
@@ -286,10 +493,10 @@ export function VisualizationPanel({
   };
   
   if (shouldShowFullScreen) {
-    // Render full visualization in full screen view with controls - exactly matching spreadsheet UI
+    // Render full visualization in full screen view with controls - using standard components
     return (
       <div className={cn(
-        "flex flex-row h-dvh w-dvw fixed top-0 left-0 z-50 bg-transparent",
+        "visualization-editor-container flex flex-row h-dvh w-dvw fixed top-0 left-0 z-50 bg-transparent",
         "transition-all duration-300 ease-in-out",
         isTransitioning ? "opacity-0 scale-95" : "opacity-100 scale-100"
       )}>
@@ -298,22 +505,22 @@ export function VisualizationPanel({
         
         {/* Main content */}
         <div className="relative flex h-full w-full z-10">
-          {/* Left panel (chat) - exactly matching spreadsheet UI */}
-          <div className="relative w-[400px] bg-muted dark:bg-background h-dvh shrink-0">
+          {/* Left panel (chat) - exactly matching document preview pattern */}
+          <div className="relative w-[400px] bg-muted dark:bg-background h-dvh shrink-0 overflow-hidden">
             {!isCurrentVersion && (
               <div className="left-0 absolute h-dvh w-[400px] top-0 bg-zinc-900/50 z-20" />
             )}
             
             <div className="flex flex-col h-full justify-between items-center gap-4">
               {/* Chat message area */}
-              <div className="flex-1 w-full overflow-y-auto">
-                <div className="p-4 border-b bg-background dark:bg-muted">
-                  <h2 className="text-lg font-medium">{title}</h2>
-                  {description && <p className="text-sm text-muted-foreground">{description}</p>}
+              <div className="flex-1 w-full overflow-hidden">
+                <div className="p-4 border-b border-border bg-background dark:bg-muted">
+                  <h2 className="text-lg font-medium truncate">{title}</h2>
+                  {description && <p className="text-sm text-muted-foreground truncate">{description}</p>}
                 </div>
                 
                 <div className="p-4">
-                  <div className="rounded-lg border p-3 mb-3 bg-muted/20">
+                  <div className="rounded-lg border p-3 mb-3 bg-background">
                     <p className="text-sm text-muted-foreground">
                       This is a visualization of your data. You can edit the visualization settings using the controls on the right.
                     </p>
@@ -323,10 +530,10 @@ export function VisualizationPanel({
             </div>
           </div>
           
-          {/* Right panel (visualization editor) */}
-          <div className="flex-1 flex flex-col h-full">
-            {/* Toolbar at top */}
-            <div className="flex justify-between items-center p-3 border-b bg-background dark:bg-muted">
+          {/* Right panel (visualization editor) - using standard components */}
+          <div className="flex-1 flex flex-col h-full overflow-hidden">
+            {/* Toolbar at top - using standard toolbar pattern */}
+            <div className="flex justify-between items-center p-3 bg-background dark:bg-muted border-b border-border">
               <div className="flex items-center gap-2">
                 <Button 
                   variant="ghost" 
@@ -336,17 +543,24 @@ export function VisualizationPanel({
                 >
                   <X className="h-4 w-4" />
                 </Button>
-                <span className="text-sm font-medium">Visualization Editor</span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">Visualization Editor</span>
+                  {documentTimestamp && (
+                    <span className="text-xs text-muted-foreground">
+                      {`Updated ${formatDistance(new Date(documentTimestamp), new Date(), { addSuffix: true })}`}
+                    </span>
+                  )}
+                </div>
               </div>
               
-              {/* Action buttons */}
+              {/* Action buttons - standard header pattern */}
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => handleVersionChange('prev')}
-                  disabled={currentVersionIndex === 0}
-                  title="Previous version"
+                  disabled={!hasVersionHistory || currentVersionIndex === 0}
+                  className={!hasVersionHistory || currentVersionIndex === 0 ? "opacity-50" : ""}
                 >
                   <UndoIcon size={18} />
                 </Button>
@@ -356,7 +570,6 @@ export function VisualizationPanel({
                   size="icon"
                   onClick={() => handleVersionChange('next')}
                   disabled={isCurrentVersion}
-                  title="Next version"
                 >
                   <RedoIcon size={18} />
                 </Button>
@@ -365,7 +578,6 @@ export function VisualizationPanel({
                   variant="ghost"
                   size="icon"
                   onClick={handleExportData}
-                  title="Export data"
                 >
                   <CopyIcon />
                 </Button>
@@ -386,28 +598,32 @@ export function VisualizationPanel({
               <PanelGroup direction="horizontal">
                 {/* Visualization panel */}
                 <Panel defaultSize={70} minSize={50}>
-                  <div className="h-full overflow-auto p-4 bg-card">
-                    <div className="border rounded-lg p-4 h-full flex items-center justify-center">
-                      {renderVisualization()}
+                  <div className="h-full p-3 bg-card">
+                    <div className="border rounded-lg p-3 h-full flex items-center justify-center overflow-hidden">
+                      <div className="w-full h-full flex items-center justify-center">
+                        {renderVisualization()}
+                      </div>
                     </div>
                   </div>
                 </Panel>
                 
-                {/* Resize handle */}
-                <PanelResizeHandle className="w-1.5 bg-muted hover:bg-muted/80 transition-colors" />
+                {/* Resize handle - standard handle with no visual styling */}
+                <PanelResizeHandle className="w-0 opacity-0" />
                 
                 {/* Controls panel */}
                 <Panel defaultSize={30} minSize={25}>
-                  <div className="h-full overflow-auto border-l">
-                    <div className="p-4 border-b bg-muted/20">
+                  <div className="h-full flex flex-col border-l">
+                    <div className="p-4 border-b bg-background flex-shrink-0">
                       <h3 className="text-sm font-medium">Visualization Controls</h3>
                     </div>
-                    <VisualizationControls
-                      type={settings.type}
-                      data={data}
-                      settings={settings}
-                      onChange={handleSettingsChange}
-                    />
+                    <div className="flex-1 overflow-y-auto">
+                      <VisualizationControls
+                        type={settings.type}
+                        data={data}
+                        settings={settings}
+                        onChange={handleSettingsChange}
+                      />
+                    </div>
                   </div>
                 </Panel>
               </PanelGroup>

@@ -26,6 +26,8 @@ type VisualizationData = {
   data: any[];
   settings: VisualizationSettings;
   version: number;
+  timestamp?: string;
+  createdAt?: string;
 };
 
 type VisualizationMetadata = {
@@ -60,6 +62,7 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
         
         // Also update metadata to maintain version history
         setMetadata((metadata) => {
+          const now = new Date().toISOString();
           const newVersion = {
             data: content.data || [],
             settings: content.settings || {
@@ -74,7 +77,9 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
               title: content.title || 'Data Visualization',
               xAxis: content.data && content.data.length > 0 ? Object.keys(content.data[0])[0] : undefined
             },
-            version: (metadata?.versions?.length || 0) + 1
+            version: (metadata?.versions?.length || 0) + 1,
+            timestamp: now,
+            createdAt: now
           };
           
           return {
@@ -93,7 +98,9 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
     isCurrentVersion,
     onSaveContent,
     metadata,
-    setMetadata
+    setMetadata,
+    getDocumentContentById,
+    isLoading
   }) => {
     // Parse the content string into visualization data
     let parsedContent;
@@ -123,6 +130,13 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
         showLabels: true,
         title: parsedContent?.title || 'Data Visualization'
       });
+    
+    // Get timestamp from metadata or content
+    const timestamp = 
+      versions[currentVersion]?.timestamp || 
+      parsedContent?.timestamp || 
+      parsedContent?.lastModified ||
+      new Date().toISOString();
     
     // Handle settings changes - create a new version
     const handleSettingsChange = (newSettings: VisualizationSettings) => {
@@ -155,7 +169,7 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
       <PanelGroup direction="horizontal" className="h-full">
         {/* Visualization panel */}
         <Panel defaultSize={70} minSize={60}>
-          <div className="h-full overflow-auto p-4 bg-card">
+          <div className="h-full overflow-y-auto overflow-x-hidden p-4 bg-card">
             <div className="border rounded-lg p-4 h-full flex items-center justify-center">
               <StandaloneChart 
                 type={settings.type || 'bar'}
@@ -205,7 +219,8 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
           });
         }
       },
-      isDisabled: ({ currentVersionIndex, metadata }) => {
+      isDisabled: ({ metadata, currentVersionIndex }) => {
+        // Disable when there are no previous versions to navigate to
         return currentVersionIndex === 0 || (metadata?.currentVersion === 0);
       },
     },

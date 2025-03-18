@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { DataTable } from './data-table';
 import { toast } from 'sonner';
@@ -33,12 +33,13 @@ export function QueryDisplay({
   const [showVisualizationPanel, setShowVisualizationPanel] = useState(false);
   const [showInlineVisualization, setShowInlineVisualization] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isHiddenInChat, setIsHiddenInChat] = useState(false);
   
-  // Listen for visualization restore event when editor is closed
+  const queryCardRef = useRef<HTMLDivElement>(null);
+  
   useEffect(() => {
     const handleRestoreVisualization = (event: CustomEvent) => {
       if (event.detail) {
-        // If we have visualization data in the event, use it to restore the card
         if (event.detail.data) {
           setVisualizationResult({
             data: event.detail.data,
@@ -46,28 +47,53 @@ export function QueryDisplay({
           });
         }
         
-        // Check if we should restore to chart view
         if (event.detail.restoreChart) {
-          // Show the inline visualization again
-          setShowInlineVisualization(true);
+          setIsHiddenInChat(false);
+          
+          setTimeout(() => {
+            setShowInlineVisualization(true);
+          }, 50);
         }
       }
     };
     
-    // Add event listener
-    window.addEventListener('restoreVisualization', handleRestoreVisualization as EventListener);
+    const handleVisualizationExpanded = (event: CustomEvent) => {
+      if (event.detail && event.detail.artifactId) {
+        setIsTransitioning(true);
+        
+        setIsHiddenInChat(true);
+        
+        setTimeout(() => {
+          setShowInlineVisualization(false);
+          setIsTransitioning(false);
+        }, 100);
+      }
+    };
     
-    // Clean up
+    const handleVisualizationClosed = (event: CustomEvent) => {
+      if (event.detail && event.detail.restoreQueryCard) {
+        setIsHiddenInChat(false);
+        
+        setTimeout(() => {
+          setShowInlineVisualization(true);
+        }, 50);
+      }
+    };
+    
+    window.addEventListener('restoreVisualization', handleRestoreVisualization as EventListener);
+    window.addEventListener('visualizationExpanded', handleVisualizationExpanded as EventListener);
+    window.addEventListener('visualizationClosed', handleVisualizationClosed as EventListener);
+    
     return () => {
       window.removeEventListener('restoreVisualization', handleRestoreVisualization as EventListener);
+      window.removeEventListener('visualizationExpanded', handleVisualizationExpanded as EventListener);
+      window.removeEventListener('visualizationClosed', handleVisualizationClosed as EventListener);
     };
   }, []);
   
-  // Function to determine best visualization type based on data structure
   function determineBestVisualization(data: any[]): string {
     if (!data || data.length === 0) return 'table';
     
-    // Look for date columns and numeric columns
     const sample = data[0];
     const hasDateColumn = Object.keys(sample).some(key => 
       key.toLowerCase().includes('date') || 
@@ -82,14 +108,14 @@ export function QueryDisplay({
     );
     
     if (hasDateColumn && numericColumns.length > 0) {
-      return 'line'; // Time series data = line chart
+      return 'line';
     } else if (numericColumns.length >= 2) {
-      return 'bar'; // Multiple numeric columns = bar chart
+      return 'bar';
     } else if (data.length <= 6 && numericColumns.length === 1) {
-      return 'pie'; // Few categories with one value = pie chart
+      return 'pie';
     }
     
-    return 'bar'; // Default to bar chart
+    return 'bar';
   }
 
   const handleFlip = () => {
@@ -104,7 +130,6 @@ export function QueryDisplay({
   const downloadCSV = () => {
     if (!data || data.length === 0) return;
     
-    // Convert data to CSV
     const headers = Object.keys(data[0]).join(',');
     const rows = data.map(row => 
       Object.values(row).map(value => 
@@ -113,7 +138,6 @@ export function QueryDisplay({
     );
     const csv = [headers, ...rows].join('\n');
     
-    // Create and trigger download
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -128,7 +152,6 @@ export function QueryDisplay({
   const visualizeData = () => {
     try {
       if (!data || !Array.isArray(data) || data.length === 0) {
-        // Provide fallback data for monthly revenue query
         if (title.toLowerCase().includes('monthly revenue')) {
           const fallbackData = [
             { month: 'January', revenue: 75000 },
@@ -138,13 +161,11 @@ export function QueryDisplay({
             { month: 'May', revenue: 94200 }
           ];
           
-          // Set visualization result with the appropriate type
           setVisualizationResult({
             data: fallbackData,
-            type: 'line' // Explicitly set line chart for time series
+            type: 'line'
           });
 
-          // First show the inline visualization in the chat card
           setShowInlineVisualization(true);
           return;
         }
@@ -153,16 +174,13 @@ export function QueryDisplay({
         return;
       }
       
-      // Determine best visualization type based on data structure
       const bestVisualizationType = determineBestVisualization(data);
       
-      // Set the visualization result with the determined type
       setVisualizationResult({
         data: data,
         type: bestVisualizationType
       });
       
-      // First show the inline visualization in the chat card
       setShowInlineVisualization(true);
     } catch (error) {
       console.error('Visualization error:', error);
@@ -171,24 +189,19 @@ export function QueryDisplay({
   };
 
   const handleBackToTable = (event?: React.MouseEvent) => {
-    // Stop event propagation to prevent the click from also triggering expandVisualization
     if (event) {
       event.stopPropagation();
       event.preventDefault();
     }
     
-    // Immediately hide the visualization to ensure smooth transition
     setIsTransitioning(true);
     setTimeout(() => {
-      // This is the critical part - set showInlineVisualization to false
-      // to return to the data table view
       setShowInlineVisualization(false);
       setIsTransitioning(false);
     }, 150);
   };
 
   const expandVisualization = (event: React.MouseEvent<HTMLElement>) => {
-    // Get the bounding box for animation
     const rect = event.currentTarget.getBoundingClientRect();
     const boundingBox = {
       top: rect.top,
@@ -197,91 +210,227 @@ export function QueryDisplay({
       height: rect.height,
     };
 
-    // Create an artifact in fullscreen mode
     const artifactId = generateUUID();
     
-    // Hide the card in chat when expanded to the editor
+    // Set transitioning state to animate the fade out
     setIsTransitioning(true);
     
+    // Keep showing inline visualization during transition
+    // DON'T change back to data table view
+    
+    const styleId = 'viz-editor-fix-styles';
+    if (!document.getElementById(styleId)) {
+      const styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      styleEl.textContent = `
+        /* Fix problematic elements in visualization editor */
+        
+        /* Fix resize handle */
+        [data-panel-resize-handle-id],
+        div[role="separator"] {
+          width: 0 !important;
+          min-width: 0 !important;
+          max-width: 0 !important;
+          background: transparent !important;
+          border: none !important;
+          outline: none !important;
+          display: block !important;
+          opacity: 0 !important;
+        }
+        
+        /* Hide all scrollbars */
+        *::-webkit-scrollbar {
+          width: 0 !important;
+          height: 0 !important;
+          display: none !important;
+        }
+        
+        * {
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+        
+        /* Fix pulsating line under header */
+        *::after,
+        *::before {
+          animation: none !important;
+          transition: none !important;
+          border-bottom: none !important;
+        }
+        
+        /* Fix the toolbar border */
+        .flex.justify-between.items-center.p-3.bg-background {
+          border-bottom: 1px solid hsl(var(--border)) !important;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+        }
+        
+        /* Add border to controls header */
+        .p-4.border-b.bg-background.flex-shrink-0 {
+          border-top: 1px solid hsl(var(--border)) !important;
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
+    
     setTimeout(() => {
-      setArtifact({
-        documentId: artifactId,
+      const currentTime = new Date();
+      const timestamp = currentTime.toISOString();
+      console.log('Creating visualization with ID and timestamp:', artifactId, timestamp);
+      
+      // First create a document that will be used by the artifact system
+      const documentBody = {
         title: title,
-        kind: 'visualization' as ArtifactKind,
         content: JSON.stringify({
           data: visualizationResult?.data || data,
           visualization: visualizationResult?.type || determineBestVisualization(data),
           description,
-          settings: {
-            type: visualizationResult?.type || determineBestVisualization(data),
-            colors: ['hsl(var(--chart-1, 221 83% 53%))', 'hsl(var(--chart-2, 358 84% 56%))', 
-                   'hsl(var(--chart-3, 160 84% 39%))', 'hsl(var(--chart-4, 45 93% 47%))',
-                   'hsl(var(--chart-5, 262 80% 63%))'],
-            showLegend: true,
-            showDataLabels: false,
-            showTitle: true,
-            showLabels: true,
-            title: title
-          }
+          timestamp,
+          lastModified: timestamp
         }),
-        isVisible: true,
-        status: 'idle',
-        boundingBox: boundingBox,
+        kind: 'visualization',
+        createdAt: timestamp // The createdAt timestamp is critical for displaying "Updated X ago"
+      };
+      
+      console.log('Document creation request body:', documentBody);
+      
+      fetch(`/api/document?id=${artifactId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(documentBody)
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(documents => {
+        console.log('Document creation response:', documents);
+        
+        // Once document is created, then create the artifact with reference to it
+        setArtifact({
+          documentId: artifactId, // Reference to the document we just created
+          title: title,
+          kind: 'visualization' as ArtifactKind,
+          content: JSON.stringify({
+            data: visualizationResult?.data || data,
+            visualization: visualizationResult?.type || determineBestVisualization(data),
+            description,
+            timestamp,
+            lastModified: timestamp,
+            settings: {
+              type: visualizationResult?.type || determineBestVisualization(data),
+              colors: ['hsl(var(--chart-1, 221 83% 53%))', 'hsl(var(--chart-2, 358 84% 56%))', 
+                    'hsl(var(--chart-3, 160 84% 39%))', 'hsl(var(--chart-4, 45 93% 47%))',
+                    'hsl(var(--chart-5, 262 80% 63%))'],
+              showLegend: true,
+              showDataLabels: false,
+              showTitle: true,
+              showLabels: true,
+              title: title,
+              customStyles: {
+                hideResizeHandle: true,
+                hideScrollbars: true,
+                preventPulsatingLine: true
+              }
+            }
+          }),
+          isVisible: true,
+          status: 'idle',
+          boundingBox: boundingBox
+        });
+        
+        // Hide the visualization only after the visualization editor is loaded
+        setTimeout(() => {
+          setShowInlineVisualization(false);
+          setIsTransitioning(false);
+        }, 300);
+        
+        // Force a revalidation of the document in case it's not loading
+        fetch(`/api/document?id=${artifactId}`, {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        }).catch(error => console.error('Error fetching document:', error));
+      }).catch(error => {
+        console.error('Error creating document record:', error);
+        
+        // Still create the artifact even if document fails
+        setArtifact({
+          documentId: artifactId,
+          title: title,
+          kind: 'visualization' as ArtifactKind,
+          content: JSON.stringify({
+            data: visualizationResult?.data || data,
+            visualization: visualizationResult?.type || determineBestVisualization(data),
+            description,
+            timestamp,
+            lastModified: timestamp,
+            settings: {
+              type: visualizationResult?.type || determineBestVisualization(data),
+              colors: ['hsl(var(--chart-1, 221 83% 53%))', 'hsl(var(--chart-2, 358 84% 56%))', 
+                    'hsl(var(--chart-3, 160 84% 39%))', 'hsl(var(--chart-4, 45 93% 47%))',
+                    'hsl(var(--chart-5, 262 80% 63%))'],
+              showLegend: true,
+              showDataLabels: false,
+              showTitle: true,
+              showLabels: true,
+              title: title
+            }
+          }),
+          isVisible: true,
+          status: 'idle',
+          boundingBox: boundingBox
+        });
+        
+        // Hide the visualization only after the editor is loaded
+        setTimeout(() => {
+          setShowInlineVisualization(false);
+          setIsTransitioning(false);
+        }, 300);
       });
-      
-      // Hide the visualization in the chat while the full editor is open
-      setShowInlineVisualization(false);
-      setIsTransitioning(false);
-      
-      toast.success('Visualization created');
     }, 150);
   };
 
   function formatSql(sql: string) {
     if (!sql) return '';
     
-    // List of SQL keywords to add newlines before
     const keywords = [
       'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING', 
       'INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'JOIN', 'UNION', 
       'LIMIT', 'OFFSET', 'ON', 'AND', 'OR'
     ];
     
-    // Replace keywords with newlined versions
     let formattedSql = sql;
     
-    // First normalize spacing
     formattedSql = formattedSql.replace(/\s+/g, ' ').trim();
     
-    // Add newlines before keywords
     keywords.forEach(keyword => {
       const regex = new RegExp(`\\s${keyword}\\s`, 'gi');
       formattedSql = formattedSql.replace(regex, `\n${keyword} `);
     });
     
-    // Special case for SELECT to prevent newline at the beginning
     if (formattedSql.startsWith('SELECT')) {
       formattedSql = 'SELECT' + formattedSql.substring(6);
     }
     
-    // Add indentation
     const lines = formattedSql.split('\n');
     let indentLevel = 0;
     
     return lines.map(line => {
       const trimmedLine = line.trim();
       
-      // Adjust indent level based on line content
       if (trimmedLine.startsWith('FROM') || 
           trimmedLine.startsWith('WHERE') ||
           trimmedLine.startsWith('GROUP BY') ||
           trimmedLine.startsWith('ORDER BY')) {
-        // These start main clauses - indent them once
         return '  ' + trimmedLine;
       } else if (trimmedLine.startsWith('AND') || 
                  trimmedLine.startsWith('OR') ||
                  trimmedLine.startsWith('ON')) {
-        // These are subclauses - indent them twice
         return '    ' + trimmedLine;
       }
       
@@ -289,15 +438,24 @@ export function QueryDisplay({
     }).join('\n');
   }
 
-  // Make sure the Data Table and Chart Card have consistent heights
-  const CARD_HEIGHT = "380px"; // Fixed height for both card states
-  const TABLE_WRAPPER_HEIGHT = "305px"; // Height for the data table container
+  const CARD_HEIGHT = "380px";
+  const TABLE_WRAPPER_HEIGHT = "305px";
+
+  if (isHiddenInChat) {
+    return null;
+  }
 
   return (
     <>
-      <div className="border rounded-lg overflow-hidden">
+      <div 
+        ref={queryCardRef}
+        className={cn(
+          "border rounded-lg overflow-hidden", 
+          "transition-opacity duration-300 ease-in-out",
+          isTransitioning ? "opacity-0" : "opacity-100"
+        )}
+      >
         {!showSql && !showInlineVisualization ? (
-          // Data table view
           <div style={{ minHeight: CARD_HEIGHT }}>
             <div className="bg-muted p-4">
               <div className="flex items-center justify-between">
@@ -338,7 +496,6 @@ export function QueryDisplay({
             </div>
           </div>
         ) : showSql ? (
-          // SQL view
           <div style={{ minHeight: CARD_HEIGHT }}>
             <div className="bg-muted p-4">
               <div className="flex items-center justify-between">
@@ -378,13 +535,11 @@ export function QueryDisplay({
             </div>
           </div>
         ) : (
-          // Inline visualization view - styled like document preview
           <div className={cn(
             "relative w-full cursor-pointer border border-muted overflow-hidden rounded-lg",
             "transition-all duration-300 ease-in-out transform",
             isTransitioning ? "opacity-0 scale-95" : "opacity-100 scale-100"
           )} style={{ height: CARD_HEIGHT }}>
-            {/* Document Header with proper controls */}
             <div className="p-4 bg-background flex flex-row items-center justify-between border-b border-muted">
               <div className="flex flex-row items-center gap-3">
                 <Button 
@@ -402,7 +557,6 @@ export function QueryDisplay({
                 <span className="font-medium">{title}</span>
               </div>
               
-              {/* Expand button using the proper FullscreenIcon */}
               <button
                 className="h-8 w-8 p-0 flex items-center justify-center hover:dark:bg-zinc-700 rounded-md hover:bg-zinc-100"
                 onClick={expandVisualization}
@@ -425,7 +579,6 @@ export function QueryDisplay({
               </button>
             </div>
             
-            {/* Properly centered chart positioning */}
             <div className="h-[290px] overflow-hidden bg-background">
               {visualizationResult && (
                 <div className="h-full w-full flex items-center justify-center">

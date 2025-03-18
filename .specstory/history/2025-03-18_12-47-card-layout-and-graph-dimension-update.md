@@ -1578,6 +1578,298 @@ for the visualization editor, can you remove the toast notification that appears
 
 _**Assistant**_
 
+I'll address all the issues you've identified with the visualization editor. Let me fix each one:
+
+1. Remove the toast notification when visualization is created
+2. Hide the query card in chat when visualization editor is open
+3. Remove the horizontal scroll bar when not needed
+4. Fix the UI showing previous version button when there is no previous version
+
+Let's start by removing the toast notification:
+
+---
+
+```diff
+        setShowInlineVisualization(false);
+        setIsTransitioning(false);
+-       
+-       toast.success('Visualization created');
+      }, 150);
+    };
+```
+
+---
+
+Now let's check how the artifact state is managed to properly hide the query card when the visualization editor is expanded:
+
+---
+
+<details>
+            <summary>Searched codebase "artifact state management hide original card" • **25** results</summary>
+        
+| File | Lines |
+|------|-------|
+| `components/artifact-actions.tsx` | L87-100 |
+| `.specstory/history/2025-03-18_06-59-remove-public-private-dropdown.md` | L4009-4062 |
+| `components/data-visualization/query-display.tsx` | L20-64 |
+| `components/artifact-close-button.tsx` | L1-27 |
+| `components/artifact.tsx` | L414-462 |
+| `components/artifact.tsx` | L1-42 |
+| `components/artifact.tsx` | L462-514 |
+| `components/artifact-actions.tsx` | L1-17 |
+| `components/artifact.tsx` | L268-294 |
+| `components/artifact.tsx` | L204-268 |
+| `.specstory/history/2025-03-18_06-59-remove-public-private-dropdown.md` | L4124-4180 |
+| `.specstory/history/2025-03-18_06-59-remove-public-private-dropdown.md` | L7270-7330 |
+| `components/artifact-actions.tsx` | L17-87 |
+| `.specstory/history/2025-03-18_06-59-remove-public-private-dropdown.md` | L9328-9389 |
+| `components/artifact.tsx` | L325-357 |
+| `artifacts/image/client.tsx` | L1-48 |
+| `.specstory/history/2025-03-18_06-59-remove-public-private-dropdown.md` | L7919-7980 |
+| `components/artifact.tsx` | L294-325 |
+| `components/artifact.tsx` | L514-523 |
+| `components/artifact.tsx` | L357-414 |
+| `components/document-preview.tsx` | L142-195 |
+| `.specstory/history/2025-03-18_06-59-remove-public-private-dropdown.md` | L8446-8495 |
+| `components/data-visualization/query-display.tsx` | L188-238 |
+| `components/artifact-messages.tsx` | L90-92 |
+| `components/toolbar.tsx` | L475-483 |
+
+</details>
+
+---
+
+Let's check the hooks/use-artifact file to understand how the artifact state is managed:
+
+---
+
+Read file: hooks/use-artifact.ts
+
+---
+
+Let's check the artifacts/visualization/client.tsx file to understand how the visualization artifact is handled:
+
+---
+
+Read file: artifacts/visualization/client.tsx
+
+---
+
+Now let's make the changes to hide the query card when the visualization editor is open:
+
+---
+
+```diff
+          });
+        }
++       
++       // Dispatch event to hide query card when visualization is expanded
++       if (artifact.isVisible && artifact.kind === 'visualization') {
++         // Notify that visualization is expanded to full screen
++         const expandEvent = new CustomEvent('visualizationExpanded', {
++           detail: { artifactId: artifact.documentId }
++         });
++         window.dispatchEvent(expandEvent);
++       }
+      }
+-   }, [artifact.documentId, artifactDefinition, setMetadata]);
++   }, [artifact.documentId, artifactDefinition, setMetadata, artifact.isVisible, artifact.kind]);
+  
+    return (
+```
+
+---
+
+Let's also add code to handle when the artifact is closed:
+
+---
+
+```diff
+  
+  function PureArtifactCloseButton() {
+-   const { setArtifact } = useArtifact();
++   const { setArtifact, artifact } = useArtifact();
+  
+    return (
+        className="h-fit p-2 dark:hover:bg-zinc-700"
+        onClick={() => {
++         // Check if we're closing a visualization
++         const isVisualization = artifact.kind === 'visualization';
++         const artifactId = artifact.documentId;
++         
+          setArtifact((currentArtifact) =>
+            currentArtifact.status === 'streaming'
+              : { ...initialArtifactData, status: 'idle' },
+          );
++         
++         // Fire event to restore query card when visualization editor is closed
++         if (isVisualization) {
++           const restoreEvent = new CustomEvent('visualizationClosed', {
++             detail: { artifactId, restoreQueryCard: true }
++           });
++           window.dispatchEvent(restoreEvent);
++         }
+        }}
+      >
+```
+
+---
+
+Now let's modify the QueryDisplay component to listen for these events and handle hiding/showing the query card:
+
+---
+
+```diff
+    const [isTransitioning, setIsTransitioning] = useState(false);
+    
+-   // Listen for visualization restore event when editor is closed
++   // Listen for visualization events
+    useEffect(() => {
++     // Handle restore event when visualization editor is closed
+      const handleRestoreVisualization = (event: CustomEvent) => {
+        if (event.detail) {
+      };
+      
+-     // Add event listener
++     // Handle visualization expanded event - hide this component
++     const handleVisualizationExpanded = (event: CustomEvent) => {
++       if (event.detail && event.detail.artifactId) {
++         // Hide this component when visualization is expanded to full screen
++         setIsTransitioning(true);
++         setTimeout(() => {
++           // Hide both the data table and inline visualization
++           setShowInlineVisualization(false);
++         }, 100);
++       }
++     };
++     
++     // Handle visualization closed event - show this component again
++     const handleVisualizationClosed = (event: CustomEvent) => {
++       if (event.detail && event.detail.restoreQueryCard) {
++         // Restore the inline visualization when the editor is closed
++         setShowInlineVisualization(true);
++       }
++     };
++     
++     // Add event listeners
+      window.addEventListener('restoreVisualization', handleRestoreVisualization as EventListener);
++     window.addEventListener('visualizationExpanded', handleVisualizationExpanded as EventListener);
++     window.addEventListener('visualizationClosed', handleVisualizationClosed as EventListener);
+      
+      // Clean up
+      return () => {
+        window.removeEventListener('restoreVisualization', handleRestoreVisualization as EventListener);
++       window.removeEventListener('visualizationExpanded', handleVisualizationExpanded as EventListener);
++       window.removeEventListener('visualizationClosed', handleVisualizationClosed as EventListener);
+      };
+    }, []);
+```
+
+---
+
+Now, let's fix the issue with the horizontal scrollbar in the visualization artifact:
+
+---
+
+```diff
+          {/* Visualization panel */}
+          <Panel defaultSize={70} minSize={60}>
+-           <div className="h-full overflow-auto p-4 bg-card">
++           <div className="h-full overflow-y-auto overflow-x-hidden p-4 bg-card">
+              <div className="border rounded-lg p-4 h-full flex items-center justify-center">
+                <StandaloneChart 
+```
+
+---
+
+Finally, let's fix the issue with the previous version button showing when there are no previous versions:
+
+---
+
+```diff
+          }
+        },
+-       isDisabled: ({ currentVersionIndex, metadata }) => {
+-         return currentVersionIndex === 0 || (metadata?.currentVersion === 0);
++       // Only show if there are previous versions
++       isVisible: ({ metadata }) => {
++         return metadata && metadata.versions && metadata.versions.length > 1 && metadata.currentVersion > 0;
+        },
+      },
+```
+
+---
+
+Let's fix the linter errors by using the correct property name:
+
+---
+
+```diff
+          return metadata && metadata.versions && metadata.versions.length > 1 && metadata.currentVersion > 0;
+        },
++       // Only hide when there are no previous versions
++       isDisabled: ({ metadata, currentVersionIndex }) => {
++         // Disable when there are no previous versions to navigate to
++         return currentVersionIndex === 0 || (metadata?.currentVersion === 0);
++       },
+      },
+      {
+```
+
+---
+
+Let's remove the isVisible property since it's causing errors:
+
+---
+
+
+
+---
+
+Let's make a more specific change:
+
+---
+
+Read file: artifacts/visualization/client.tsx
+
+---
+
+Let's fix the issue:
+
+---
+
+
+
+---
+
+Let's try a more targeted strategy:
+
+---
+
+
+
+---
+
+Let's restart the server and test the changes we've made so far:
+
+---
+
+Cancelled
+
+---
+
+
+
+---
+
+_**User**_
+
+it doesn't look like the changes were applied correctly
+
+---
+
+_**Assistant**_
+
 
 
 ---

@@ -28,6 +28,9 @@ interface StandaloneChartProps {
   colors?: string[];
   startYAxisFromZero?: boolean;
   formatNumbers?: boolean;
+  showLegend?: boolean;
+  showDataLabels?: boolean;
+  title?: string;
 }
 
 export function StandaloneChart({ 
@@ -37,7 +40,10 @@ export function StandaloneChart({
   width = '100%',
   colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'],
   startYAxisFromZero = false,
-  formatNumbers = false
+  formatNumbers = false,
+  showLegend = true,
+  showDataLabels = false,
+  title
 }: StandaloneChartProps) {
   // Ensure we have data
   const hasData = data && Array.isArray(data) && data.length > 0;

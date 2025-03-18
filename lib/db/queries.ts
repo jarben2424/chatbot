@@ -190,24 +190,57 @@ export async function saveDocument({
   kind,
   content,
   userId,
+  createdAt,
+  previousVersion,
+  chatId
 }: {
   id: string;
   title: string;
   kind: ArtifactKind;
   content: string;
   userId: string;
+  createdAt?: Date;
+  previousVersion?: string;
+  chatId?: string;
 }) {
   try {
-    return await db.insert(document).values({
+    // Only include fields that we know exist in the database
+    const documentValues: any = {
       id,
       title,
-      kind,
       content,
       userId,
-      createdAt: new Date(),
-    });
+      createdAt: createdAt || new Date(),
+    };
+    
+    // Add kind if it exists (it should be either 'kind' or 'text' depending on migration state)
+    try {
+      documentValues.kind = kind;
+    } catch (e) {
+      console.log('Field "kind" might not exist, trying "text"');
+      documentValues.text = kind;
+    }
+    
+    // Only add these optional fields if they are provided
+    if (previousVersion) {
+      try {
+        documentValues.previousVersion = previousVersion;
+      } catch (e) {
+        console.log('Field "previousVersion" might not exist in the database');
+      }
+    }
+    
+    if (chatId) {
+      try {
+        documentValues.chatId = chatId;
+      } catch (e) {
+        console.log('Field "chatId" might not exist in the database');
+      }
+    }
+    
+    return await db.insert(document).values(documentValues);
   } catch (error) {
-    console.error('Failed to save document in database');
+    console.error('Failed to save document in database', error);
     throw error;
   }
 }

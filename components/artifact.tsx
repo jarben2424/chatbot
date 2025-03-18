@@ -264,8 +264,30 @@ function PureArtifact({
           setMetadata,
         });
       }
+      
+      // Handle visualization artifacts specially to manage query card visibility
+      if (artifact.isVisible && artifact.kind === 'visualization') {
+        try {
+          // Dispatch event to hide query card when visualization is expanded to full screen
+          const expandEvent = new CustomEvent('visualizationExpanded', {
+            detail: { 
+              artifactId: artifact.documentId,
+              isFullScreen: true,
+              timestamp: Date.now() // Add timestamp to ensure uniqueness
+            }
+          });
+          
+          // Allow a short delay for rendering before dispatching the event
+          setTimeout(() => {
+            window.dispatchEvent(expandEvent);
+            console.log('Visualization expanded event dispatched', artifact.documentId);
+          }, 10);
+        } catch (error) {
+          console.error('Error dispatching visualization expanded event:', error);
+        }
+      }
     }
-  }, [artifact.documentId, artifactDefinition, setMetadata]);
+  }, [artifact.documentId, artifactDefinition, setMetadata, artifact.isVisible, artifact.kind]);
 
   return (
     <AnimatePresence>
