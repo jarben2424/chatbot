@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 
 import type { ArtifactKind } from './artifact';
 import { FileIcon, LoaderIcon, MessageIcon, PencilEditIcon } from './icons';
@@ -25,7 +25,12 @@ const getActionText = (
 
 interface DocumentToolResultProps {
   type: 'create' | 'update' | 'request-suggestions';
-  result: { id: string; title: string; kind: ArtifactKind };
+  result: {
+    id: string;
+    title: string;
+    kind: ArtifactKind;
+    error?: string;
+  };
   isReadonly: boolean;
 }
 
@@ -35,6 +40,15 @@ function PureDocumentToolResult({
   isReadonly,
 }: DocumentToolResultProps) {
   const { setArtifact } = useArtifact();
+  
+  // Show error toast on mount if error is present
+  useEffect(() => {
+    if (result.error) {
+      setTimeout(() => {
+        toast.info(result.error);
+      }, 500);
+    }
+  }, [result.error]);
 
   return (
     <button
@@ -88,7 +102,7 @@ export const DocumentToolResult = memo(PureDocumentToolResult, () => true);
 
 interface DocumentToolCallProps {
   type: 'create' | 'update' | 'request-suggestions';
-  args: { title: string };
+  args: { title: string; error?: string };
   isReadonly: boolean;
 }
 
@@ -125,6 +139,13 @@ function PureDocumentToolCall({
           isVisible: true,
           boundingBox,
         }));
+        
+        // Handle error message if present
+        if (args.error) {
+          setTimeout(() => {
+            toast.info(args.error);
+          }, 500);
+        }
       }}
     >
       <div className="flex flex-row gap-3 items-start">

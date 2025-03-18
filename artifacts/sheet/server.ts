@@ -9,8 +9,8 @@ export const sheetDocumentHandler = createDocumentHandler<'sheet'>({
   onCreateDocument: async ({ title, dataStream }) => {
     try {
       const { fullStream } = streamObject({
-        model: myProvider.languageModel('correct-model-id'),
-        system: getSystemPrompt(sheetPrompt, title),
+        model: myProvider.languageModel('gpt-3.5-turbo'),
+        system: await getSystemPrompt({ artifactType: 'sheet' }),
         prompt: title,
         schema: z.object({
           csv: z.string().describe('CSV data'),
@@ -52,7 +52,7 @@ export const sheetDocumentHandler = createDocumentHandler<'sheet'>({
     let draftContent = '';
 
     const { fullStream } = streamObject({
-      model: myProvider.languageModel('artifact-model'),
+      model: myProvider.languageModel('gpt-3.5-turbo'),
       system: updateDocumentPrompt(document.content, 'sheet'),
       prompt: description,
       schema: z.object({

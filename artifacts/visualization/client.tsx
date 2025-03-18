@@ -10,7 +10,7 @@ import { StandaloneChart } from '@/components/data-visualization/charts/standalo
 import { VisualizationControls } from '@/components/data-visualization/visualization-controls';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { toast } from 'sonner';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 type VisualizationSettings = {
   type: string;
@@ -139,30 +139,26 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
       parsedContent?.lastModified ||
       new Date().toISOString();
     
-    // Effect to handle dropdown toggle and overlay
+    // State for dropdown visibility
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    
+    // Handle click outside to close dropdown
     useEffect(() => {
-      // Function to handle save button click
-      const handleSaveClick = () => {
-        const dropdown = document.getElementById('dashboard-save-dropdown');
-        const overlay = document.getElementById('dashboard-dropdown-overlay');
-        
-        if (dropdown?.classList.contains('hidden')) {
-          dropdown?.classList.remove('hidden');
-          overlay?.classList.remove('hidden');
-        } else {
-          dropdown?.classList.add('hidden');
-          overlay?.classList.add('hidden');
+      if (!isDropdownOpen || typeof window === 'undefined') return;
+      
+      const handleClickOutside = (event: MouseEvent) => {
+        const target = event.target as HTMLElement;
+        // Close dropdown if click is outside
+        if (!target.closest('.save-dropdown-container')) {
+          setIsDropdownOpen(false);
         }
       };
       
-      // Set up click listener
-      const saveButton = document.querySelector('[data-save-button="true"]');
-      saveButton?.addEventListener('click', handleSaveClick);
-      
+      document.addEventListener('mousedown', handleClickOutside);
       return () => {
-        saveButton?.removeEventListener('click', handleSaveClick);
+        document.removeEventListener('mousedown', handleClickOutside);
       };
-    }, []);
+    }, [isDropdownOpen]);
     
     // Handle settings changes - create a new version
     const handleSettingsChange = (newSettings: VisualizationSettings) => {
@@ -228,22 +224,10 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
                   <h3 className="text-sm font-medium text-muted-foreground">Controls</h3>
                   
                   {/* Improved save button with dropdown */}
-                  <div className="relative group">
+                  <div className="relative group save-dropdown-container">
                     <button
                       className="px-3 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-1.5"
-                      data-save-button="true"
-                      onClick={() => {
-                        const dropdown = document.getElementById('dashboard-save-dropdown');
-                        const overlay = document.getElementById('dashboard-dropdown-overlay');
-                        
-                        if (dropdown?.classList.contains('hidden')) {
-                          dropdown?.classList.remove('hidden');
-                          overlay?.classList.remove('hidden');
-                        } else {
-                          dropdown?.classList.add('hidden');
-                          overlay?.classList.add('hidden');
-                        }
-                      }}
+                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16L21 8V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -254,76 +238,72 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
                     </button>
                     
                     {/* Dropdown menu */}
-                    <div id="dashboard-save-dropdown" className="absolute right-0 mt-1 w-56 bg-card rounded-md border shadow-lg z-50 hidden">
-                      <ul className="py-1">
-                        <li>
-                          <button 
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-muted/50 transition-colors flex items-center gap-2"
-                            onClick={() => {
-                              // Save the current visualization
-                              const newContent = JSON.stringify({
-                                data: visualizationData,
-                                settings: settings,
-                                visualization: settings.type
-                              });
-                              onSaveContent(newContent, true);
-                              
-                              // Hide dropdown and overlay
-                              const dropdown = document.getElementById('dashboard-save-dropdown');
-                              const overlay = document.getElementById('dashboard-dropdown-overlay');
-                              dropdown?.classList.add('hidden');
-                              overlay?.classList.add('hidden');
-                              
-                              // Show success toast
-                              toast.success('Dashboard added to My Dashboards');
-                              
-                              // Close the visualization editor and return to chat
-                              // Find the close button and simulate a click
-                              const closeButton = document.querySelector('.artifact-close-button');
-                              if (closeButton instanceof HTMLElement) {
-                                closeButton.click();
-                              }
-                            }}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                            New dashboard
-                          </button>
-                        </li>
-                        <li>
-                          <button 
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-muted/50 transition-colors flex items-center gap-2"
-                            onClick={() => {
-                              // Save content
-                              const newContent = JSON.stringify({
-                                data: visualizationData,
-                                settings: settings,
-                                visualization: settings.type
-                              });
-                              onSaveContent(newContent, true);
-                              
-                              // Hide dropdown and overlay
-                              const dropdown = document.getElementById('dashboard-save-dropdown');
-                              const overlay = document.getElementById('dashboard-dropdown-overlay');
-                              dropdown?.classList.add('hidden');
-                              overlay?.classList.add('hidden');
-                              
-                              // Show "coming soon" toast
-                              toast.info('Existing dashboard feature coming soon');
-                            }}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M19 3H5C3.89543 3 3 3.89543 3 5V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              <path d="M8 10H6V16H8V10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              <path d="M13 7H11V16H13V7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              <path d="M18 13H16V16H18V13Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                            Existing dashboard
-                          </button>
-                        </li>
-                      </ul>
-                    </div>
+                    {isDropdownOpen && (
+                      <div className="absolute right-0 mt-1 w-56 bg-card rounded-md border shadow-lg z-50">
+                        <ul className="py-1">
+                          <li>
+                            <button 
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-muted/50 transition-colors flex items-center gap-2"
+                              onClick={() => {
+                                // Save the current visualization
+                                const newContent = JSON.stringify({
+                                  data: visualizationData,
+                                  settings: settings,
+                                  visualization: settings.type
+                                });
+                                onSaveContent(newContent, true);
+                                
+                                // Close dropdown
+                                setIsDropdownOpen(false);
+                                
+                                // Show success toast
+                                toast.success('Dashboard added to My Dashboards');
+                                
+                                // Close the visualization editor and return to chat
+                                // Find the close button and simulate a click
+                                const closeButton = document.querySelector('.artifact-close-button');
+                                if (closeButton instanceof HTMLElement) {
+                                  closeButton.click();
+                                }
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                              New dashboard
+                            </button>
+                          </li>
+                          <li>
+                            <button 
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-muted/50 transition-colors flex items-center gap-2"
+                              onClick={() => {
+                                // Save content
+                                const newContent = JSON.stringify({
+                                  data: visualizationData,
+                                  settings: settings,
+                                  visualization: settings.type
+                                });
+                                onSaveContent(newContent, true);
+                                
+                                // Close dropdown
+                                setIsDropdownOpen(false);
+                                
+                                // Show "coming soon" toast
+                                toast.info('Existing dashboard feature coming soon');
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M19 3H5C3.89543 3 3 3.89543 3 5V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M8 10H6V16H8V10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M13 7H11V16H13V7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M18 13H16V16H18V13Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                              Existing dashboard
+                            </button>
+                          </li>
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -339,16 +319,6 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
             </div>
           </div>
         </div>
-        
-        {/* Add click away listener to close dropdown when clicking outside */}
-        <div 
-          className="fixed inset-0 z-40 hidden" 
-          id="dashboard-dropdown-overlay"
-          onClick={() => {
-            document.getElementById('dashboard-save-dropdown')?.classList.add('hidden');
-            document.getElementById('dashboard-dropdown-overlay')?.classList.add('hidden');
-          }}
-        />
       </div>
     );
   },

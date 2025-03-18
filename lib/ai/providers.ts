@@ -6,5 +6,6 @@ export const myProvider = customProvider({
     'correct-model-id': openai('correct-model-id'),
     'gpt-3.5-turbo': openai('gpt-3.5-turbo'),
     'gpt-4': openai('gpt-4'),
+    'artifact-model': openai('gpt-3.5-turbo'),
   }
 });

@@ -10,8 +10,8 @@ export const codeDocumentHandler = createDocumentHandler<'code'>({
     let draftContent = '';
 
     const { fullStream } = streamObject({
-      model: myProvider.languageModel('artifact-model'),
-      system: getSystemPrompt(codePrompt, title),
+      model: myProvider.languageModel('gpt-3.5-turbo'),
+      system: await getSystemPrompt({ artifactType: 'code' }),
       prompt: title,
       schema: z.object({
         code: z.string(),
@@ -42,8 +42,8 @@ export const codeDocumentHandler = createDocumentHandler<'code'>({
     let draftContent = '';
 
     const { fullStream } = streamObject({
-      model: myProvider.languageModel('artifact-model'),
-      system: getSystemPrompt(updateDocumentPrompt(document.content, 'code'), description),
+      model: myProvider.languageModel('gpt-3.5-turbo'),
+      system: updateDocumentPrompt(document.content, 'code'),
       prompt: description,
       schema: z.object({
         code: z.string(),

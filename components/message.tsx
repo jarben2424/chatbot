@@ -177,6 +177,7 @@ const PurePreviewMessage = ({
                             description={result.description}
                             artifactId={result.artifactId}
                             expandable={true}
+                            onClose={() => {}} 
                           />
                         </div>
                       );
@@ -189,6 +190,7 @@ const PurePreviewMessage = ({
                     } else if (toolName === 'createDocument') {
                       return (
                         <DocumentPreview
+                          key={toolCallId}
                           isReadonly={isReadonly}
                           result={result}
                         />
@@ -196,6 +198,7 @@ const PurePreviewMessage = ({
                     } else if (toolName === 'updateDocument') {
                       return (
                         <DocumentToolResult
+                          key={toolCallId}
                           type="update"
                           result={result}
                           isReadonly={isReadonly}
@@ -204,6 +207,7 @@ const PurePreviewMessage = ({
                     } else if (toolName === 'requestSuggestions') {
                       return (
                         <DocumentToolResult
+                          key={toolCallId}
                           type="request-suggestions"
                           result={result}
                           isReadonly={isReadonly}
@@ -211,7 +215,7 @@ const PurePreviewMessage = ({
                       );
                     } else {
                       return (
-                        <pre>{JSON.stringify(result, null, 2)}</pre>
+                        <pre key={toolCallId}>{JSON.stringify(result, null, 2)}</pre>
                       );
                     }
                   }
