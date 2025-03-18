@@ -438,7 +438,7 @@ export const visualizationArtifact = new Artifact<'visualization', Visualization
       },
     },
     {
-      description: 'Analyze data',
+      description: 'Analyze chart',
       icon: <LineChartIcon />,
       onClick: ({ appendMessage }) => {
         appendMessage({
