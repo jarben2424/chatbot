@@ -338,14 +338,20 @@ export function VisualizationEditor({
         
         // Dispatch a custom event to restore the visualization card
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('restoreVisualization', {
-            detail: { 
-              data: parsedData,
-              settings,
-              type: settings.type,
-              title
-            }
-          }));
+          try {
+            // Include all necessary data to correctly restore the chart card
+            window.dispatchEvent(new CustomEvent('restoreVisualization', {
+              detail: { 
+                data: parsedData,
+                settings,
+                type: settings.type,
+                title,
+                restoreChart: true // Flag to indicate we want to restore to chart view, not query view
+              }
+            }));
+          } catch (error) {
+            console.error('Error dispatching restore event:', error);
+          }
         }
       }
       setIsClosing(false);

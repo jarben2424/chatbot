@@ -46,8 +46,11 @@ export function QueryDisplay({
           });
         }
         
-        // Show the inline visualization again
-        setShowInlineVisualization(true);
+        // Check if we should restore to chart view
+        if (event.detail.restoreChart) {
+          // Show the inline visualization again
+          setShowInlineVisualization(true);
+        }
       }
     };
     
@@ -174,14 +177,17 @@ export function QueryDisplay({
       event.preventDefault();
     }
     
+    // Immediately hide the visualization to ensure smooth transition
     setIsTransitioning(true);
     setTimeout(() => {
+      // This is the critical part - set showInlineVisualization to false
+      // to return to the data table view
       setShowInlineVisualization(false);
       setIsTransitioning(false);
     }, 150);
   };
 
-  const expandVisualization = (event: React.MouseEvent<HTMLDivElement>) => {
+  const expandVisualization = (event: React.MouseEvent<HTMLElement>) => {
     // Get the bounding box for animation
     const rect = event.currentTarget.getBoundingClientRect();
     const boundingBox = {
@@ -283,12 +289,16 @@ export function QueryDisplay({
     }).join('\n');
   }
 
+  // Make sure the Data Table and Chart Card have consistent heights
+  const CARD_HEIGHT = "380px"; // Fixed height for both card states
+  const TABLE_WRAPPER_HEIGHT = "305px"; // Height for the data table container
+
   return (
     <>
       <div className="border rounded-lg overflow-hidden">
         {!showSql && !showInlineVisualization ? (
           // Data table view
-          <div>
+          <div style={{ minHeight: CARD_HEIGHT }}>
             <div className="bg-muted p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -322,13 +332,14 @@ export function QueryDisplay({
               className={cn("transition-all duration-300", { 
                 "opacity-50 transform scale-95": isFlipping 
               })}
+              style={{ height: TABLE_WRAPPER_HEIGHT, overflowY: 'auto' }}
             >
               <DataTable data={data} />
             </div>
           </div>
         ) : showSql ? (
           // SQL view
-          <div>
+          <div style={{ minHeight: CARD_HEIGHT }}>
             <div className="bg-muted p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -359,6 +370,7 @@ export function QueryDisplay({
               className={cn("transition-all duration-300", { 
                 "opacity-50 transform scale-95": isFlipping 
               })}
+              style={{ height: TABLE_WRAPPER_HEIGHT, overflowY: 'auto' }}
             >
               <pre className="bg-muted/30 p-4 overflow-x-auto text-sm">
                 <code>{formatSql(sql || '')}</code>
@@ -371,36 +383,9 @@ export function QueryDisplay({
             "relative w-full cursor-pointer border border-muted overflow-hidden rounded-lg",
             "transition-all duration-300 ease-in-out transform",
             isTransitioning ? "opacity-0 scale-95" : "opacity-100 scale-100"
-          )}>
-            {/* Hitbox Layer - exactly like document preview */}
-            <div
-              className="size-full absolute top-0 left-0 z-10"
-              onClick={expandVisualization}
-              role="presentation"
-              aria-hidden="true"
-            >
-              <div className="w-full p-4 flex justify-end items-center">
-                <div className="absolute right-[9px] top-[9px] p-2 hover:dark:bg-zinc-700 rounded-md hover:bg-zinc-100">
-                  <svg
-                    height="16"
-                    strokeLinejoin="round"
-                    viewBox="0 0 16 16"
-                    width="16"
-                    style={{ color: 'currentcolor' }}
-                  >
-                    <path
-                      fillRule="evenodd"
-                      clipRule="evenodd"
-                      d="M1 5.25V6H2.5V5.25V2.5H5.25H6V1H5.25H2C1.44772 1 1 1.44772 1 2V5.25ZM5.25 14.9994H6V13.4994H5.25H2.5V10.7494V9.99939H1V10.7494V13.9994C1 14.5517 1.44772 14.9994 2 14.9994H5.25ZM15 10V10.75V14C15 14.5523 14.5523 15 14 15H10.75H10V13.5H10.75H13.5V10.75V10H15ZM10.75 1H10V2.5H10.75H13.5V5.25V6H15V5.25V2C15 1.44772 14.5523 1 14 1H10.75Z"
-                      fill="currentColor"
-                    ></path>
-                  </svg>
-                </div>
-              </div>
-            </div>
-            
-            {/* Document Header */}
-            <div className="p-4 bg-background flex flex-row gap-2 items-center justify-between border-b border-muted">
+          )} style={{ height: CARD_HEIGHT }}>
+            {/* Document Header with proper controls */}
+            <div className="p-4 bg-background flex flex-row items-center justify-between border-b border-muted">
               <div className="flex flex-row items-center gap-3">
                 <Button 
                   size="sm" 
@@ -417,19 +402,38 @@ export function QueryDisplay({
                 <span className="font-medium">{title}</span>
               </div>
               
-              {/* Empty space for balance */}
-              <div className="w-8"></div>
+              {/* Expand button using the proper FullscreenIcon */}
+              <button
+                className="h-8 w-8 p-0 flex items-center justify-center hover:dark:bg-zinc-700 rounded-md hover:bg-zinc-100"
+                onClick={expandVisualization}
+                aria-label="Expand"
+              >
+                <svg
+                  height="16"
+                  strokeLinejoin="round"
+                  viewBox="0 0 16 16"
+                  width="16"
+                  style={{ color: 'currentcolor' }}
+                >
+                  <path
+                    fillRule="evenodd"
+                    clipRule="evenodd"
+                    d="M1 5.25V6H2.5V5.25V2.5H5.25H6V1H5.25H2C1.44772 1 1 1.44772 1 2V5.25ZM5.25 14.9994H6V13.4994H5.25H2.5V10.7494V9.99939H1V10.7494V13.9994C1 14.5517 1.44772 14.9994 2 14.9994H5.25ZM15 10V10.75V14C15 14.5523 14.5523 15 14 15H10.75H10V13.5H10.75H13.5V10.75V10H15ZM10.75 1H10V2.5H10.75H13.5V5.25V6H15V5.25V2C15 1.44772 14.5523 1 14 1H10.75Z"
+                    fill="currentColor"
+                  ></path>
+                </svg>
+              </button>
             </div>
             
-            {/* Document Content - with fixed height */}
-            <div className="h-[257px] overflow-hidden bg-background">
+            {/* Properly centered chart positioning */}
+            <div className="h-[290px] overflow-hidden bg-background">
               {visualizationResult && (
                 <div className="h-full w-full flex items-center justify-center">
-                  <div className="size-full px-4" style={{ maxHeight: '257px' }}>
+                  <div className="w-full px-6 pt-16 pb-2">
                     <StandaloneChart
                       type={visualizationResult.type}
                       data={visualizationResult.data}
-                      height={240}
+                      height={275}
                       width="100%"
                       startYAxisFromZero={true}
                       formatNumbers={true}

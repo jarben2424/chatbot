@@ -227,7 +227,7 @@ export function VisualizationPanel({
           <StandaloneChart 
             type={settings.type === 'auto' ? 'line' : settings.type}
             data={fallbackData}
-            height={300}
+            height={isForceExpanded ? 350 : 215}
             width="100%"
             startYAxisFromZero={true}
             formatNumbers={true}
@@ -236,7 +236,7 @@ export function VisualizationPanel({
         );
       }
       
-      return <div className="p-4 text-center text-muted-foreground">No data available</div>;
+      return <div className="text-center text-muted-foreground">No data available</div>;
     }
     
     // Get a specific chart type, never using 'auto'
@@ -247,7 +247,7 @@ export function VisualizationPanel({
       <StandaloneChart 
         type={chartType}
         data={formattedData}
-        height={300}
+        height={isForceExpanded ? 350 : 215}
         width="100%"
         startYAxisFromZero={true}
         formatNumbers={true}
@@ -448,7 +448,9 @@ export function VisualizationPanel({
       
       {/* Document Content - exactly like document preview */}
       <div className="h-[257px] overflow-y-hidden border rounded-b-2xl dark:bg-muted border-t-0 dark:border-zinc-700">
-        {renderVisualization()}
+        <div className="flex items-center justify-center h-full pt-2 px-6 pr-8">
+          {renderVisualization()}
+        </div>
       </div>
     </div>
   );

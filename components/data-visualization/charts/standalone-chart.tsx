@@ -43,7 +43,7 @@ export function StandaloneChart({
   const hasData = data && Array.isArray(data) && data.length > 0;
   
   if (!hasData) {
-    return <div className="p-8 text-center text-muted-foreground">No data available</div>;
+    return <div className="h-full flex items-center justify-center text-center text-muted-foreground">No data available</div>;
   }
 
   // Log visualization data for debugging
@@ -192,8 +192,8 @@ export function StandaloneChart({
     return 0; // Show all ticks for fewer data points
   };
 
-  // Set uniform margins for better appearance
-  const chartMargins = { top: 10, right: 20, left: 20, bottom: 20 };
+  // Set uniform margins for better appearance in the visualization card
+  const chartMargins = { top: 5, right: 35, left: 15, bottom: 30 };
   
   switch (type) {
     case 'bar':
@@ -207,17 +207,17 @@ export function StandaloneChart({
             <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
             <XAxis 
               dataKey={dateOrMonthKey} 
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 11 }}
               tickFormatter={formatXAxisTick}
               interval={calculateInterval()}
             />
             <YAxis 
-              padding={{ top: 15, bottom: 5 }}
+              padding={{ top: 10, bottom: 10 }}
               tickFormatter={formatYAxis}
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 11 }}
               allowDecimals={false}
               domain={startYAxisFromZero ? [0, 'dataMax'] : undefined}
-              width={50}
+              width={55}
             />
             <Tooltip 
               formatter={formatTooltipValue}
@@ -228,7 +228,7 @@ export function StandaloneChart({
               }}
             />
             <Legend 
-              wrapperStyle={{ paddingTop: 10 }}
+              wrapperStyle={{ paddingTop: 12 }}
               formatter={(value) => value.replace(/_/g, ' ')}
             />
             {valueKeys.map((key, index) => (
@@ -253,17 +253,17 @@ export function StandaloneChart({
             <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
             <XAxis 
               dataKey={dateOrMonthKey} 
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 11 }}
               tickFormatter={formatXAxisTick}
               interval={calculateInterval()}
             />
             <YAxis 
-              padding={{ top: 15, bottom: 5 }}
+              padding={{ top: 10, bottom: 10 }}
               tickFormatter={formatYAxis}
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 11 }}
               allowDecimals={false}
               domain={startYAxisFromZero ? [0, 'dataMax'] : undefined}
-              width={50}
+              width={55}
             />
             <Tooltip 
               formatter={formatTooltipValue}
@@ -274,7 +274,7 @@ export function StandaloneChart({
               }}
             />
             <Legend 
-              wrapperStyle={{ paddingTop: 10 }}
+              wrapperStyle={{ paddingTop: 12 }}
               formatter={(value) => value.replace(/_/g, ' ')}
             />
             {valueKeys.map((key, index) => (
@@ -326,8 +326,8 @@ export function StandaloneChart({
               }}
             />
             <Legend 
+              wrapperStyle={{ paddingTop: 12 }}
               formatter={(value) => formatXAxisTick(value)}
-              wrapperStyle={{ paddingTop: 10 }}
             />
           </PieChart>
         </ResponsiveContainer>
@@ -345,17 +345,17 @@ export function StandaloneChart({
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
               <XAxis 
                 dataKey={dateOrMonthKey} 
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 11 }}
                 tickFormatter={formatXAxisTick}
                 interval={calculateInterval()}
               />
               <YAxis 
-                padding={{ top: 15, bottom: 5 }}
+                padding={{ top: 10, bottom: 10 }}
                 tickFormatter={formatYAxis}
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 11 }}
                 allowDecimals={false}
                 domain={startYAxisFromZero ? [0, 'dataMax'] : undefined}
-                width={50}
+                width={55}
               />
               <Tooltip 
                 formatter={formatTooltipValue}
@@ -366,7 +366,7 @@ export function StandaloneChart({
                 }}
               />
               <Legend 
-                wrapperStyle={{ paddingTop: 10 }}
+                wrapperStyle={{ paddingTop: 12 }}
                 formatter={(value) => value.replace(/_/g, ' ')}
               />
               {valueKeys.map((key, index) => (
@@ -395,17 +395,17 @@ export function StandaloneChart({
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
               <XAxis 
                 dataKey={dateOrMonthKey} 
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 11 }}
                 tickFormatter={formatXAxisTick}
                 interval={calculateInterval()}
               />
               <YAxis 
-                padding={{ top: 15, bottom: 5 }}
+                padding={{ top: 10, bottom: 10 }}
                 tickFormatter={formatYAxis}
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 11 }}
                 allowDecimals={false}
                 domain={startYAxisFromZero ? [0, 'dataMax'] : undefined}
-                width={50}
+                width={55}
               />
               <Tooltip 
                 formatter={formatTooltipValue}
@@ -416,7 +416,7 @@ export function StandaloneChart({
                 }}
               />
               <Legend 
-                wrapperStyle={{ paddingTop: 10 }}
+                wrapperStyle={{ paddingTop: 12 }}
                 formatter={(value) => value.replace(/_/g, ' ')}
               />
               {valueKeys.map((key, index) => (
@@ -432,4 +432,4 @@ export function StandaloneChart({
         );
       }
   }
-} 
+}
