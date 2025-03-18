@@ -90,11 +90,11 @@ export function Chat({
             {message.data && (
               <div className="mt-4">
                 <QueryDisplay 
-                  data={message.data} 
-                  visualization={message.visualization}
-                  sql={message.sql}
-                  title={message.title}
-                  description={message.description}
+                  data={message.data as any[]} 
+                  visualization={(message as any).visualization}
+                  sql={(message as any).sql}
+                  title={(message as any).title}
+                  description={(message as any).description}
                 />
               </div>
             )}
@@ -102,7 +102,7 @@ export function Chat({
         )}
       />
 
-      <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
+      <form className={`flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl ${messages.length === 0 ? 'relative -top-16' : ''}`}>
         {!isReadonly && (
           <MultimodalInput
             chatId={id}

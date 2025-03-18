@@ -5,9 +5,16 @@ import { useRouter } from 'next/navigation';
 import { useWindowSize } from 'usehooks-ts';
 import { memo } from 'react';
 import useSWR from 'swr';
-
-import { ModelSelector } from '@/components/model-selector';
 import { SidebarToggle } from '@/components/sidebar-toggle';
+import { ModeToggle } from '@/components/mode-toggle';
+import { ModelSelector } from '@/components/model-selector';
+import { FollowupToggle } from '@/components/followup-toggle';
+import { cn } from '@/lib/utils';
+import { useChatVisibility } from '@/hooks/use-chat-visibility';
+import { VisibilitySelector } from './visibility-selector';
+import { DownloadButton } from './download-button';
+import Image from 'next/image';
+import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { PlusIcon } from './icons';
 import { useSidebar } from './ui/sidebar';
@@ -17,22 +24,35 @@ import { fetcher } from '@/lib/utils';
 // Add the VisibilityType type directly in this file
 type VisibilityType = 'private' | 'public';
 
+interface ChatHeaderProps {
+  chatId: string;
+  selectedModelId: string;
+  isReadonly: boolean;
+}
+
 function PureChatHeader({
   chatId,
   selectedModelId,
   isReadonly,
-}: {
-  chatId: string;
-  selectedModelId: string;
-  isReadonly: boolean;
-}) {
+}: ChatHeaderProps) {
   const router = useRouter();
   const { open } = useSidebar();
   const { width: windowWidth } = useWindowSize();
   const { data: rateLimit } = useSWR('/api/rate-limit', fetcher);
+  const { visibilityType, setVisibilityType } = useChatVisibility({
+    chatId,
+    initialVisibility: 'private',
+  });
+  
+  const { theme, systemTheme } = useTheme();
+  // Determine which logo to use
+  const currentTheme = theme === 'system' ? systemTheme : theme;
+  const logoSrc = currentTheme === 'dark' 
+    ? '/images/Hang-Logo-Short-W.png'
+    : '/images/Hang-Logo-Short.png';
 
   return (
-    <header className="flex sticky top-0 bg-background py-1.5 items-center px-2 md:px-2 gap-2">
+    <header className="flex sticky top-0 bg-background py-1.5 items-center px-2 md:px-2 gap-2 z-10">
       <SidebarToggle />
 
       {(!open || windowWidth < 768) && (

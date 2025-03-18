@@ -14,6 +14,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { toast } from 'sonner';
 import { formatDistance } from 'date-fns';
 import { FloatingAnalysisButton } from './floating-analysis-button';
+import { toPng } from 'html-to-image';
 
 // Import the VisualizationSettings interface from visualization-controls.tsx
 interface VisualizationSettings {
@@ -27,7 +28,7 @@ interface VisualizationSettings {
   xAxis?: string;
 }
 
-interface VisualizationPanelProps {
+export interface VisualizationPanelProps {
   data: any[];
   visualization: string;
   title: string;
@@ -38,6 +39,7 @@ interface VisualizationPanelProps {
   onClose: () => void;
   onExpand?: () => void;
   onSave?: (visualizationData: any) => void;
+  onCaptureChart?: (imageDataUrl: string, chartData: any) => void;
 }
 
 export function VisualizationPanel({
@@ -50,7 +52,8 @@ export function VisualizationPanel({
   forceExpanded = false,
   onClose,
   onExpand,
-  onSave
+  onSave,
+  onCaptureChart
 }: VisualizationPanelProps) {
   const { setArtifact, artifact } = useArtifact();
   
@@ -645,6 +648,120 @@ export function VisualizationPanel({
     }
   };
   
+  // Add the chart capture function
+  const captureChartAsImage = async () => {
+    const chartElement = document.querySelector('.chart-container');
+    if (!chartElement) {
+      toast.error('Could not find chart to capture');
+      return;
+    }
+
+    try {
+      const dataUrl = await toPng(chartElement as HTMLElement, {
+        quality: 0.95,
+        backgroundColor: 'white',
+      });
+
+      // If a capture callback was provided, use it
+      if (onCaptureChart) {
+        onCaptureChart(dataUrl, {
+          title,
+          data,
+          visualization,
+          chartId: artifactId || undefined,
+        });
+        toast.success('Chart captured for embedding');
+      } else {
+        // Create temporary element to trigger download
+        const tempLink = document.createElement('a');
+        tempLink.href = dataUrl;
+        tempLink.download = `${title.replace(/\s+/g, '_')}_chart.png`;
+        document.body.appendChild(tempLink);
+        tempLink.click();
+        document.body.removeChild(tempLink);
+        
+        toast.success('Chart image downloaded');
+      }
+
+      return dataUrl;
+    } catch (error) {
+      console.error('Error capturing chart:', error);
+      toast.error('Failed to capture chart image');
+      return null;
+    }
+  };
+  
+  // Also add the analysis text for the "stable" case
+  let analysisText = '';
+  
+  if (settings.type === 'line') {
+    // Safely extract numeric values with type checking
+    const firstItem = formattedData[0];
+    const keys = Object.keys(firstItem);
+    const numericKey = keys.find(key => typeof firstItem[key] === 'number') || keys[1];
+    
+    // Create strongly typed array of numbers
+    const dataPoints: number[] = formattedData.map(item => {
+      const value = item[numericKey];
+      return typeof value === 'number' ? value : 0;
+    });
+    
+    const trend = dataPoints[dataPoints.length - 1] > dataPoints[0] ? 'upward' : 'downward';
+    const startValue = dataPoints[0] || 0;
+    const endValue = dataPoints[dataPoints.length - 1] || 0;
+    
+    // Avoid division by zero
+    const growth = startValue !== 0 
+      ? ((endValue - startValue) / Math.abs(startValue) * 100).toFixed(1)
+      : '0.0';
+    
+    analysisText = `Looking at this line chart, I can see a ${trend} trend with approximately ${growth}% ${endValue > startValue ? 'growth' : 'decline'} from beginning to end. `;
+    
+    // Check for volatility
+    const max = Math.max(...dataPoints);
+    const min = Math.min(...dataPoints);
+    const volatility = max - min;
+    
+    if (max > 0 && volatility > (max * 0.3)) {
+      analysisText += `There's significant volatility in the data, suggesting potential instability or seasonal factors. `;
+    } else {
+      analysisText += `The trend appears relatively stable without major fluctuations. `;
+    }
+  } else if (settings.type === 'bar') {
+    analysisText = `This bar chart shows ${title} data. `;
+    
+    // Find some basic metrics with type safety
+    const firstItem = formattedData[0];
+    const numericKey = Object.keys(firstItem).find(key => typeof firstItem[key] === 'number');
+    
+    if (numericKey) {
+      // Create a strongly typed array of numbers
+      const values: number[] = formattedData.map(item => {
+        const value = item[numericKey];
+        return typeof value === 'number' ? value : 0;
+      });
+      
+      const max = Math.max(...values);
+      const min = Math.min(...values);
+      const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+      
+      analysisText += `The values range from ${min} to ${max}, with an average of ${avg.toFixed(1)}. `;
+    }
+  } else {
+    analysisText = `This ${settings.type} chart displays ${title} data. Based on the visualization, there are patterns and relationships that could be explored further. `;
+  }
+
+  // Display a toast with the analysis
+  toast.info(
+    <div className="max-w-md">
+      <h3 className="font-medium mb-1">Chart Analysis</h3>
+      <p className="text-sm text-muted-foreground">{analysisText}</p>
+    </div>,
+    {
+      duration: 8000,
+    }
+  );
+
   if (shouldShowFullScreen) {
     // Render full visualization in full screen view with controls - using standard components
     return (
@@ -735,13 +852,57 @@ export function VisualizationPanel({
                   <CopyIcon />
                 </Button>
                 
-                <Button
-                  variant="outline"
-                  onClick={handleSave}
-                  className="ml-2"
+                {/* Improved save button with dropdown */}
+                <div className="relative group save-dropdown-container">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-1" 
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  >
+                    <Save className="h-4 w-4" />
+                    <span className="hidden sm:inline">Save</span>
+                  </Button>
+                  
+                  {isDropdownOpen && (
+                    <div className="absolute right-0 mt-1 w-60 rounded-md shadow-lg bg-background border border-border z-50">
+                      <div className="py-1" role="menu" aria-orientation="vertical">
+                        <button
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-accent flex items-center gap-2"
+                          onClick={() => {
+                            // Save to a new dashboard
+                            saveVisualization('new');
+                            setIsDropdownOpen(false);
+                          }}
+                        >
+                          <FileIcon className="h-4 w-4" />
+                          New dashboard
+                        </button>
+                        <button
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-accent flex items-center gap-2"
+                          onClick={() => {
+                            // Save to existing dashboard
+                            saveVisualization('existing');
+                            setIsDropdownOpen(false);
+                          }}
+                        >
+                          <BarChart className="h-4 w-4" />
+                          Existing dashboard
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Add Chart Capture Button */}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-1" 
+                  onClick={captureChartAsImage}
                 >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save
+                  <FileIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Embed in Doc</span>
                 </Button>
               </div>
             </div>
@@ -856,7 +1017,7 @@ export function VisualizationPanel({
               console.error('Error generating chart analysis:', error);
               analysisText = `I encountered an error while analyzing this chart. This could be due to unexpected data formats or missing values.`;
             }
-            
+
             // Display a toast with the analysis
             toast.info(
               <div className="max-w-md">
@@ -874,11 +1035,11 @@ export function VisualizationPanel({
       </div>
     );
   }
-  
-  // Render preview in chat - now styled exactly like document preview
+
+  // Render preview in chat mode
   return (
     <div className="relative w-full cursor-pointer">
-      {/* Hitbox Layer - exactly like document preview */}
+      {/* Hitbox Layer */}
       <div
         className="size-full absolute top-0 left-0 rounded-xl z-10"
         onClick={handleExpand}
@@ -892,7 +1053,7 @@ export function VisualizationPanel({
         </div>
       </div>
       
-      {/* Document Header - exactly like document preview */}
+      {/* Document Header */}
       <div className="p-4 border rounded-t-2xl flex flex-row gap-2 items-start sm:items-center justify-between dark:bg-muted border-b-0 dark:border-zinc-700">
         <div className="flex flex-row items-start sm:items-center gap-3">
           <div className="text-muted-foreground">
@@ -903,7 +1064,7 @@ export function VisualizationPanel({
         <div className="w-8" />
       </div>
       
-      {/* Document Content - exactly like document preview */}
+      {/* Document Content */}
       <div className="h-[257px] overflow-y-hidden border rounded-b-2xl dark:bg-muted border-t-0 dark:border-zinc-700">
         <div className="flex items-center justify-center h-full pt-2 px-6 pr-8">
           {renderVisualization()}
@@ -911,4 +1072,4 @@ export function VisualizationPanel({
       </div>
     </div>
   );
-} 
+}

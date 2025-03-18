@@ -1,6 +1,5 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import { Button } from './ui/button';
 import { ChatRequestOptions, CreateMessage, Message } from 'ai';
 import { memo } from 'react';
@@ -16,40 +15,32 @@ interface SuggestedActionsProps {
 function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
   const suggestedActions = [
     {
-      title: 'Analyze sales trends',
-      label: 'for the last quarter',
-      action: 'Can you analyze our sales trends for the last quarter and identify any patterns or opportunities for growth?',
+      title: 'Can you create an awesome looking 3D fractal animation?',
+      action: 'Can you create an awesome looking 3D fractal animation?',
     },
     {
-      title: 'Customer satisfaction',
-      label: 'metrics and insights',
-      action: 'What are our current customer satisfaction metrics and what insights can we draw from them?',
+      title: 'Can you create a rocket simulation for a mission to mars using real orbital mechanics?',
+      action: 'Can you create a rocket simulation for a mission to mars using real orbital mechanics?',
     },
     {
-      title: 'Menu performance',
-      label: 'analysis and recommendations',
-      action: 'Can you provide a menu performance analysis and suggest items for optimization?',
+      title: 'Can you solve the "infinity long" problem?',
+      action: 'Can you solve the "infinity long" problem?',
     },
     {
-      title: 'Operational efficiency',
-      label: 'metrics and benchmarks',
-      action: 'What are our key operational efficiency metrics and how do they compare to industry benchmarks?',
+      title: 'What would happen to the Earth\'s climate if the planet\'s axial tilt were 0 degrees?',
+      action: 'What would happen to the Earth\'s climate if the planet\'s axial tilt were 0 degrees?',
     },
   ];
 
   return (
     <div
       data-testid="suggested-actions"
-      className="grid sm:grid-cols-2 gap-2 w-full"
+      className="flex flex-col gap-2 w-full max-w-xl mx-auto px-4"
     >
       {suggestedActions.map((suggestedAction, index) => (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-          transition={{ delay: 0.05 * index }}
-          key={`suggested-action-${suggestedAction.title}-${index}`}
-          className={index > 1 ? 'hidden sm:block' : 'block'}
+        <div
+          key={`suggested-action-${index}`}
+          className="opacity-80"
         >
           <Button
             variant="ghost"
@@ -60,14 +51,11 @@ function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
                 content: suggestedAction.action,
               });
             }}
-            className="text-left border rounded-xl px-4 py-3.5 text-sm flex-1 gap-1 sm:flex-col w-full h-auto justify-start items-start"
+            className="text-left py-1.5 px-3 text-sm w-full h-auto justify-start items-start hover:bg-muted/20 text-foreground/70 transition-colors font-normal rounded-lg border-0 bg-gradient-to-r from-muted/10 to-transparent"
           >
-            <span className="font-medium">{suggestedAction.title}</span>
-            <span className="text-muted-foreground">
-              {suggestedAction.label}
-            </span>
+            {suggestedAction.title}
           </Button>
-        </motion.div>
+        </div>
       ))}
     </div>
   );
