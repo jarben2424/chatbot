@@ -33,6 +33,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
+import { DashboardHeader } from '../_components/dashboard-header';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface SortableCardProps {
   id: string;
@@ -155,89 +157,118 @@ export default function MyDashboardPage() {
   });
 
   return (
-    <div className="flex flex-col p-6 h-full">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">My Dashboard</h1>
-        
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative" aria-label="Email Subscriptions">
-              <Bell className="h-5 w-5" />
-              {activeSubscriptionCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground rounded-full w-4 h-4 text-xs flex items-center justify-center">
-                  {activeSubscriptionCount}
-                </span>
-              )}
-              <span className="sr-only">Email Subscriptions ({activeSubscriptionCount})</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="w-full sm:max-w-[400px] md:max-w-[450px] overflow-y-auto">
-            <SheetHeader className="flex flex-row items-center justify-between">
-              <div>
-                <SheetTitle>Email Subscriptions</SheetTitle>
-                <SheetDescription>
-                  Manage your automated email notifications for dashboard metrics
-                </SheetDescription>
+    <div className="flex flex-col h-full">
+      <DashboardHeader
+        title="My Dashboard"
+        description="Customize your personal dashboard with metrics that matter to you"
+        customActions={
+          <Sheet>
+            <SheetTrigger asChild>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline"
+                    size="sm" 
+                    className="md:px-2 md:h-fit relative ml-auto" 
+                    aria-label="Email Subscriptions"
+                  >
+                    <Bell className="h-4 w-4" />
+                    {activeSubscriptionCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground rounded-full w-4 h-4 text-xs flex items-center justify-center">
+                        {activeSubscriptionCount}
+                      </span>
+                    )}
+                    <span className="sr-only">Email Subscriptions ({activeSubscriptionCount})</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent align="end">Email Subscriptions</TooltipContent>
+              </Tooltip>
+            </SheetTrigger>
+            <SheetContent className="w-full sm:max-w-[400px] md:max-w-[450px] overflow-y-auto">
+              <SheetHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <SheetTitle>Email Subscriptions</SheetTitle>
+                  <SheetDescription>
+                    Manage your automated email notifications for dashboard metrics
+                  </SheetDescription>
+                </div>
+              </SheetHeader>
+              
+              <div className="flex justify-end my-4">
+                <Button size="sm" onClick={() => setIsAddingSubscription(true)}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  New Subscription
+                </Button>
               </div>
-            </SheetHeader>
-            
-            <div className="flex justify-end my-4">
-              <Button size="sm" onClick={() => setIsAddingSubscription(true)}>
+              
+              <div className="mt-2">
+                <EmailSubscriptionsList 
+                  onSubscriptionChange={() => {
+                    // Update the count when subscriptions are modified
+                    const subscriptions = getEmailSubscriptions();
+                    const activeCount = subscriptions.filter(sub => sub.active).length;
+                    setActiveSubscriptionCount(activeCount);
+                  }}
+                  isAddingSubscription={isAddingSubscription}
+                  setIsAddingSubscription={setIsAddingSubscription}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+        }
+      />
+      
+      <div className="flex-1 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">My Dashboard</h1>
+            <p className="text-muted-foreground">Drag and drop to reorder your metrics</p>
+          </div>
+        </div>
+        
+        {items.length === 0 ? (
+          <div className="flex justify-center items-center w-full h-[400px]">
+            <div className="border-2 border-dashed border-muted rounded-lg p-12 max-w-2xl w-full flex flex-col items-center justify-center text-center">
+              <p className="text-muted-foreground mb-6">
+                Create metrics to visualize your business data. You can add metrics directly or by asking in the chat.
+              </p>
+              <Button variant="outline">
                 <PlusCircle className="mr-2 h-4 w-4" />
-                New Subscription
+                Add Metric
               </Button>
             </div>
-            
-            <div className="mt-2">
-              <EmailSubscriptionsList 
-                onSubscriptionChange={() => {
-                  // Update the count when subscriptions are modified
-                  const subscriptions = getEmailSubscriptions();
-                  const activeCount = subscriptions.filter(sub => sub.active).length;
-                  setActiveSubscriptionCount(activeCount);
-                }}
-                isAddingSubscription={isAddingSubscription}
-                setIsAddingSubscription={setIsAddingSubscription}
-              />
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-      
-      {items.length === 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <AddMetricCard />
+          </div>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={sortedItems.map(item => item.id)}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                {sortedItems.map((item) => (
+                  <SortableCard key={item.id} id={item.id}>
+                    <div className="h-full">
+                      <Card className="h-full">
+                        <CardHeader className="handle cursor-grab bg-accent/30 pb-2">
+                          <CardTitle className="text-sm font-medium truncate">{item.title}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {/* This content will be populated by DashboardQueriesList */}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </SortableCard>
+                ))}
+                <AddMetricCard />
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
+        
+        <div className="hidden">
+          <DashboardQueriesList />
         </div>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={sortedItems.map(item => item.id)}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-              {sortedItems.map((item) => (
-                <SortableCard key={item.id} id={item.id}>
-                  <div className="h-full">
-                    <Card className="h-full">
-                      <CardHeader className="handle cursor-grab bg-accent/30 pb-2">
-                        <CardTitle className="text-sm font-medium truncate">{item.title}</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {/* This content will be populated by DashboardQueriesList */}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </SortableCard>
-              ))}
-              <AddMetricCard />
-            </div>
-          </SortableContext>
-        </DndContext>
-      )}
-      
-      <div className="hidden">
-        <DashboardQueriesList />
       </div>
     </div>
   );
@@ -245,15 +276,11 @@ export default function MyDashboardPage() {
 
 function AddMetricCard() {
   return (
-    <Card className="border-2 border-dashed border-primary/20 bg-transparent h-64 flex flex-col items-center justify-center p-6 hover:border-primary/40 transition-colors cursor-pointer">
+    <Card className="border-2 border-dashed border-muted bg-transparent h-64 flex flex-col items-center justify-center p-6 hover:border-primary/40 transition-colors cursor-pointer">
       <div className="flex flex-col items-center text-muted-foreground">
-        <div className="flex space-x-2 mb-3">
-          <BarChart className="h-10 w-10 opacity-80" />
-          <LineChart className="h-10 w-10 opacity-80" />
-        </div>
         <h3 className="text-lg font-medium mb-2">Add Metric</h3>
         <p className="text-center text-sm">
-          Drag and drop metrics from your business data queries to build your dashboard
+          Create metrics to visualize your business data
         </p>
         <Button variant="outline" className="mt-4" size="sm">
           <PlusCircle className="mr-2 h-4 w-4" />

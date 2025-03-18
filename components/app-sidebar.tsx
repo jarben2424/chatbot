@@ -42,6 +42,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
       name: 'Dashboards',
       href: '/dashboards',
       icon: LayoutDashboard,
+      shortcut: '⌘D',
       children: [
         {
           name: 'My Dashboard',
@@ -65,12 +66,14 @@ export function AppSidebar({ user }: { user: User | undefined }) {
     {
       name: 'Customers',
       href: '/customers',
-      icon: Users
+      icon: Users,
+      shortcut: '⌘S'
     },
     {
       name: 'Campaigns',
       href: '/campaigns',
-      icon: Megaphone
+      icon: Megaphone,
+      shortcut: '⌘C'
     }
   ];
 
@@ -78,16 +81,16 @@ export function AppSidebar({ user }: { user: User | undefined }) {
     <Sidebar className="group-data-[side=left]:border-r-0 border-r border-r-border/40 
       dark:bg-gradient-to-l dark:from-border/40 dark:via-background/20 dark:to-transparent 
       light:bg-gradient-to-l light:from-zinc-300/70 light:via-zinc-200/40 light:to-transparent 
-      shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
-      <SidebarHeader className="h-[60px] flex items-center">
+      shadow-[2px_0_5px_rgba(0,0,0,0.1)] flex flex-col h-full">
+      <SidebarHeader className="h-[60px] flex items-center py-1.5 px-0">
         <SidebarMenu>
-          <div className="flex flex-row justify-between items-center px-2">
+          <div className="flex flex-row justify-between items-center pr-1 pl-2">
             <Link
               href="/"
               onClick={() => {
                 setOpenMobile(false);
               }}
-              className="flex items-center"
+              className="flex items-center ml-2"
             >
               <Image
                 src={theme === 'dark' 
@@ -97,83 +100,85 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                 alt="Hang Logo"
                 width={32}
                 height={32}
-                className="object-contain"
+                className="object-contain w-8 h-8"
+                style={{ aspectRatio: '1/1' }}
                 priority
               />
             </Link>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={() => {
+                    router.push('/');
+                    router.refresh();
+                  }}
+                  variant="outline"
+                  className="md:px-2 md:h-fit mr-2"
+                >
+                  <PlusIcon size={16} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent align="end">New Chat</TooltipContent>
+            </Tooltip>
           </div>
         </SidebarMenu>
       </SidebarHeader>
       
-      <div className="px-3 py-2 space-y-1">
+      <div className="px-3 py-2 mt-6 space-y-1">
         {navigationItems.map((item) => (
           <div key={item.name}>
             {item.children ? (
               <div>
-                <button
-                  onClick={() => setDashboardsOpen(!dashboardsOpen)}
+                <Link 
+                  href="/dashboards"
                   className={cn(
                     "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors",
                     pathname?.startsWith(item.href) 
                       ? "bg-accent text-accent-foreground" 
                       : "hover:bg-accent hover:text-accent-foreground"
                   )}
+                  onClick={() => setOpenMobile(false)}
                 >
                   <div className="flex items-center gap-3">
                     <item.icon className="h-4 w-4" />
-                    {item.name}
+                    Open Dashboards
                   </div>
-                  {dashboardsOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
+                  {item.shortcut && (
+                    <span className="text-xs text-muted-foreground">{item.shortcut}</span>
                   )}
-                </button>
-                
-                {dashboardsOpen && (
-                  <div className="ml-6 mt-1 space-y-1">
-                    {item.children.map((child) => (
-                      <Link
-                        key={child.name}
-                        href={child.href}
-                        className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent",
-                          pathname === child.href && "bg-accent/50 font-medium"
-                        )}
-                        onClick={() => setOpenMobile(false)}
-                      >
-                        <span className="flex-1">{child.name}</span>
-                        {child.tag && (
-                          <span className="ml-auto inline-flex h-5 items-center justify-center rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
-                            {child.tag}
-                          </span>
-                        )}
-                      </Link>
-                    ))}
-                  </div>
-                )}
+                </Link>
               </div>
             ) : (
               <Link
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent",
+                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent",
                   pathname === item.href && "bg-accent/80 font-medium"
                 )}
                 onClick={() => setOpenMobile(false)}
               >
-                <item.icon className="h-4 w-4" />
-                {item.name}
+                <div className="flex items-center gap-3">
+                  <item.icon className="h-4 w-4" />
+                  {item.name === 'Customers' ? 'View Segments' : item.name}
+                </div>
+                {item.shortcut && (
+                  <span className="text-xs text-muted-foreground">{item.shortcut}</span>
+                )}
               </Link>
             )}
           </div>
         ))}
       </div>
       
-      <SidebarContent>
-        <SidebarHistory user={user} />
-      </SidebarContent>
-      <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>
+      <div className="mt-8 flex-grow overflow-auto">
+        <SidebarContent>
+          <SidebarHistory user={user} />
+        </SidebarContent>
+      </div>
+      
+      <div className="mt-auto">
+        <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>
+      </div>
     </Sidebar>
   );
 }
