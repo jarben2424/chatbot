@@ -22,6 +22,7 @@ import { DbQueryIndicator } from './db-query-indicator';
 import { EmailSubscriptionIndicator } from './email-subscription-indicator';
 import { AddToDashboardButton } from './add-to-dashboard-button';
 import { DashboardSubscriptionButton } from './dashboard-subscription-button';
+import { QueryResultVisualization } from './query-result-visualization';
 
 const PurePreviewMessage = ({
   chatId,
@@ -187,9 +188,14 @@ const PurePreviewMessage = ({
                                 <AddToDashboardButton 
                                   question={args.question}
                                   sqlQuery={toolInvocation.result.query}
+                                  result={toolInvocation.result.results}
                                 />
                               </div>
-                              <pre className="text-xs overflow-auto max-h-60">{JSON.stringify(toolInvocation.result.results, null, 2)}</pre>
+                              <QueryResultVisualization 
+                                data={toolInvocation.result.results}
+                                query={toolInvocation.result.query}
+                                visualizationType={toolInvocation.result.visualizationType}
+                              />
                             </div>
                           ) : toolName === 'dashboardEmailSubscription' ? (
                             <div className="bg-muted p-4 rounded-md">

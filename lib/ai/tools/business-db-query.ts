@@ -9,12 +9,13 @@ type SnowflakeConnection = snowflake.Connection;
 type SnowflakeRow = Record<string, any>;
 type QueryResult = {
   query: string;
-  results: SnowflakeRow[] | { data: SnowflakeRow[]; note: string };
+  results: SnowflakeRow[] | { data: SnowflakeRow[]; note: string } | any;
+  visualizationType?: string;
 };
 type ErrorResult = {
   error: string;
   details: string;
-};
+}
 
 /**
  * Business database query tool using Vercel AI SDK
@@ -72,19 +73,26 @@ export const businessDbQuery = tool({
       // Execute the query with a timeout
       const results = await executeQuery(connection, sqlQuery);
       
+      // Determine the visualization type based on the result structure
+      const visualizationType = suggestVisualizationType(results);
+      
+      // Transform the results based on the visualization type
+      const transformedResults = transformQueryResults(results, visualizationType);
+      
       // Save the query and results to ChatGeneratedMetrics
       await saveChatGeneratedMetric({
         question,
         sqlQuery,
         conversationId,
         category: detectQueryCategory(question, sqlQuery),
-        visualizationType: suggestVisualizationType(results),
+        visualizationType,
       });
       
-      // Format and return results
+      // Return the query, results and visualization type
       return {
         query: sqlQuery,
-        results: formatResults(results),
+        results: transformedResults,
+        visualizationType,
       };
     } catch (error) {
       console.error('Error in business DB query execution:', error);
@@ -560,30 +568,198 @@ function suggestVisualizationType(results: SnowflakeRow[]): string {
   // Check for date/time columns for time series data
   const firstRow = results[0];
   const columns = Object.keys(firstRow);
-  const hasDateColumn = columns.some(col => 
+  
+  // Look for time-based columns
+  const timeColumns = columns.filter(col => 
     col.toLowerCase().includes('date') || 
     col.toLowerCase().includes('time') ||
     col.toLowerCase().includes('year') ||
-    col.toLowerCase().includes('month')
+    col.toLowerCase().includes('month') ||
+    col.toLowerCase().includes('day') ||
+    col.toLowerCase().includes('week')
   );
   
-  const hasNumericColumn = columns.some(col => {
+  // Look for numeric columns
+  const numericColumns = columns.filter(col => {
     const value = firstRow[col];
     return typeof value === 'number';
   });
   
-  // If there's a date column and numeric column, suggest chart for time series
-  if (hasDateColumn && hasNumericColumn) {
-    return 'chart';
+  // If there's a date column and numeric column, suggest line chart for time series
+  if (timeColumns.length > 0 && numericColumns.length > 0) {
+    return 'line-chart';
   }
   
-  // If there are categorical columns with numeric values, suggest chart
-  if (columns.length >= 2 && hasNumericColumn) {
-    return 'chart';
+  // If there are categorical columns with numeric values, suggest bar chart
+  if (columns.length >= 2 && numericColumns.length > 0) {
+    return 'bar-chart';
   }
   
   // Default to table view
   return 'table';
+}
+
+/**
+ * Transforms query results into the appropriate format for visualization
+ */
+function transformQueryResults(results: SnowflakeRow[], visualizationType: string): any {
+  if (!results || !Array.isArray(results) || results.length === 0) {
+    return results;
+  }
+
+  // Transform based on the visualization type
+  switch (visualizationType) {
+    case 'line-chart':
+      return transformForLineChart(results);
+    case 'bar-chart':
+      return transformForBarChart(results);
+    case 'highlight':
+      return transformForHighlight(results);
+    default:
+      return results;
+  }
+}
+
+/**
+ * Transforms query results for line chart visualization
+ * Identifies time dimension and numeric measures
+ */
+function transformForLineChart(results: SnowflakeRow[]): any {
+  if (!results || results.length === 0) return { data: [], xKey: '', yKeys: [] };
+
+  const columns = Object.keys(results[0]);
+  
+  // Find time-based column for x-axis
+  const timeColumn = columns.find(col => 
+    col.toLowerCase().includes('date') || 
+    col.toLowerCase().includes('time') ||
+    col.toLowerCase().includes('year') ||
+    col.toLowerCase().includes('month') ||
+    col.toLowerCase().includes('day') ||
+    col.toLowerCase().includes('week')
+  ) || columns[0]; // Default to first column if no time column found
+  
+  // Find numeric columns for y-axis
+  const numericColumns = columns.filter(col => {
+    const value = results[0][col];
+    return typeof value === 'number' && col !== timeColumn;
+  });
+  
+  // Format the data for the chart
+  const data = results.map(row => {
+    const formattedRow: Record<string, any> = {};
+    
+    // Process the time column
+    const timeValue = row[timeColumn];
+    formattedRow[timeColumn] = typeof timeValue === 'string' && timeValue.includes('T') 
+      ? timeValue.split('T')[0] // Simple date extraction from ISO string
+      : timeValue;
+    
+    // Add all numeric values
+    numericColumns.forEach(col => {
+      formattedRow[col] = row[col];
+    });
+    
+    return formattedRow;
+  });
+  
+  return {
+    data,
+    xKey: timeColumn,
+    yKeys: numericColumns
+  };
+}
+
+/**
+ * Transforms query results for bar chart visualization
+ * Identifies categorical dimension and numeric measures
+ */
+function transformForBarChart(results: SnowflakeRow[]): any {
+  if (!results || results.length === 0) return { data: [], xKey: '', yKeys: [] };
+  
+  const columns = Object.keys(results[0]);
+  
+  // Find numeric columns for measures
+  const numericColumns = columns.filter(col => {
+    const value = results[0][col];
+    return typeof value === 'number';
+  });
+  
+  // Find non-numeric column for categories
+  const categoricalColumns = columns.filter(col => {
+    const value = results[0][col];
+    return typeof value !== 'number';
+  });
+  
+  const categoryColumn = categoricalColumns[0] || columns[0];
+  
+  // Limit the number of categories to prevent overcrowding
+  let formattedData = results;
+  if (results.length > 10) {
+    // Sort by the first numeric column in descending order and take top 10
+    const sortColumn = numericColumns[0];
+    if (sortColumn) {
+      formattedData = [...results]
+        .sort((a, b) => (b[sortColumn] as number) - (a[sortColumn] as number))
+        .slice(0, 10);
+    } else {
+      formattedData = results.slice(0, 10);
+    }
+  }
+  
+  return {
+    data: formattedData,
+    xKey: categoryColumn,
+    yKeys: numericColumns
+  };
+}
+
+/**
+ * Transforms query results for highlight visualization
+ * Used for single value metrics
+ */
+function transformForHighlight(results: SnowflakeRow[]): any {
+  if (!results || results.length === 0) return { value: 'N/A', label: 'No data' };
+  
+  const row = results[0];
+  const columns = Object.keys(row);
+  
+  // If there's only one column, use that for the value and generate a label
+  if (columns.length === 1) {
+    const column = columns[0];
+    return {
+      value: row[column],
+      label: column.charAt(0).toUpperCase() + column.slice(1).replace(/_/g, ' ').toLowerCase()
+    };
+  }
+  
+  // If there are two columns, use one for label and one for value
+  if (columns.length === 2) {
+    const numericColumnIndex = typeof row[columns[0]] === 'number' ? 0 : 1;
+    const textColumnIndex = numericColumnIndex === 0 ? 1 : 0;
+    
+    return {
+      value: row[columns[numericColumnIndex]],
+      label: row[columns[textColumnIndex]]
+    };
+  }
+  
+  // For more complex data, prioritize numeric values
+  const numericColumns = columns.filter(col => typeof row[col] === 'number');
+  const textColumns = columns.filter(col => typeof row[col] === 'string');
+  
+  if (numericColumns.length > 0 && textColumns.length > 0) {
+    return {
+      value: row[numericColumns[0]],
+      label: row[textColumns[0]]
+    };
+  }
+  
+  // Default case
+  return {
+    value: row[columns[0]],
+    label: columns[0].charAt(0).toUpperCase() + columns[0].slice(1).replace(/_/g, ' ').toLowerCase()
+  };
 }
 
 /**

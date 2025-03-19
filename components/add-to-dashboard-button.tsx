@@ -19,41 +19,69 @@ interface AddToDashboardButtonProps {
 
 // Helper function to guess the best visualization type based on result data
 function suggestVisualizationType(result: any): VisualizationType {
-  if (!result || !Array.isArray(result)) {
+  if (!result) {
+    return 'table';
+  }
+  
+  // Check if the result is already in the transformed format
+  if (result.data && result.xKey && result.yKeys) {
+    // Already transformed data 
+    if (result.xKey.toLowerCase().includes('date') || 
+        result.xKey.toLowerCase().includes('time') ||
+        result.xKey.toLowerCase().includes('year') ||
+        result.xKey.toLowerCase().includes('month')) {
+      return 'line-chart';
+    }
+    return 'bar-chart';
+  }
+
+  // For highlight format
+  if (result.value !== undefined && result.label) {
+    return 'highlight';
+  }
+  
+  // For raw array data
+  const dataArray = Array.isArray(result) ? result : 
+                   (result.data && Array.isArray(result.data)) ? result.data : null;
+  
+  if (!dataArray || dataArray.length === 0) {
     return 'table';
   }
   
   // If there's only one row with one value, suggest highlight
-  if (result.length === 1 && Object.keys(result[0]).length === 1) {
+  if (dataArray.length === 1 && Object.keys(dataArray[0]).length === 1) {
     return 'highlight';
   }
   
   // Check for date/time columns for time series data
-  const firstRow = result[0];
+  const firstRow = dataArray[0];
   const columns = Object.keys(firstRow);
-  const hasDateColumn = columns.some(col => 
+  
+  const timeColumns = columns.filter(col => 
     col.toLowerCase().includes('date') || 
     col.toLowerCase().includes('time') ||
     col.toLowerCase().includes('year') ||
-    col.toLowerCase().includes('month')
+    col.toLowerCase().includes('month') ||
+    col.toLowerCase().includes('day') ||
+    col.toLowerCase().includes('week')
   );
   
-  const hasNumericColumn = columns.some(col => {
+  const numericColumns = columns.filter(col => {
     const value = firstRow[col];
     return typeof value === 'number';
   });
   
   // If there's a date column and numeric column, suggest line chart for time series
-  if (hasDateColumn && hasNumericColumn) {
+  if (timeColumns.length > 0 && numericColumns.length > 0) {
     return 'line-chart';
   }
   
   // If there are categorical columns with numeric values, suggest bar chart
-  if (columns.length >= 2 && hasNumericColumn) {
+  if (columns.length >= 2 && numericColumns.length > 0) {
     return 'bar-chart';
   }
   
-  // Default to table view
+  // Default to table
   return 'table';
 }
 
