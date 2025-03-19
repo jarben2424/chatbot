@@ -156,7 +156,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
   const { setOpenMobile } = useSidebar();
   const { id } = useParams();
   const pathname = usePathname();
-  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const {
     data: history,
     isLoading,
@@ -327,16 +327,22 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
   return (
     <>
       <Collapsible open={isHistoryOpen} onOpenChange={setIsHistoryOpen} className="w-full">
-        <div className="flex items-center justify-between px-3 py-2">
-          <h2 className="text-sm font-semibold">Chat History</h2>
+        <div className="flex items-center justify-between px-3 py-2 group cursor-pointer" onClick={() => setIsHistoryOpen(!isHistoryOpen)}>
+          <h2 className="text-sm font-semibold group-hover:text-primary transition-colors pl-3">Chat History</h2>
           <CollapsibleTrigger 
-            className="h-5 w-5 rounded-sm hover:bg-sidebar-accent/50 flex items-center justify-center transition-all"
+            className="h-6 w-6 rounded-full bg-sidebar-accent/30 group-hover:bg-primary/10 flex items-center justify-center transition-all"
+            asChild
           >
-            {isHistoryOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            <button className="focus:outline-none">
+              {isHistoryOpen ? 
+                <ChevronDown size={16} className="text-foreground/70 group-hover:text-primary transition-colors" /> : 
+                <ChevronRight size={16} className="text-foreground/70 group-hover:text-primary transition-colors" />
+              }
+            </button>
           </CollapsibleTrigger>
         </div>
         
-        <CollapsibleContent>
+        <CollapsibleContent className="animate-collapsible-down">
           {enabledGroups.map(([group, chats]) => (
             <SidebarGroup key={group}>
               <div className="px-2 py-1 text-xs text-sidebar-foreground/50">
