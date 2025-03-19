@@ -35,12 +35,12 @@ function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
   return (
     <div
       data-testid="suggested-actions"
-      className="flex flex-col gap-2 w-full max-w-xl mx-auto px-4"
+      className="flex flex-col gap-2 w-full max-w-xl mt-4 pl-[24px] pr-4"
     >
       {suggestedActions.map((suggestedAction, index) => (
         <div
           key={`suggested-action-${index}`}
-          className="opacity-80"
+          className="opacity-85"
         >
           <Button
             variant="ghost"
@@ -51,7 +51,7 @@ function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
                 content: suggestedAction.action,
               });
             }}
-            className="text-left py-1.5 px-3 text-sm w-full h-auto justify-start items-start hover:bg-muted/20 text-foreground/70 transition-colors font-normal rounded-lg border-0 bg-gradient-to-r from-muted/10 to-transparent"
+            className="text-left py-1.5 pl-3 pr-3 text-sm w-full h-auto justify-start items-start hover:bg-muted/20 text-gray-500 transition-colors font-normal rounded-lg border-0"
           >
             {suggestedAction.title}
           </Button>

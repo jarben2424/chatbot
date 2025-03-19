@@ -278,7 +278,7 @@ function PureMultimodalInput({
       {messages.length === 0 &&
         attachments.length === 0 &&
         uploadQueue.length === 0 && (
-          <div className="mt-8">
+          <div className="">
             <SuggestedActions append={append} chatId={chatId} />
           </div>
       )}

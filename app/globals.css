@@ -33,6 +33,19 @@
     .text-balance {
         text-wrap: balance;
     }
+
+    .animate-blink {
+        animation: blink 1s step-end infinite;
+    }
+}
+
+@keyframes blink {
+    from, to {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0;
+    }
 }
 
 @layer base {
