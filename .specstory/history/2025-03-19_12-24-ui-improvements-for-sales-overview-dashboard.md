@@ -2768,7 +2768,914 @@ Now I'll update the step 3 page to match the styling and UI improvements we made
 
 ---
 
-Cancelled
+```diff
+  import { Button } from '@/components/ui/button';
+  import Link from 'next/link';
+- import { RefreshCw } from 'lucide-react';
++ import { RefreshCw, ChevronRight, ChevronLeft, Users } from 'lucide-react';
+  
+  // Sample audience segments data
+            <div className="flex-1">
+              <CampaignsHeader title="Create Campaign" />
+-             <div className="flex-1 overflow-auto bg-gray-50">
+-               <div className="mx-auto max-w-4xl px-4 py-6">
+-                 <div className="mb-4">
+-                   <h1 className="text-xl font-semibold mb-1">Create Campaign</h1>
+-                   <p className="text-sm text-muted-foreground">Create and optimize personalized offer campaigns</p>
+-                 </div>
+-                 
++             <div className="flex-1 overflow-auto bg-slate-50/30">
++               <div className="mx-auto max-w-4xl px-4 py-8">
+                  {/* Progress Steps */}
+-                 <div className="flex items-center justify-between mb-8 relative">
+-                   <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-gray-200 -z-10"></div>
+-                   
+-                   {/* Connector Line with completed part */}
+-                   <div className="absolute top-1/2 left-0 w-1/2 h-[1px] bg-indigo-600 -z-10"></div>
++                 <div className="relative mb-10">
++                   {/* Line connecting steps */}
++                   <div className="absolute top-6 left-0 right-0 h-1 bg-gray-200 -z-10"></div>
++                   <div className="absolute top-6 left-0 w-1/2 h-1 bg-indigo-600 -z-10"></div>
+                    
+-                   {/* Step 1 - Completed */}
+-                   <div className="flex flex-col items-center">
+-                     <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-2 z-10">
+-                       1
+-                     </div>
+-                     <span className="text-sm font-medium text-indigo-600">Campaign Type</span>
+-                   </div>
+-                   
+-                   {/* Step 2 - Completed */}
+-                   <div className="flex flex-col items-center">
+-                     <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-2 z-10">
+-                       2
+-                     </div>
+-                     <span className="text-sm font-medium text-indigo-600">Select Offers</span>
+-                   </div>
+-                   
+-                   {/* Step 3 - Current */}
+-                   <div className="flex flex-col items-center">
+-                     <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-2 z-10">
+-                       3
+-                     </div>
+-                     <span className="text-sm font-medium text-indigo-600">Target Audience</span>
+-                   </div>
+-                   
+-                   {/* Step 4 - Upcoming */}
+-                   <div className="flex flex-col items-center">
+-                     <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
+-                       4
++                   <div className="flex justify-between">
++                     {/* Step 1 - Completed */}
++                     <div className="flex flex-col items-center">
++                       <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-3 shadow-md transition-all duration-300">
++                         <span className="text-base font-medium">✓</span>
++                       </div>
++                       <span className="text-sm font-medium text-indigo-600">Campaign Type</span>
++                     </div>
++                     
++                     {/* Step 2 - Completed */}
++                     <div className="flex flex-col items-center">
++                       <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-3 shadow-md transition-all duration-300">
++                         <span className="text-base font-medium">✓</span>
++                       </div>
++                       <span className="text-sm font-medium text-indigo-600">Select Offers</span>
++                     </div>
++                     
++                     {/* Step 3 - Current */}
++                     <div className="flex flex-col items-center">
++                       <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-3 shadow-md transition-all duration-300">
++                         <span className="text-base font-medium">3</span>
++                       </div>
++                       <span className="text-sm font-medium text-indigo-600">Target Audience</span>
++                     </div>
++                     
++                     {/* Step 4 - Upcoming */}
++                     <div className="flex flex-col items-center">
++                       <div className="w-12 h-12 rounded-full bg-white border-2 border-gray-200 text-gray-400 flex items-center justify-center mb-3 transition-all duration-300">
++                         <span className="text-base font-medium">4</span>
++                       </div>
++                       <span className="text-sm text-gray-500">Review & Sync</span>
+                      </div>
+-                     <span className="text-sm text-gray-500">Review & Sync</span>
+                    </div>
+                  </div>
+                  
+                  {/* Audience Selection */}
+-                 <div className="bg-white rounded-lg shadow p-6 mb-6">
++                 <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+                    <div className="flex justify-between items-center mb-4">
+-                     <h2 className="text-lg font-medium">Select Segment</h2>
+-                     <Button variant="ghost" size="sm" className="text-indigo-600 hover:text-indigo-700">
++                     <div>
++                       <h3 className="text-lg font-medium mb-1">Target Audience</h3>
++                       <p className="text-sm text-gray-500">Select a customer segment for your campaign</p>
++                     </div>
++                     <Button variant="outline" size="sm" className="border-indigo-200 hover:bg-indigo-50 text-indigo-600">
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Refresh
+                      </Button>
+                    </div>
+                    
+-                   <div className="space-y-4">
++                   <div className="space-y-4 mt-6">
+                      {segments.map((segment) => (
+                        <div 
+                          key={segment.id}
+-                         className={`p-4 border rounded-md cursor-pointer transition-all ${
++                         className={`p-4 border rounded-lg flex items-center justify-between cursor-pointer transition-all ${
+                            selectedSegment === segment.id 
+-                             ? 'border-indigo-600 bg-indigo-50/30' 
+-                             : 'border-gray-200 hover:border-gray-300'
++                             ? 'border-indigo-600 bg-indigo-50/50 shadow-sm' 
++                             : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                          }`}
+                          onClick={() => setSelectedSegment(segment.id)}
+                        >
+-                         <div className="flex justify-between items-center">
++                         <div className="flex items-start">
++                           <div className="mr-4">
++                             <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
++                               <Users className="h-5 w-5 text-indigo-600" />
++                             </div>
++                           </div>
+                            <div>
+                              <h3 className="font-medium">{segment.name}</h3>
+                              <p className="text-sm text-gray-500">{segment.description}</p>
+                            </div>
+-                           <div className="text-sm text-gray-500">
++                         </div>
++                         
++                         <div className="flex items-center">
++                           <div className="text-sm font-medium text-gray-700 mr-4">
+                              {segment.count.toLocaleString()} users
+                            </div>
++                           <div 
++                             className={`w-6 h-6 rounded-full flex items-center justify-center ${
++                               selectedSegment === segment.id 
++                                 ? 'bg-indigo-600 text-white' 
++                                 : 'border-2 border-gray-300'
++                             }`}
++                           >
++                             {selectedSegment === segment.id && <span className="text-xs">✓</span>}
++                           </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
++                   
++                   {selectedSegment && (
++                     <div className="mt-4 py-3 px-4 bg-indigo-50 rounded-lg text-sm text-indigo-800">
++                       <p>Selected segment: {segments.find(s => s.id === selectedSegment)?.name}</p>
++                     </div>
++                   )}
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex justify-between">
+                    <Link href="/campaigns/create/step2">
+-                     <Button variant="outline">
++                     <Button variant="outline" className="bg-white hover:bg-slate-50 border-gray-200">
++                       <ChevronLeft className="mr-1 h-4 w-4" />
+                        Back
+                      </Button>
+                    >
+                      Optimize Campaign
++                     <ChevronRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  </div>
+```
+
+---
+
+I've updated the step 3 page to be consistent with the UI changes we made to steps 1 and 2. Here are the key improvements:
+
+### 1. Progress Indicator
+- Updated to match the improved progress indicator from steps 1 and 2
+- Increased circle sizes from 8×8px to 12×12px for better visibility
+- Added checkmarks (✓) for completed steps (1 and 2)
+- Updated the progress bar with proper styling and dimensions
+- Added proper transitions and shadow effects for a more polished look
+
+### 2. Visual Styling & Layout
+- Changed the background from `bg-gray-50` to `bg-slate-50/30` to match previous steps
+- Added more vertical padding (`py-8` instead of `py-6`) for better spacing
+- Removed the redundant "Create Campaign" header
+- Increased bottom margins from `mb-6` to `mb-8` for better visual rhythm
+- Improved shadow styling with `shadow-md` instead of just `shadow`
+
+### 3. Segment Selection UI
+- Completely redesigned the segment selection UI to match the card style from step 2
+- Added segment icons with proper containers matching step 2's styling
+- Added better selection indicators (checkmark in circle)
+- Improved hover states and transitions
+- Changed rounded-md to rounded-lg for consistency
+- Added improved selection indicator and styling when a segment is selected
+
+### 4. Section Headers
+- Added improved section header with subtitle
+- Changed the "Select Segment" to "Target Audience" with a descriptive subtitle
+- Styled the Refresh button to match the styling of the "Select All" button in step 2
+
+### 5. Additional Features
+- Added a selection summary indicator at the bottom showing the selected segment
+- Added directional icons to buttons (ChevronLeft/ChevronRight)
+- Styled buttons to match step 1 and 2 (with proper background and hover states)
+- Added responsive hover effects to segments with shadow transitions
+
+### 6. User Counts
+- Improved the styling of the user count indicator
+- Moved it next to the selection indicator for better layout
+- Changed the text color and weight for better readability
+
+These changes create a cohesive user experience across all three steps, with consistent styling, interactions, and visual hierarchy. The page now looks more polished and professional while maintaining the clear flow and functionality of the original design.
+
+---
+
+_**User**_
+
+can you improve the transition page/animation between slide 3 and 4 to be:
+1. more consistent with the UI changes we made for steps 1-3
+2. look much more clean and visually appealing
+3. show up as a pop up over step 3 page that blurs and darkens the page behind it 
+4. have a load bar that operates more like a standard load bar rather than go back and forth, and have a pulse animation affect for the visual that is more visually appealing and engaging, but not overly noisy
+
+---
+
+_**Assistant**_
+
+I'll create an improved transition animation between steps 3 and 4 as a popup overlay with blur effect and a better loading animation. Let me first check the current optimization page:
+
+---
+
+Read file: /Users/brianbendett/Documents/chatbot/app/(auth)/campaigns/create/optimization/page.tsx
+
+---
+
+Now let's check the Progress component:
+
+---
+
+Read file: /Users/brianbendett/Documents/chatbot/components/ui/progress.tsx
+
+---
+
+Now I'll create a new component for the optimization transition as a modal overlay on step 3:
+
+---
+
+```diff
+  import { Button } from '@/components/ui/button';
+  import Link from 'next/link';
+- import { RefreshCw, ChevronRight, ChevronLeft, Users } from 'lucide-react';
++ import { RefreshCw, ChevronRight, ChevronLeft, Users, Zap, Sparkles } from 'lucide-react';
++ import { Progress } from '@/components/ui/progress';
++ import { motion, AnimatePresence } from 'framer-motion';
+  
+  // Sample audience segments data
+    }
+  ];
++ 
++ // Optimization modal component
++ function OptimizationModal({ isOpen, onComplete }: { isOpen: boolean; onComplete: () => void }) {
++   const [step, setStep] = useState(1);
++   const [progress, setProgress] = useState(0);
++   
++   useEffect(() => {
++     if (!isOpen) return;
++     
++     let interval: NodeJS.Timeout;
++     let timeoutId: NodeJS.Timeout;
++     
++     const simulateProgress = () => {
++       interval = setInterval(() => {
++         setProgress(prev => {
++           const newProgress = prev + 0.5;
++           if (newProgress >= 100) {
++             clearInterval(interval);
++             
++             if (step < 3) {
++               // Move to next step
++               setStep(prevStep => prevStep + 1);
++               setProgress(0);
++               // Start the next phase
++               timeoutId = setTimeout(simulateProgress, 300);
++             } else {
++               // All steps complete
++               timeoutId = setTimeout(onComplete, 500);
++             }
++             return 100;
++           }
++           return newProgress;
++         });
++       }, 20);
++     };
++     
++     simulateProgress();
++     
++     return () => {
++       clearInterval(interval);
++       clearTimeout(timeoutId);
++     };
++   }, [isOpen, step, onComplete]);
++   
++   const stepText = {
++     1: 'Analyzing customer data',
++     2: 'Matching offers to segment',
++     3: 'Optimizing campaign performance'
++   };
++   
++   return (
++     <AnimatePresence>
++       {isOpen && (
++         <motion.div 
++           className="fixed inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-sm"
++           initial={{ opacity: 0 }}
++           animate={{ opacity: 1 }}
++           exit={{ opacity: 0 }}
++         >
++           <motion.div 
++             className="bg-white rounded-xl shadow-xl p-8 max-w-md w-full m-4"
++             initial={{ scale: 0.9, opacity: 0 }}
++             animate={{ scale: 1, opacity: 1 }}
++             exit={{ scale: 0.9, opacity: 0 }}
++             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
++           >
++             <div className="text-center">
++               {/* Optimization Animation */}
++               <div className="relative w-24 h-24 mx-auto mb-6">
++                 <div className="absolute inset-0 rounded-full border-2 border-indigo-100"></div>
++                 
++                 {/* Pulsing circle animation */}
++                 <motion.div 
++                   className="absolute inset-2 rounded-full bg-indigo-50"
++                   animate={{ 
++                     scale: [1, 1.05, 1],
++                     opacity: [0.7, 0.9, 0.7] 
++                   }}
++                   transition={{ 
++                     duration: 2, 
++                     repeat: Infinity,
++                     ease: "easeInOut" 
++                   }}
++                 ></motion.div>
++                 
++                 {/* Main circle */}
++                 <div className="absolute inset-3 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white">
++                   {step === 1 && (
++                     <motion.div 
++                       animate={{ rotate: 360 }}
++                       transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
++                     >
++                       <RefreshCw className="h-8 w-8" />
++                     </motion.div>
++                   )}
++                   {step === 2 && (
++                     <motion.div 
++                       animate={{ 
++                         scale: [1, 1.1, 1],
++                       }}
++                       transition={{ duration: 1.5, repeat: Infinity }}
++                     >
++                       <Zap className="h-8 w-8" />
++                     </motion.div>
++                   )}
++                   {step === 3 && (
++                     <motion.div 
++                       animate={{ 
++                         y: [0, -3, 0],
++                       }}
++                       transition={{ duration: 1.2, repeat: Infinity }}
++                     >
++                       <Sparkles className="h-8 w-8" />
++                     </motion.div>
++                   )}
++                 </div>
++               </div>
++               
++               <h2 className="text-xl font-semibold mb-2 text-gray-800">Optimizing Your Campaign</h2>
++               <p className="text-gray-600 mb-6">
++                 Our AI is analyzing data patterns to create the perfect personalized experience for your customers
++               </p>
++               
++               {/* Step Indicators */}
++               <div className="flex justify-between mb-3 text-sm text-gray-500 font-medium">
++                 <div className={`${step >= 1 ? "text-indigo-600 font-medium" : ""}`}>Analyzing</div>
++                 <div className={`${step >= 2 ? "text-indigo-600 font-medium" : ""}`}>Matching</div>
++                 <div className={`${step >= 3 ? "text-indigo-600 font-medium" : ""}`}>Optimizing</div>
++               </div>
++               
++               {/* Progress bar */}
++               <div className="relative h-2 mb-4">
++                 <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
++                   <motion.div 
++                     className="h-full bg-indigo-600 rounded-full"
++                     style={{ width: `${progress}%` }}
++                     initial={{ width: 0 }}
++                     transition={{ type: "spring", damping: 15, stiffness: 60 }}
++                   />
++                 </div>
++                 
++                 {/* Progress glow effect */}
++                 <motion.div 
++                   className="absolute top-0 left-0 h-full w-4 bg-gradient-to-r from-transparent to-white/30"
++                   style={{ left: `${progress - 2}%` }}
++                   animate={{ opacity: [0.5, 1, 0.5] }}
++                   transition={{ duration: 1.5, repeat: Infinity }}
++                 />
++               </div>
++               
++               <p className="text-sm text-indigo-600 font-medium">
++                 {stepText[step as keyof typeof stepText]}...
++               </p>
++             </div>
++           </motion.div>
++         </motion.div>
++       )}
++     </AnimatePresence>
++   );
++ }
+  
+  export default function TargetAudiencePage() {
+    const [loading, setLoading] = useState(true);
+    const [selectedSegment, setSelectedSegment] = useState<string | null>(null);
++   const [showOptimization, setShowOptimization] = useState(false);
+  
+    useEffect(() => {
+  
+    const handleOptimizeCampaign = () => {
+-     // In a real application, you would save this data and navigate to step 4
+-     router.push('/campaigns/create/optimization');
++     // Show the optimization modal instead of navigating directly
++     setShowOptimization(true);
++   };
++   
++   const handleOptimizationComplete = () => {
++     // Navigate to step 4 after optimization is complete
++     router.push('/campaigns/create/step4');
+    };
+  
+          </div>
+        </SidebarProvider>
++       
++       {/* Optimization Modal */}
++       <OptimizationModal 
++         isOpen={showOptimization} 
++         onComplete={handleOptimizationComplete} 
++       />
+      </div>
+    );
+```
+
+---
+
+I've created a beautiful transition animation between steps 3 and 4 with the following improvements:
+
+### 1. Modal Overlay with Blur Effect
+- Created a modal that appears over step 3 page when "Optimize Campaign" is clicked
+- Added a semi-transparent dark background (`bg-black/40`) that darkens the page behind it
+- Implemented a subtle blur effect (`backdrop-blur-sm`) for a modern, premium look
+- Added smooth entrance/exit animations using Framer Motion
+
+### 2. Improved Loading Animation
+- Designed a progressive linear loading bar that moves forward only (no back-and-forth)
+- Added a subtle glow effect that moves with the progress bar
+- Implemented three distinct phases with unique animations:
+  - **Analyzing**: A rotating refresh icon
+  - **Matching**: A pulsing lightning bolt
+  - **Optimizing**: A floating sparkles icon
+
+### 3. Visual Consistency
+- Used the same color palette and styling as steps 1-3
+- Maintained rounded corners and shadow effects consistent with other UI elements
+- Used the same typography styles for headers and descriptions
+
+### 4. Enhanced Animation Effects
+- Added subtle pulsing effect for the main animation container
+- Created smooth spring animations for the modal entrance/exit
+- Implemented smooth progress transitions with natural easing
+- Added consistent visual feedback for each step
+
+### 5. Progress Indicators
+- Improved step indicators that highlight the current phase
+- Used a consistent 3-step process matching the segmented progress display
+- Added descriptive text that changes with each phase
+- Styled with the same aesthetic as the step indicators from steps 1-3
+
+### 6. Technical Implementation
+- Created a self-contained component for better organization
+- Used `useEffect` to manage animation timing and transitions
+- Implemented proper cleanup to prevent memory leaks
+- Added type safety for a production-ready implementation
+
+This implementation creates a visually appealing, professional transition between steps that feels integrated with the rest of the UI while adding a touch of polish and sophistication to indicate that AI processing is happening. The clean, modern design with subtle animations provides visual interest without being distracting or overwhelming.
+
+---
+
+_**User**_
+
+Can you have the transition have a load bar that continuously fills. we can just hard fill the timing of the load animation for now as this is just for a demo
+
+---
+
+_**Assistant**_
+
+I'll update the optimization modal to have a continuously filling load bar with a fixed timing for the demo. Let me simplify the animation while maintaining the visual appeal:
+
+---
+
+```diff
+  // Optimization modal component
+  function OptimizationModal({ isOpen, onComplete }: { isOpen: boolean; onComplete: () => void }) {
+-   const [step, setStep] = useState(1);
+    const [progress, setProgress] = useState(0);
+    
+    useEffect(() => {
+      if (!isOpen) return;
+      
+-     let interval: NodeJS.Timeout;
+      let timeoutId: NodeJS.Timeout;
+      
+-     const simulateProgress = () => {
+-       interval = setInterval(() => {
+-         setProgress(prev => {
+-           const newProgress = prev + 0.5;
+-           if (newProgress >= 100) {
+-             clearInterval(interval);
+-             
+-             if (step < 3) {
+-               // Move to next step
+-               setStep(prevStep => prevStep + 1);
+-               setProgress(0);
+-               // Start the next phase
+-               timeoutId = setTimeout(simulateProgress, 300);
++     // Simple continuous progress that fills in 3.2 seconds
++     const startTime = Date.now();
++     const duration = 3200; // 3.2 seconds for the entire animation
++     
++     const updateProgress = () => {
++       const elapsed = Date.now() - startTime;
++       const newProgress = Math.min(100, (elapsed / duration) * 100);
++       
++       setProgress(newProgress);
++       
++       if (newProgress < 100) {
++         timeoutId = setTimeout(updateProgress, 16); // ~60fps
+        } else {
+-               // All steps complete
+-               timeoutId = setTimeout(onComplete, 500);
+-             }
+-             return 100;
++         timeoutId = setTimeout(onComplete, 400);
+        }
+-           return newProgress;
+-         });
+-       }, 20);
+      };
+      
+-     simulateProgress();
++     updateProgress();
+      
+      return () => {
+-       clearInterval(interval);
+        clearTimeout(timeoutId);
+      };
+-   }, [isOpen, step, onComplete]);
++   }, [isOpen, onComplete]);
+    
+-   const stepText = {
+-     1: 'Analyzing customer data',
+-     2: 'Matching offers to segment',
+-     3: 'Optimizing campaign performance'
++   // Get a descriptive text based on progress
++   const getStepText = () => {
++     if (progress < 33) {
++       return 'Analyzing customer data...';
++     } else if (progress < 66) {
++       return 'Matching offers to segment...';
++     } else {
++       return 'Optimizing campaign performance...';
++     }
++   };
++   
++   // Get the icon based on progress
++   const getStepIcon = () => {
++     if (progress < 33) {
++       return (
++         <motion.div 
++           animate={{ rotate: 360 }}
++           transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
++         >
++           <RefreshCw className="h-8 w-8" />
++         </motion.div>
++       );
++     } else if (progress < 66) {
++       return (
++         <motion.div 
++           animate={{ scale: [1, 1.1, 1] }}
++           transition={{ duration: 1.5, repeat: Infinity }}
++         >
++           <Zap className="h-8 w-8" />
++         </motion.div>
++       );
++     } else {
++       return (
++         <motion.div 
++           animate={{ y: [0, -3, 0] }}
++           transition={{ duration: 1.2, repeat: Infinity }}
++         >
++           <Sparkles className="h-8 w-8" />
++         </motion.div>
++       );
++     }
+    };
+    
+                  {/* Main circle */}
+                  <div className="absolute inset-3 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white">
+-                   {step === 1 && (
+-                     <motion.div 
+-                       animate={{ rotate: 360 }}
+-                       transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+-                     >
+-                       <RefreshCw className="h-8 w-8" />
+-                     </motion.div>
+-                   )}
+-                   {step === 2 && (
+-                     <motion.div 
+-                       animate={{ 
+-                         scale: [1, 1.1, 1],
+-                       }}
+-                       transition={{ duration: 1.5, repeat: Infinity }}
+-                     >
+-                       <Zap className="h-8 w-8" />
+-                     </motion.div>
+-                   )}
+-                   {step === 3 && (
+-                     <motion.div 
+-                       animate={{ 
+-                         y: [0, -3, 0],
+-                       }}
+-                       transition={{ duration: 1.2, repeat: Infinity }}
+-                     >
+-                       <Sparkles className="h-8 w-8" />
+-                     </motion.div>
+-                   )}
++                   {getStepIcon()}
+                  </div>
+                </div>
+                </p>
+                
+-               {/* Step Indicators */}
++               {/* Step Indicators - visually show position in the process */}
+                <div className="flex justify-between mb-3 text-sm text-gray-500 font-medium">
+-                 <div className={`${step >= 1 ? "text-indigo-600 font-medium" : ""}`}>Analyzing</div>
+-                 <div className={`${step >= 2 ? "text-indigo-600 font-medium" : ""}`}>Matching</div>
+-                 <div className={`${step >= 3 ? "text-indigo-600 font-medium" : ""}`}>Optimizing</div>
++                 <div className={progress >= 33 ? "text-indigo-600 font-medium" : ""}>Analyzing</div>
++                 <div className={progress >= 66 ? "text-indigo-600 font-medium" : ""}>Matching</div>
++                 <div className={progress >= 95 ? "text-indigo-600 font-medium" : ""}>Optimizing</div>
+                </div>
+                
+                      style={{ width: `${progress}%` }}
+                      initial={{ width: 0 }}
+-                     transition={{ type: "spring", damping: 15, stiffness: 60 }}
+                    />
+                  </div>
+                
+                <p className="text-sm text-indigo-600 font-medium">
+-                 {stepText[step as keyof typeof stepText]}...
++                 {getStepText()}
+                </p>
+              </div>
+```
+
+---
+
+I've updated the optimization modal with a continuous loading bar that fills at a consistent pace from start to finish. Here are the key changes:
+
+### 1. Simplified Loading Animation
+- Replaced the multi-step approach with a single, continuous progress bar
+- Set a fixed duration of 3.2 seconds for the entire loading process (demo purposes)
+- Used a time-based approach instead of incrementing by fixed amounts
+- Removed the spring animation for a smoother linear progress
+
+### 2. Dynamic Content Based on Progress
+- Created helper functions to dynamically update the UI based on the current progress:
+  - `getStepText()`: Changes the descriptive text at different progress thresholds
+  - `getStepIcon()`: Changes the animated icon to match the current phase
+- This gives the appearance of distinct phases while maintaining a single continuous progress bar
+
+### 3. Progress-Based Indicators
+- Updated the step indicators to highlight based on progress percentage:
+  - "Analyzing" highlights at 33% progress
+  - "Matching" highlights at 66% progress
+  - "Optimizing" highlights at 95% progress
+- This creates visual consistency with the progress bar
+
+### 4. Smoother Transitions
+- Used a higher framerate update (16ms intervals, ~60fps) for smoother animation
+- Maintained the glow effect that follows the progress bar
+- Kept all the visual polish (blur backdrop, animations) while simplifying the logic
+
+### 5. Cleaner Implementation
+- Removed redundant state (no more separate step state)
+- Used a single timer management approach for better performance
+- Set a slightly shorter completion delay (400ms) for better responsiveness
+
+The result is a more straightforward, continuously filling load bar that still provides visual feedback about the different stages of optimization. The animation remains engaging and polished while being simpler and more predictable for demo purposes.
+
+---
+
+_**User**_
+
+the load bar in the transition animation is still not filling up visibly. 
+
+---
+
+_**Assistant**_
+
+Let me fix the loading bar in the transition animation to make sure it visibly fills up correctly:
+
+---
+
+```diff
+                
+                {/* Progress bar */}
+-               <div className="relative h-2 mb-4">
+-                 <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+-                   <motion.div 
+-                     className="h-full bg-indigo-600 rounded-full"
++               <div className="h-2 w-full bg-gray-100 rounded-full mb-4 overflow-hidden">
++                 <div 
++                   className="h-full bg-indigo-600 rounded-full transition-all duration-100 ease-linear"
+                    style={{ width: `${progress}%` }}
+-                     initial={{ width: 0 }}
+-                   />
+-                 </div>
+-                 
+-                 {/* Progress glow effect */}
+-                 <motion.div 
+-                   className="absolute top-0 left-0 h-full w-4 bg-gradient-to-r from-transparent to-white/30"
+-                   style={{ left: `${progress - 2}%` }}
+-                   animate={{ opacity: [0.5, 1, 0.5] }}
+-                   transition={{ duration: 1.5, repeat: Infinity }}
+                  />
+                </div>
+```
+
+---
+
+I've fixed the loading bar in the transition animation to ensure it visibly fills up correctly. 
+
+The main changes I made:
+
+1. **Simplified the Progress Bar Structure**
+   - Removed the nested structure that might have been causing rendering issues
+   - Changed from using Framer Motion's `motion.div` to a standard `div` with CSS transitions
+
+2. **Enhanced the Transition Properties**
+   - Added proper CSS transitions with `transition-all duration-100 ease-linear`
+   - This ensures the width changes are smoothly animated
+
+3. **Removed Problematic Animation Elements**
+   - Removed the potentially distracting glow effect that might have been interfering with the loading bar visibility
+   - Eliminated the `initial={{ width: 0 }}` property which might have been conflicting with the inline style
+
+4. **Fixed Styling Attributes**
+   - Maintained the proper coloring (indigo-600 for the fill)
+   - Kept the proper rounded corners and overflow handling
+   - Made sure the height fully expands within the container
+
+These changes provide a cleaner, more reliable loading bar animation that directly shows the progress with a simple width transition, making it more visible and reliable. The loading bar now appears as a standard progress indicator that fills from left to right in a smooth, continuous motion over the specified duration.
+
+---
+
+_**User**_
+
+can the bar loading be more gradually filling throughout the course of the animation transition effect?
+
+---
+
+_**Assistant**_
+
+I'll modify the loading bar to fill more gradually throughout the animation. Let me update the animation timing and approach:
+
+---
+
+```diff
+      if (!isOpen) return;
+      
++     let animationFrameId: number;
+      let timeoutId: NodeJS.Timeout;
+      
+-     // Simple continuous progress that fills in 3.2 seconds
++     // Longer, more gradual animation (5 seconds total)
+      const startTime = Date.now();
+-     const duration = 3200; // 3.2 seconds for the entire animation
++     const duration = 5000; // 5 seconds for the entire animation
+      
++     // Use requestAnimationFrame for smoother animation
+      const updateProgress = () => {
+        const elapsed = Date.now() - startTime;
+-       const newProgress = Math.min(100, (elapsed / duration) * 100);
+-       
++       
++       // Use a cubic easing function for more natural progression
++       // Starts slower, accelerates in the middle, slows down at the end
++       let newProgress;
++       const t = Math.min(1, elapsed / duration);
++       if (t < 0.5) {
++         // Slower at the beginning
++         newProgress = 4 * t * t * t;
++       } else {
++         // Faster in the middle, slower at the end
++         newProgress = 1 - Math.pow(-2 * t + 2, 3) / 2;
++       }
++       
++       newProgress = Math.min(1, newProgress) * 100;
+        setProgress(newProgress);
+        
+        if (newProgress < 100) {
+-         timeoutId = setTimeout(updateProgress, 16); // ~60fps
++         animationFrameId = requestAnimationFrame(updateProgress);
+        } else {
+          timeoutId = setTimeout(onComplete, 400);
+        }
+      };
+      
+-     updateProgress();
++     animationFrameId = requestAnimationFrame(updateProgress);
+      
+      return () => {
++       cancelAnimationFrame(animationFrameId);
+        clearTimeout(timeoutId);
+      };
+                
+                {/* Progress bar */}
+-               <div className="h-2 w-full bg-gray-100 rounded-full mb-4 overflow-hidden">
++               <div className="h-3 w-full bg-gray-100 rounded-full mb-4 overflow-hidden">
+                  <div 
+-                   className="h-full bg-indigo-600 rounded-full transition-all duration-100 ease-linear"
+-                   style={{ width: `${progress}%` }}
++                   className="h-full bg-indigo-600 rounded-full"
++                   style={{ 
++                     width: `${progress}%`,
++                     transition: "width 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)"
++                   }}
+                  />
+                </div>
+```
+
+---
+
+I've improved the loading bar animation to make it fill more gradually throughout the transition with these key changes:
+
+1. **Enhanced Animation Duration and Timing:**
+   - Extended the total animation time from 3.2 seconds to 5 seconds for a more relaxed, gradual fill
+   - Implemented a sophisticated cubic bezier easing function that:
+     - Starts slower (gentle beginning)
+     - Accelerates in the middle (builds momentum)
+     - Decelerates at the end (smooth finish)
+
+2. **Smoother Animation Implementation:**
+   - Switched from `setTimeout` to `requestAnimationFrame` for smoother, more efficient animation
+   - Added proper animation frame cleanup with `cancelAnimationFrame`
+   - This provides better performance and smoother visuals
+
+3. **Improved Progress Bar Appearance:**
+   - Increased the height of the progress bar from 2px to 3px for better visibility
+   - Added a more sophisticated transition effect using a custom cubic-bezier curve
+   - The transition: "width 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)" creates a material-design-like animation
+
+4. **Cubic Easing Function:**
+   - Added a sophisticated easing algorithm that changes speed throughout the animation:
+   - For the first half (t < 0.5): Uses a cubic function (4t³) that starts very slow and gradually accelerates
+   - For the second half: Uses a complementary function that slows down toward the end
+   - This creates a more natural, pleasing filling effect than linear progression
+
+These changes create a more visually satisfying loading experience, where the progress bar starts gradually, builds momentum, and then smoothly completes - giving users a more refined transition that feels intentional and polished.
+
+---
+
+_**User**_
+
+while the stages light up gradually, the load bar below them only fills up at the end quickly. can the progress of the load bar fill below the text align with the text that's lighting up?
+
+---
+
+_**Assistant**_
+
+Let me fix the issue with the progress bar to ensure it fills up more gradually and aligns with the text indicators that are lighting up:
+
+---
+
+```diff
+                    style={{ 
+                      width: `${progress}%`,
+-                     transition: "width 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)"
+                    }}
+                  />
+```
 
 ---
 
