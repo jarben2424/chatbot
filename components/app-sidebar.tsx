@@ -1,7 +1,7 @@
 'use client';
 
 import type { User } from 'next-auth';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { LayoutDashboard, Users, Megaphone, Cpu, Cable } from 'lucide-react';
@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 export function AppSidebar({ user }: { user: User | undefined }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
   const { theme, systemTheme } = useTheme();
 
@@ -31,6 +32,9 @@ export function AppSidebar({ user }: { user: User | undefined }) {
   const logoSrc = currentTheme === 'dark' 
     ? '/images/Hang-Logo-Short-W.png'
     : '/images/Hang-Logo-Short.png';
+
+  // Check if we're on the welcome/fresh chat screen
+  const isWelcomeScreen = pathname === '/';
 
   const navigationItems = [
     {
@@ -84,23 +88,25 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                 priority
               />
             </Link>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  className="h-9 w-9 p-0"
-                  onClick={() => {
-                    setOpenMobile(false);
-                    router.push('/');
-                    router.refresh();
-                  }}
-                >
-                  <PlusIcon />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent align="end">New Chat</TooltipContent>
-            </Tooltip>
+            {!isWelcomeScreen && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    className="h-9 w-9 p-0"
+                    onClick={() => {
+                      setOpenMobile(false);
+                      router.push('/');
+                      router.refresh();
+                    }}
+                  >
+                    <PlusIcon />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent align="end">New Chat</TooltipContent>
+              </Tooltip>
+            )}
           </div>
         </SidebarMenu>
       </SidebarHeader>

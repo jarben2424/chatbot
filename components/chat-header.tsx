@@ -1,25 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useWindowSize } from 'usehooks-ts';
 import { memo } from 'react';
 import useSWR from 'swr';
 import { SidebarToggle } from '@/components/sidebar-toggle';
-import { ModeToggle } from '@/components/mode-toggle';
-import { ModelSelector } from '@/components/model-selector';
-import { FollowupToggle } from '@/components/followup-toggle';
 import { cn } from '@/lib/utils';
 import { useChatVisibility } from '@/hooks/use-chat-visibility';
 import { VisibilitySelector } from './visibility-selector';
-import { DownloadButton } from './download-button';
-import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { PlusIcon } from './icons';
 import { useSidebar } from './ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { fetcher } from '@/lib/utils';
+import { ModelSelector } from '@/components/model-selector';
+import Image from 'next/image';
 
 // Add the VisibilityType type directly in this file
 type VisibilityType = 'private' | 'public';
@@ -36,6 +33,7 @@ function PureChatHeader({
   isReadonly,
 }: ChatHeaderProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { open } = useSidebar();
   const { width: windowWidth } = useWindowSize();
   const { data: rateLimit } = useSWR('/api/rate-limit', fetcher);
@@ -50,12 +48,15 @@ function PureChatHeader({
   const logoSrc = currentTheme === 'dark' 
     ? '/images/Hang-Logo-Short-W.png'
     : '/images/Hang-Logo-Short.png';
+    
+  // Check if we're on the welcome/fresh chat screen
+  const isWelcomeScreen = pathname === '/';
 
   return (
     <header className="flex sticky top-0 bg-background py-1.5 items-center px-2 md:px-2 gap-2 z-10">
       <SidebarToggle />
 
-      {(!open || windowWidth < 768) && (
+      {(!open || windowWidth < 768) && !isWelcomeScreen && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -77,13 +78,27 @@ function PureChatHeader({
       {!isReadonly && (
         <ModelSelector
           selectedModelId={selectedModelId}
-          className="order-1 md:order-2"
+          className={cn("order-1 md:order-2", isWelcomeScreen && !open ? "mr-auto" : "")}
         />
       )}
 
       {rateLimit && !rateLimit.isPaid && (
         <div className="text-xs text-muted-foreground">
           {rateLimit.remaining} of {rateLimit.total} messages remaining today
+        </div>
+      )}
+      
+      {/* Add Hang logo in the header when on welcome screen */}
+      {isWelcomeScreen && (
+        <div className="ml-auto order-last absolute right-4 top-1/2 -translate-y-1/2">
+          <Image
+            src="/images/Hang-Logo-Full-RichBlack.png"
+            alt="Hang AI"
+            width={150}
+            height={44}
+            priority
+            className="h-14 w-auto"
+          />
         </div>
       )}
     </header>
