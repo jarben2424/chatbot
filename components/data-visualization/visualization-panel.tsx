@@ -9,7 +9,7 @@ import { VisualizationControls } from './visualization-controls';
 import { X, Maximize2, FullscreenIcon, BarChart, FileIcon, CopyIcon, UndoIcon, RedoIcon, SparklesIcon, LineChartIcon, Save } from 'lucide-react';
 import { ArtifactKind, UIArtifact } from '@/components/artifact';
 import { StandaloneChart } from './charts/standalone-chart';
-import { cn } from '@/lib/utils';
+import { cn, generateUUID } from '@/lib/utils';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { toast } from 'sonner';
 import { formatDistance } from 'date-fns';
@@ -122,6 +122,7 @@ export function VisualizationPanel({
   const [isForceExpanded, setIsForceExpanded] = useState(forceExpanded);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [versionHistory, setVersionHistory] = useState([{
     data, 
     settings,
@@ -761,6 +762,65 @@ export function VisualizationPanel({
       duration: 8000,
     }
   );
+
+  const saveVisualization = (type: 'new' | 'existing') => {
+    try {
+      // Store in database as a document
+      const timestamp = new Date().toISOString();
+      const artifactId = artifact?.documentId || generateUUID();
+      
+      // Save the visualization to the document API
+      fetch(`/api/document?id=${artifactId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: title,
+          content: JSON.stringify({
+            data: formattedData,
+            settings: settings,
+            visualization: settings.type,
+            timestamp,
+            lastModified: timestamp
+          }),
+          kind: 'visualization',
+          createdAt: timestamp
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(() => {
+        // Reload the artifact with the updated information
+        setArtifact(prev => ({
+          ...prev,
+          title: title,
+          documentId: artifactId,
+          content: JSON.stringify({
+            data: formattedData,
+            settings: settings,
+            visualization: settings.type,
+            timestamp,
+            lastModified: timestamp
+          })
+        }));
+        
+        // Show success toast
+        toast.success(type === 'new' ? 'Saved to new dashboard' : 'Added to dashboard');
+      })
+      .catch(error => {
+        console.error('Error saving visualization:', error);
+        toast.error('Failed to save visualization');
+      });
+    } catch (error) {
+      console.error('Error in saveVisualization:', error);
+      toast.error('An error occurred while saving');
+    }
+  };
 
   if (shouldShowFullScreen) {
     // Render full visualization in full screen view with controls - using standard components

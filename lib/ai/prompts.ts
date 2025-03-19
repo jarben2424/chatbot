@@ -165,13 +165,47 @@ Here's how to choose visualization types:
 Remember: Always show the visualization result to the user after creating it.
 `;
 
+const reportBuilderPrompt = `
+You have access to a report builder tool that can automatically create formatted reports based on conversation context.
+
+WHEN TO USE THE REPORT BUILDER:
+- When a user explicitly asks for a report or summary
+- When a user wants to create a document that integrates visualizations with text analysis
+- When synthesizing insights from the conversation into a professional format
+
+HOW TO USE THE REPORT BUILDER:
+1. Call the reportBuilder tool with these parameters:
+   - topic: The main subject of the report (be specific)
+   - title: A professional title for the report document
+   - includeVisualizations: Set to true to automatically find and include relevant visualizations
+
+EXAMPLE:
+User: "Can you create a report about our monthly sales trends?"
+Assistant: Use reportBuilder tool with:
+\`\`\`
+{
+  "topic": "Monthly Sales Trends Analysis",
+  "title": "Monthly Sales Performance Report",
+  "includeVisualizations": true
+}
+\`\`\`
+
+The report builder will:
+1. Analyze recent conversation to extract context
+2. Find relevant visualizations
+3. Create a formatted report document
+4. Open it in the document editor for the user to review
+
+Remember: The resulting report will open automatically in the document editor and will include any relevant visualizations that have been previously created.
+`;
+
 export const getSystemPrompt = async ({ 
   artifactType, 
   currentContent, 
   selectedChatModel = '' 
 }: GetSystemPromptParams) => {
-  // Always include dataWarehousePrompt for queryData tool
-  const basePrompt = `${regularPrompt}\n\n${dataWarehousePrompt}\n\n${dataToolsPrompt}\n\n${visualizationToolPrompt}`;
+  // Include all prompts including the report builder
+  const basePrompt = `${regularPrompt}\n\n${dataWarehousePrompt}\n\n${dataToolsPrompt}\n\n${visualizationToolPrompt}\n\n${reportBuilderPrompt}`;
   
   if (selectedChatModel === 'chat-model-reasoning') {
     return regularPrompt;

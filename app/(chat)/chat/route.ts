@@ -23,7 +23,52 @@ import { dataTools } from '@/lib/ai/tools/data-tools';
 import { getWeather } from '@/lib/ai/tools/get-weather';
 import { createDocument } from '@/lib/ai/tools/create-document';
 import { updateDocument } from '@/lib/ai/tools/update-document';
+import { buildReport, buildReportTool } from '@/lib/ai/tools/report-builder';
 import { checkRateLimit } from '@/lib/rate-limit';
+
+// Create a function to handle opening the artifact immediately
+const forceOpenArtifact = (dataStream: any, documentInfo: { id: string, title: string, kind: string }) => {
+  try {
+    // First signal - direct artifact data
+    dataStream.writeData({
+      type: 'artifact',
+      content: {
+        documentId: documentInfo.id,
+        title: documentInfo.title,
+        kind: documentInfo.kind,
+        isVisible: true,
+        status: 'idle'
+      }
+    });
+    
+    // Second signal with delay - to ensure it's processed after any rendering
+    setTimeout(() => {
+      try {
+        console.log('Sending delayed force-open signal');
+        dataStream.writeData({
+          type: 'force-artifact-visible',
+          content: {
+            documentId: documentInfo.id,
+            title: documentInfo.title,
+            kind: documentInfo.kind,
+            isVisible: true,
+            status: 'idle'
+          }
+        });
+        
+        // Final completion signal
+        dataStream.writeData({
+          type: 'finish',
+          content: ''
+        });
+      } catch (e) {
+        console.error('Error sending delayed signals:', e);
+      }
+    }, 800);
+  } catch (error) {
+    console.error('Error in forceOpenArtifact:', error);
+  }
+};
 
 // Chat endpoint - POST /chat
 export async function POST(request: Request) {
@@ -56,8 +101,7 @@ export async function POST(request: Request) {
       await saveChat({ 
         id, 
         userId: session.user.id, 
-        title,
-        visibility: 'private'
+        title
       });
     }
 
@@ -91,32 +135,103 @@ export async function POST(request: Request) {
               'getWeather',
               'createDocument',
               'updateDocument',
+              'buildReport',
             ],
             tools: {
               ...dataTools,
               getWeather,
               createDocument: createDocument({ session, dataStream }),
               updateDocument: updateDocument({ session, dataStream }),
+              buildReport: {
+                parameters: buildReportTool.parameters,
+                description: buildReportTool.description,
+                execute: async (args, options) => {
+                  try {
+                    console.log('Building report with args:', args, 'toolCallId:', options?.toolCallId);
+                    
+                    // Send an initial progress update to show the "Thinking" indicator
+                    dataStream.writeData({
+                      type: 'tool-status',
+                      content: {
+                        toolCallId: options?.toolCallId || '',
+                        status: 'running',
+                        message: 'Generating comprehensive report...'
+                      }
+                    });
+                    
+                    const result = await buildReport(args, { 
+                      toolCallId: options?.toolCallId || '', 
+                      dataStream, 
+                      session, 
+                      chatId: id 
+                    });
+                    
+                    console.log('Report build successful, returning result:', result);
+                    
+                    // Use the dedicated function to force open the artifact
+                    forceOpenArtifact(dataStream, {
+                      id: result.id,
+                      title: result.title,
+                      kind: result.kind
+                    });
+                    
+                    // Add a final tool-status update indicating completion
+                    dataStream.writeData({
+                      type: 'tool-status',
+                      content: {
+                        toolCallId: options?.toolCallId || '',
+                        status: 'complete',
+                        message: 'Report generation complete'
+                      }
+                    });
+                    
+                    // Return a simple string response for the successful report creation
+                    return `I've created a report titled "${args.title}" that you can now view and edit.`;
+                  } catch (error) {
+                    console.error('Report builder error:', error);
+                    
+                    // Return a more helpful error message
+                    if (error instanceof Error && error.message.includes('No such languageModel')) {
+                      return `I was unable to create the report due to a configuration issue. Please try a different request or contact the administrator.`;
+                    }
+                    
+                    return `I was unable to create the report due to an error. Please try again later.`;
+                  }
+                }
+              },
             },
-            onFinish: async (result) => {
+            onFinish: async (result: any) => {
               try {
-                // Access messages correctly from the result object
-                // This depends on the structure of the result object from the AI SDK
-                const responseMessages = result.messages || [];
+                // Basic type checking to prevent errors
+                const responseMessages = [];
+                
+                // Try to access messages from the result, fallback to empty array
+                if (result && typeof result === 'object') {
+                  if (Array.isArray(result.messages)) {
+                    responseMessages.push(...result.messages);
+                  } else if (Array.isArray(result.steps)) {
+                    // Extract messages from steps if that's the structure
+                    const messagesFromSteps = result.steps
+                      .filter((step: any) => step && step.type === 'assistant' && step.content)
+                      .map((step: any) => step.content);
+                    responseMessages.push(...messagesFromSteps);
+                  }
+                }
+                
                 console.log('Saving response messages:', {
                   count: responseMessages.length,
-                  sample: responseMessages[0]
+                  sample: responseMessages.length ? responseMessages[0] : null
                 });
                 
                 if (responseMessages.length) {
                   await saveMessages({
-                    messages: responseMessages.map((message) => ({
+                    messages: responseMessages.map((message: any) => ({
                       id: message.id || generateUUID(),
                       chatId: id,
-                      role: message.role,
+                      role: message.role || 'assistant',
                       content: typeof message.content === 'string' 
                         ? { text: message.content } 
-                        : message.content,
+                        : message.content || { text: '' },
                       createdAt: new Date(),
                     })),
                   });
@@ -134,7 +249,12 @@ export async function POST(request: Request) {
           result.mergeIntoDataStream(dataStream);
         } catch (error) {
           console.error('Stream execution error:', error);
-          dataStream.write({ type: 'error', error: 'Failed to process request' });
+          // Simplified error handling
+          try {
+            dataStream.writeData({ type: 'error', content: 'Failed to process request' });
+          } catch (e) {
+            console.error('Error while writing to dataStream:', e);
+          }
         }
       },
       onError: (error) => {

@@ -21,8 +21,10 @@ import {
 import { toast } from 'sonner';
 import { useLocalStorage, useWindowSize } from 'usehooks-ts';
 import { useSidebar } from './ui/sidebar';
+import { useRouter } from 'next/navigation';
 
 import { sanitizeUIMessages } from '@/lib/utils';
+import { generateUUID } from '@/lib/utils';
 
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from './icons';
 import { PreviewAttachment } from './preview-attachment';
@@ -71,6 +73,7 @@ function PureMultimodalInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
   const { setOpen } = useSidebar();
+  const router = useRouter();
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -165,6 +168,43 @@ function PureMultimodalInput({
   const submitForm = useCallback(() => {
     window.history.replaceState({}, '', `/chat/${chatId}`);
 
+    // Function to handle hardcoded prompt redirections
+    const handleHardcodedPrompts = (inputText: string): boolean => {
+      const lowerInput = inputText.toLowerCase().trim();
+      
+      // Map of trigger phrases to redirect paths
+      const redirectMap: Record<string, string> = {
+        'view my campaigns': '/campaigns',
+        'view campaigns': '/campaigns',
+        'show campaigns': '/campaigns',
+        'show my campaigns': '/campaigns',
+        'go to campaigns': '/campaigns',
+        'view dashboards': '/dashboards',
+        'show dashboards': '/dashboards',
+        'view my dashboards': '/dashboards',
+        'show my dashboards': '/dashboards',
+        'go to dashboards': '/dashboards',
+      };
+
+      // Check if the input matches any of our trigger phrases
+      for (const [phrase, path] of Object.entries(redirectMap)) {
+        if (lowerInput === phrase) {
+          // We'll both navigate and still submit the form
+          setTimeout(() => {
+            router.push(path);
+          }, 100);
+          return false; // Return false to allow form submission to proceed
+        }
+      }
+
+      return false; // Not a hardcoded prompt, or we're handling both actions
+    };
+
+    // Check for hardcoded prompts
+    if (handleHardcodedPrompts(input)) {
+      return; // If a hardcoded prompt was handled, don't proceed with normal submission
+    }
+
     handleSubmit(undefined, {
       experimental_attachments: attachments,
     });
@@ -192,6 +232,10 @@ function PureMultimodalInput({
     chatId,
     messages.length,
     setOpen,
+    input,
+    router,
+    setInput,
+    resetHeight
   ]);
 
   const uploadFile = async (file: File) => {

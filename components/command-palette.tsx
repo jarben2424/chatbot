@@ -22,8 +22,8 @@ const commands: Command[] = [
   {
     id: 'dashboard',
     icon: <LayoutDashboardIcon className="h-4 w-4" />,
-    label: 'Show me my dashboard',
-    action: 'Show me my dashboard'
+    label: 'View dashboards',
+    action: 'View dashboards'
   },
   {
     id: 'segments',

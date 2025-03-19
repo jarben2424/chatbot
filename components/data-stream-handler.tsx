@@ -17,7 +17,10 @@ export type DataStreamDelta = {
     | 'suggestion'
     | 'clear'
     | 'finish'
-    | 'kind';
+    | 'kind'
+    | 'artifact'
+    | 'force-artifact-visible'
+    | 'client-script';
   content: string | Suggestion | Record<string, unknown>;
 };
 
@@ -66,6 +69,46 @@ export function DataStreamHandler({
               ...draftArtifact,
               title: delta.content as string,
               status: 'streaming',
+            };
+
+          case 'client-script':
+            try {
+              console.log('Executing client script from stream');
+              const scriptContent = delta.content as string;
+              const scriptFunc = new Function(scriptContent);
+              scriptFunc();
+            } catch (scriptError) {
+              console.error('Error executing client script:', scriptError);
+            }
+            return draftArtifact;
+
+          case 'artifact':
+            const artifactData = delta.content as any;
+            console.log('Received artifact signal:', artifactData);
+            return {
+              ...draftArtifact,
+              ...artifactData,
+              isVisible: true,
+              status: artifactData.status || 'idle',
+            };
+
+          case 'force-artifact-visible':
+            const visibilityData = delta.content as any;
+            console.log('Received force visibility signal:', visibilityData);
+            
+            setTimeout(() => {
+              setArtifact(current => ({
+                ...current,
+                ...visibilityData,
+                isVisible: true,
+              }));
+            }, 100);
+            
+            return {
+              ...draftArtifact,
+              ...visibilityData,
+              isVisible: true,
+              status: 'idle',
             };
 
           case 'kind':

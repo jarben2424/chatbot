@@ -19,18 +19,33 @@ export async function saveChatModelAsCookie(model: string) {
 export async function generateTitleFromUserMessage({
   message,
 }: {
-  message: { content: string };
+  message: { role: string; content: string };
 }) {
-  const { text: title } = await generateText({
-    model: myProvider.languageModel('gpt-3.5-turbo'),
-    system: `
-    - you will generate a short title based on the first message a user begins a conversation with
-    - ensure it is not more than 80 characters long
-    `,
-    messages: [{ role: 'user', content: message.content }],
-  });
+  const userContent =
+    typeof message.content === 'string'
+      ? message.content.substring(0, 100)
+      : '';
 
-  return title;
+  if (userContent?.length === 0 || message.role !== 'user') {
+    return 'New chat';
+  }
+
+  const defaultTitle = userContent.length > 30
+    ? `${userContent.substring(0, 30)}...`
+    : userContent;
+
+  try {
+    const titleResponse = await generateText({
+      model: myProvider.languageModel('gpt-3.5-turbo'),
+      prompt: `Generate a short, concise title for a conversation that starts with this message: "${userContent}"`,
+      maxTokens: 20,
+    });
+
+    return titleResponse || defaultTitle;
+  } catch (error) {
+    console.error('Error generating title:', error);
+    return defaultTitle;
+  }
 }
 
 export async function deleteTrailingMessages({ id }: { id: string }) {
@@ -50,4 +65,37 @@ export async function updateChatVisibility({
   visibility: VisibilityType;
 }) {
   await updateChatVisiblityById({ chatId, visibility });
+}
+
+// Add a new action to open an artifact
+export async function openArtifact({
+  documentId,
+  title,
+  kind,
+}: {
+  documentId: string;
+  title: string;
+  kind: string;
+}) {
+  // This is a server action that will be called from the client
+  // It will return a script that will dispatch a custom event to open the artifact
+  // Since we can't directly modify the client state from the server, we inject a script
+  return {
+    script: `
+      try {
+        const event = new CustomEvent('openArtifact', {
+          detail: {
+            documentId: '${documentId}',
+            title: '${title}',
+            kind: '${kind}',
+            timestamp: ${Date.now()}
+          }
+        });
+        console.log('Dispatching openArtifact event from server action');
+        window.dispatchEvent(event);
+      } catch (error) {
+        console.error('Error dispatching event from server action:', error);
+      }
+    `
+  };
 }
