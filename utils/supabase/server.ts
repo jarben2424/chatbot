@@ -1,38 +1,33 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
+import { cache } from 'react';
 
-// Use this for components and API routes
-export const createClient = async () => {
-  try {
-    const cookieStore = cookies()
-    
-    if (!cookieStore) {
-      console.warn('Cookie store not available, using direct Supabase client')
-      return createDirectClient()
-    }
-    
-    return createServerComponentClient({
-      cookies: () => cookieStore
-    })
-  } catch (error) {
-    console.error('Error creating Supabase client with cookies:', error)
-    return createDirectClient()
-  }
-}
+// Define type for Supabase client
+export type SupabaseClient = ReturnType<typeof createSupabaseClient>;
 
-// Fallback to using direct Supabase client if cookies are not available
-const createDirectClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing Supabase environment variables')
+// Create a Supabase client for server-side usage (cached to improve performance)
+export const createClient = cache(() => {
+  // Get environment variables for Supabase
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Missing Supabase environment variables for server');
   }
-  
-  return createSupabaseClient(supabaseUrl, supabaseKey, {
+
+  // Get cookies for maintaining auth state
+  const cookieStore = cookies();
+
+  return createSupabaseClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       persistSession: false,
-    }
-  })
-}
+      autoRefreshToken: false,
+      // Use cookies to maintain session across requests
+      cookies: {
+        get(name) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    },
+  });
+});

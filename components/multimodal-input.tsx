@@ -23,7 +23,7 @@ import { useLocalStorage, useWindowSize } from 'usehooks-ts';
 
 import { sanitizeUIMessages } from '@/lib/utils';
 
-import { ArrowUpIcon, PaperclipIcon, StopIcon } from './icons';
+import { ArrowUpIcon, PaperclipIcon, SparklesIcon, StopIcon } from './icons';
 import { PreviewAttachment } from './preview-attachment';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
@@ -262,8 +262,9 @@ function PureMultimodalInput({
         }}
       />
 
-      <div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start">
+      <div className="absolute bottom-0 p-2 w-fit flex flex-row gap-1 justify-start">
         <AttachmentsButton fileInputRef={fileInputRef} isLoading={isLoading} />
+        <DeepThinkingButton isLoading={isLoading} />
       </div>
 
       <div className="absolute bottom-0 right-0 p-2 w-fit flex flex-row justify-end">
@@ -371,3 +372,26 @@ const SendButton = memo(PureSendButton, (prevProps, nextProps) => {
   if (prevProps.input !== nextProps.input) return false;
   return true;
 });
+
+function PureDeepThinkingButton({
+  isLoading,
+}: {
+  isLoading: boolean;
+}) {
+  return (
+    <Button
+      data-testid="deep-thinking-button"
+      className="rounded-full px-3 py-1.5 h-fit bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-600 hover:bg-zinc-50 hover:dark:bg-zinc-900 flex items-center gap-1.5 text-black dark:text-white"
+      onClick={(event) => {
+        event.preventDefault();
+        // Add functionality for DeepThinkingButton here
+      }}
+      disabled={isLoading}
+    >
+      <SparklesIcon size={14} />
+      <span className="text-xs">Deep thinking</span>
+    </Button>
+  );
+}
+
+const DeepThinkingButton = memo(PureDeepThinkingButton);

@@ -103,6 +103,286 @@ export const businessDbQuery = tool({
   },
 });
 
+// Database schema definitions
+const DATABASE_SCHEMA = {
+  schema: 'HANG_LOYALTY_PUBLIC',
+  tables: {
+    CUSTOMERS: {
+      columns: {
+        ID: 'TEXT',
+        PROGRAM_MEMBERSHIP_ID: 'TEXT',
+        CREATED_AT: 'TIMESTAMP_NTZ',
+        UPDATED_AT: 'TIMESTAMP_NTZ',
+        PROGRAM_ID: 'NUMBER',
+        _FIVETRAN_DELETED: 'BOOLEAN',
+        _FIVETRAN_SYNCED: 'TIMESTAMP_TZ',
+        IS_ANONYMOUS_THIRD_PARTY: 'BOOLEAN'
+      }
+    },
+    CUSTOMER_IDENTIFIERS: {
+      columns: {
+        ID: 'TEXT',
+        CUSTOMER_ID: 'TEXT',
+        IDENTIFIER_ID: 'TEXT',
+        CREATED_AT: 'TIMESTAMP_NTZ',
+        UPDATED_AT: 'TIMESTAMP_NTZ',
+        _FIVETRAN_DELETED: 'BOOLEAN',
+        _FIVETRAN_SYNCED: 'TIMESTAMP_TZ'
+      }
+    },
+    CUSTOMER_TRANSACTIONS: {
+      columns: {
+        ID: 'TEXT',
+        CUSTOMER_ID: 'TEXT',
+        TRANSACTION_ID: 'TEXT',
+        CREATED_AT: 'TIMESTAMP_NTZ',
+        UPDATED_AT: 'TIMESTAMP_NTZ',
+        _FIVETRAN_DELETED: 'BOOLEAN',
+        _FIVETRAN_SYNCED: 'TIMESTAMP_TZ'
+      }
+    },
+    PROGRAM_MEMBERSHIPS: {
+      columns: {
+        ID: 'TEXT',
+        WALLET_ADDRESS: 'TEXT',
+        NFT_LOYALTY_PROGRAM_ID: 'NUMBER',
+        UPDATED_AT: 'TIMESTAMP_NTZ',
+        NFT_USER_ID: 'TEXT',
+        ON_CHAIN_TOKEN_ID: 'NUMBER',
+        CREATED_AT: 'TIMESTAMP_NTZ',
+        EXTERNAL_USER_ID: 'TEXT',
+        _FIVETRAN_DELETED: 'BOOLEAN',
+        _FIVETRAN_SYNCED: 'TIMESTAMP_TZ',
+        DYNAMIC_ATTRIBUTES: 'VARIANT',
+        SIGNUP_SOURCE: 'NUMBER',
+        VERIFIED: 'BOOLEAN',
+        VERIFIED_AT: 'TIMESTAMP_NTZ',
+        EMAIL: 'TEXT',
+        STRIPE_CUSTOMER_ID: 'TEXT',
+        EMAIL_VERIFIED_AT: 'TIMESTAMP_NTZ',
+        DELETED_AT: 'TIMESTAMP_NTZ'
+      }
+    },
+    PROMOTED_REWARDS: {
+      columns: {
+        ID: 'NUMBER',
+        END_DATE: 'TIMESTAMP_NTZ',
+        IMAGE_SMALL_FILE_SIZE: 'NUMBER',
+        IMAGE_HERO_FILE_SIZE: 'NUMBER',
+        LOYALTY_REWARD_ID: 'NUMBER',
+        IMAGE_HERO_UPDATED_AT: 'TIMESTAMP_NTZ',
+        CREATED_AT: 'TIMESTAMP_NTZ',
+        TITLE: 'TEXT',
+        TITLE_SHORT: 'TEXT',
+        DESCRIPTION_MD: 'TEXT',
+        IMAGE_HERO_FILE_NAME: 'TEXT',
+        IMAGE_SMALL_UPDATED_AT: 'TIMESTAMP_NTZ',
+        UPDATED_AT: 'TIMESTAMP_NTZ',
+        IMAGE_SMALL_FILE_NAME: 'TEXT',
+        IMAGE_HERO_CONTENT_TYPE: 'TEXT',
+        START_DATE: 'TIMESTAMP_NTZ',
+        IMAGE_SMALL_CONTENT_TYPE: 'TEXT',
+        _FIVETRAN_DELETED: 'BOOLEAN',
+        _FIVETRAN_SYNCED: 'TIMESTAMP_TZ',
+        DYNAMIC_ATTRIBUTES: 'VARIANT',
+        DELETED_AT: 'TIMESTAMP_NTZ'
+      }
+    },
+    TRANSACTIONS: {
+      columns: {
+        ID: 'TEXT',
+        EXTERNAL_ID: 'TEXT',
+        EXTERNAL_ORDER_ID: 'TEXT',
+        EXTERNAL_LOCATION_ID: 'TEXT',
+        PROVIDER: 'NUMBER',
+        TRANSACTION_TYPE: 'NUMBER',
+        TOTAL_DISCOUNT: 'FLOAT',
+        SOURCE: 'TEXT',
+        VALUE: 'FLOAT',
+        PROGRAM_ID: 'NUMBER',
+        TRANSACTION_TIMESTAMP: 'TIMESTAMP_NTZ',
+        CREATED_AT: 'TIMESTAMP_NTZ',
+        UPDATED_AT: 'TIMESTAMP_NTZ',
+        PROGRAM_MEMBERSHIP_ID: 'TEXT',
+        _FIVETRAN_DELETED: 'BOOLEAN',
+        _FIVETRAN_SYNCED: 'TIMESTAMP_TZ',
+        CLOSED_DATE: 'TIMESTAMP_NTZ',
+        MODIFIED_TIME: 'TIMESTAMP_NTZ',
+        TOTAL_REFUND: 'FLOAT',
+        DETAILED_SOURCE: 'TEXT',
+        LOCATION: 'TEXT',
+        VOIDED: 'BOOLEAN',
+        TOTAL_DEFERRED_SALES: 'FLOAT',
+        PROMISED_DATE: 'TIMESTAMP_NTZ',
+        TOTAL_DEFERRED_ITEMS: 'FLOAT',
+        TOTAL_NON_GRATUITY_SERVICE_CHARGE: 'FLOAT'
+      }
+    },
+    TRANSACTION_IDENTIFIERS: {
+      columns: {
+        ID: 'TEXT',
+        TRANSACTION_ID: 'TEXT',
+        IDENTIFIER_ID: 'TEXT',
+        CREATED_AT: 'TIMESTAMP_NTZ',
+        UPDATED_AT: 'TIMESTAMP_NTZ',
+        _FIVETRAN_DELETED: 'BOOLEAN',
+        _FIVETRAN_SYNCED: 'TIMESTAMP_TZ'
+      }
+    },
+    TRANSACTION_LINE_ITEMS: {
+      columns: {
+        ID: 'TEXT',
+        TRANSACTION_ID: 'TEXT',
+        VALUE: 'FLOAT',
+        QUANTITY: 'NUMBER',
+        EXTERNAL_ID: 'TEXT',
+        EXTERNAL_ITEM_ID: 'TEXT',
+        EXTERNAL_GROUP_ID: 'TEXT',
+        EXTERNAL_MULTI_LOCATION_ITEM_ID: 'TEXT',
+        EXTERNAL_MULTI_LOCATION_GROUP_ID: 'TEXT',
+        CREATED_AT: 'TIMESTAMP_NTZ',
+        UPDATED_AT: 'TIMESTAMP_NTZ',
+        _FIVETRAN_DELETED: 'BOOLEAN',
+        _FIVETRAN_SYNCED: 'TIMESTAMP_TZ',
+        DISPLAY_NAME: 'TEXT',
+        UNIT_PRICE: 'FLOAT',
+        GROUP_DISPLAY_NAME: 'TEXT'
+      }
+    }
+  }
+};
+
+// SQL generation requirements
+const QUERY_REQUIREMENTS = [
+  'Queries will run on Snowflake',
+  'Filter out records with _FIVETRAN_DELETED = true in ALL queries',
+  'Timestamps are stored in UTC; convert them using CONVERT_TIMEZONE(\'UTC\', \'America/Los_Angeles\', transaction_timestamp) when filtering by date',
+  'ALWAYS filter for program_id = 1614 when querying hang_loyalty_public.transactions',
+  'Use clear column aliases for better readability',
+  'Limit result sets to a reasonable number of rows (e.g., LIMIT 1000)',
+  'For time-based queries, ensure proper timestamp conversion and timezone handling',
+  'When calculating aggregates, include appropriate GROUP BY clauses',
+  'For financial calculations, use ROUND() for currency values',
+  'Add appropriate ORDER BY clauses for ranked or sorted data',
+  'Handle NULL values appropriately using COALESCE() or IS NULL/IS NOT NULL conditions',
+  'Output clean, well-formatted SQL with consistent indentation'
+];
+
+// Example queries
+const EXAMPLE_QUERIES = [
+  {
+    question: 'How many transactions did we have in November 2024 at our Nashville Midtown location?',
+    sql: `SELECT COUNT(*) AS transaction_count
+FROM hang_loyalty_public.transactions
+WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transactions.transaction_timestamp) >= '2024-11-01'
+  AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transactions.transaction_timestamp) < '2024-12-01'
+  AND transactions.location = 'Nashville - Midtown'
+  AND transactions.program_id = 1614
+  AND transactions._FIVETRAN_DELETED = false`
+  },
+  {
+    question: 'What was our most popular location last week based on transaction count?',
+    sql: `SELECT location, COUNT(*) AS transaction_count
+FROM hang_loyalty_public.transactions
+WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) >= DATEADD(DAY, -7, CURRENT_DATE)
+  AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) < CURRENT_DATE
+  AND transactions.program_id = 1614
+  AND transactions._FIVETRAN_DELETED = false
+GROUP BY location
+ORDER BY transaction_count DESC
+LIMIT 1`
+  },
+  {
+    question: 'How many orders did we have today?',
+    sql: `SELECT COUNT(DISTINCT id) AS num_orders 
+FROM hang_loyalty_public.transactions 
+WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp)::date = CURRENT_DATE
+  AND program_id = 1614
+  AND _FIVETRAN_DELETED = false`
+  },
+  {
+    question: 'What are some unique item names?',
+    sql: `SELECT DISTINCT name AS item_name
+FROM hang_loyalty_public.menu_items
+WHERE _FIVETRAN_DELETED = false
+ORDER BY item_name
+LIMIT 50`
+  },
+  {
+    question: 'What\'s our total revenue by location?',
+    sql: `SELECT location, SUM(amount) AS total_revenue
+FROM hang_loyalty_public.transactions
+WHERE program_id = 1614
+  AND _FIVETRAN_DELETED = false
+GROUP BY location
+ORDER BY total_revenue DESC`
+  }
+];
+
+// Additional rules (kept as an array for clarity)
+const ADDITIONAL_RULES = [
+  'When the query needs to filter strings, always use ILIKE %..% unless exact match explicitly requested',
+  'Use \\ as escape character; use \\\\ for literal \\',
+  'Use average functions for averages, excluding nulls; avoid SUM()/COUNT()',
+  'Subqueries without IN must return one row using MIN/MAX/ANY_VALUE',
+  'SAMPLE(10) means 10%; use ROWS for specific row counts',
+  'For simple arrays after flattening, use value directly',
+  'Flatten JSON arrays with CROSS JOIN LATERAL FLATTEN; use <alias>.value',
+  'Extract JSON object values with c[\'key1\'] or c:key2',
+  'Avoid JSON functions unless requested',
+  'Check ARRAY/VARIANT for strings with LATERAL FLATTEN and ILIKE',
+  'Use MEDIAN(col) for medians',
+  'Never use subqueries in SELECT clause',
+  'For "last <unit>", use DATE_TRUNC(\'<unit>\', CURRENT_DATE - INTERVAL \'1 <unit>\')',
+  'Interpret seasonal terms relative to current date',
+  'Use TRANSACTION_TIMESTAMP for transaction timing',
+  'Use meaningful aliases',
+  'Sum transaction_line_item.value for line item sales',
+  '"Program" means program_id',
+  'First purchase uses earliest TRANSACTION_TIMESTAMP',
+  'Always filter date ranges by year and month',
+  'Use transactions.detailed_source for "channel" or "source"',
+  'Convert UTC to PST with CONVERT_TIMEZONE',
+  'For ROI: link redemptions to transactions via program_membership_id within 1-minute window',
+  'Exclude customer IDs: \'1661bbcf-d1ee-495e-a915-d78a0ae6cae2\', \'d33d8333-90bb-4bb2-949d-585e20a168c2\'',
+  'Aggregate for trends; detail for specific transactions',
+  'Group MoM figures by month and year',
+  'Repeat customer = 2+ distinct transactions',
+  'AOV = AVG(value - total_deferred_items)',
+  'Map "in-store" to transactions.detailed_source',
+  'DATE_TRUNC returns full timestamps; handle appropriately',
+  'Label duration outputs with units',
+  'Join customer_transactions for customer-level data',
+  'UPDATED_AT is redeem time',
+  'Use 30-day window for frequency',
+  '"Return rate" is 7-day following return rate',
+  'Return rate = (Returning customers) / (Total initial customers)',
+  'Use display_name for item reports',
+  'Retention: 30-day (1–30), 60-day (31–60), 90-day (61–90)',
+  'Use DATE_TRUNC for time-based aggregates',
+  'First purchase date for customer acquisition',
+  'Total sales = SUM(value - total_deferred_items)',
+  'Visits/month buckets: <1, 1-5, >5',
+  'Order modifiers in TOAST_RESTAURANT_ORDERS.transaction_payload'
+];
+
+// Construct system prompt
+const getSystemPrompt = () => `
+You are a SQL query generator for a business database. Generate a SQL query for the user's question.
+
+DATABASE DETAILS:
+${JSON.stringify(DATABASE_SCHEMA, null, 2)}
+
+IMPORTANT QUERY REQUIREMENTS:
+${QUERY_REQUIREMENTS.join('\n')}
+
+EXAMPLE QUERIES:
+${EXAMPLE_QUERIES.map((ex, i) => `${i + 1}. ${ex.question}\n\`\`\`sql\n${ex.sql}\n\`\`\``).join('\n\n')}
+
+ADDITIONAL CONTEXT AND IMPORTANT RULES:
+${ADDITIONAL_RULES.map((rule, i) => `${i + 1}. ${rule}`).join('\n')}
+`;
+
 /**
  * Generates a SQL query from a natural language question using AI
  */
@@ -113,92 +393,11 @@ async function generateSqlQuery(question: string): Promise<string> {
       apiKey: process.env.OPENAI_API_KEY,
     });
     
-    // System prompt that guides SQL generation with extensive context and examples
-    const systemPrompt = `
-You are a SQL query generator for a business database. Generate a SQL query for the user's question.
-
-DATABASE DETAILS:
-You have access to a database with these tables:
-- hang_loyalty_public.transactions (columns: id, location, amount, transaction_timestamp, transaction_type, program_id, user_id, detailed_source, value, total_deferred_items, etc)
-- hang_loyalty_public.users (columns: id, email, name, etc)
-- hang_loyalty_public.earning_redemptions (columns: id, transaction_id, etc)
-- hang_loyalty_public.transaction_line_items (columns: transaction_id, quantity, item_name, etc)
-- hang_loyalty_public.menu_items (columns: id, name, price, category, description, etc)
-
-IMPORTANT QUERY REQUIREMENTS:
-1. Queries will run on Snowflake
-2. Filter out records with _FIVETRAN_DELETED = true in ALL queries
-3. Timestamps are stored in UTC; convert them using CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) when filtering by date
-4. ALWAYS filter for program_id = 1614 when querying hang_loyalty_public.transactions
-5. Use clear column aliases for better readability
-6. Limit result sets to a reasonable number of rows (e.g., LIMIT 1000)
-7. For time-based queries, ensure proper timestamp conversion and timezone handling
-8. When calculating aggregates, include appropriate GROUP BY clauses
-9. For financial calculations, use ROUND() for currency values
-10. Add appropriate ORDER BY clauses for ranked or sorted data
-11. Handle NULL values appropriately using COALESCE() or IS NULL/IS NOT NULL conditions
-12. Output clean, well-formatted SQL with consistent indentation
-
-EXAMPLE QUERIES:
-
-1. How many transactions did we have in November 2024 at our Nashville Midtown location?
-\`\`\`sql
-SELECT COUNT(*) AS transaction_count
-FROM hang_loyalty_public.transactions
-WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transactions.transaction_timestamp) >= '2024-11-01'
-  AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transactions.transaction_timestamp) < '2024-12-01'
-  AND transactions.location = 'Nashville - Midtown'
-  AND transactions.program_id = 1614
-  AND transactions._FIVETRAN_DELETED = false
-\`\`\`
-
-2. What was our most popular location last week based on transaction count?
-\`\`\`sql
-SELECT location, COUNT(*) AS transaction_count
-FROM hang_loyalty_public.transactions
-WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) >= DATEADD(DAY, -7, CURRENT_DATE)
-  AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) < CURRENT_DATE
-  AND transactions.program_id = 1614
-  AND transactions._FIVETRAN_DELETED = false
-GROUP BY location
-ORDER BY transaction_count DESC
-LIMIT 1
-\`\`\`
-
-3. How many orders did we have today?
-\`\`\`sql
-SELECT COUNT(DISTINCT id) AS num_orders 
-FROM hang_loyalty_public.transactions 
-WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp)::date = CURRENT_DATE
-  AND program_id = 1614
-  AND _FIVETRAN_DELETED = false
-\`\`\`
-
-4. What are some unique item names?
-\`\`\`sql
-SELECT DISTINCT name AS item_name
-FROM hang_loyalty_public.menu_items
-WHERE _FIVETRAN_DELETED = false
-ORDER BY item_name
-LIMIT 50
-\`\`\`
-
-5. What's our total revenue by location?
-\`\`\`sql
-SELECT location, SUM(amount) AS total_revenue
-FROM hang_loyalty_public.transactions
-WHERE program_id = 1614
-  AND _FIVETRAN_DELETED = false
-GROUP BY location
-ORDER BY total_revenue DESC
-\`\`\`
-`;
-
     // Use OpenAI API directly
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: getSystemPrompt() },
         { role: 'user', content: question }
       ],
       temperature: 0.1, // Low temperature for more deterministic responses
