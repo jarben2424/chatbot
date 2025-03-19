@@ -87,7 +87,7 @@ export const buildReportTool = tool({
   parameters: z.object({
     topic: z.string().describe('The main topic of the report'),
     title: z.string().describe('The title for the report document'),
-    includeVisualizations: z.boolean().default(true).describe('Whether to include relevant visualizations in the report')
+    includeVisualizations: z.boolean().default(false).describe('Whether to include relevant visualizations in the report')
   }),
   execute: async ({ topic, title, includeVisualizations }) => {
     // This is a dummy implementation that will be replaced in the route handler
@@ -97,7 +97,7 @@ export const buildReportTool = tool({
 
 // The main function to be exported for use in the chat API route
 export async function buildReport(
-  { topic, title, includeVisualizations = true }: {
+  { topic, title, includeVisualizations = false }: {
     topic: string;
     title: string;
     includeVisualizations?: boolean;
@@ -122,12 +122,173 @@ export async function buildReport(
     await saveDocument({
       id: documentId,
       title,
-      content: `# ${title}\n\nGenerating report...`,
+      content: `# ${title}`,
       kind: 'text',
       userId: session.user.id,
     });
     
     // Send initial signal that document is created
+    dataStream.writeData({
+      type: 'artifact',
+      content: {
+        documentId,
+        title,
+        kind: 'text',
+        isVisible: false, // Start as hidden until we have content
+        status: 'idle',
+        autoFocus: false,
+        shouldOpen: false
+      }
+    });
+    
+    // First send the progress status - this appears right away
+    dataStream.writeData({
+      type: 'tool-status',
+      content: {
+        toolCallId,
+        status: 'running',
+        message: `Analyzing chat context, data, and charts...`
+      }
+    });
+    
+    // Extract context from recent messages
+    const chatContext = await extractChatContext(chatId);
+    
+    // Update status to show progress
+    dataStream.writeData({
+      type: 'tool-status',
+      content: {
+        toolCallId,
+        status: 'running',
+        message: `Organizing report structure and generating content...`
+      }
+    });
+    
+    // Find relevant visualizations (only if includeVisualizations is true)
+    let relevantVisualizations: any[] = [];
+    // Disable visualizations by default to avoid errors
+    if (includeVisualizations) {
+      try {
+        relevantVisualizations = await findRelevantVisualizations(topic);
+        console.log(`Found ${relevantVisualizations.length} relevant visualizations for topic: ${topic}`);
+      } catch (vizError) {
+        console.error('Error finding visualizations, proceeding without them:', vizError);
+        relevantVisualizations = [];
+      }
+    }
+    
+    // Prepare visualization references (empty by default)
+    const visualizationReferences: any[] = [];
+    
+    // Only process visualizations if explicilty enabled and there are valid ones found
+    if (includeVisualizations && relevantVisualizations.length > 0) {
+      for (const viz of relevantVisualizations) {
+        try {
+          const content = typeof viz.content === 'string' ? JSON.parse(viz.content || '{}') : (viz.content || {});
+          visualizationReferences.push({
+            id: viz.id,
+            title: viz.title || 'Visualization',
+            description: content.description || '',
+            type: content.visualization || 'bar',
+            data: content.data || []
+          });
+        } catch (parseError) {
+          console.error('Error parsing visualization content, skipping:', parseError);
+          // Skip this visualization
+        }
+      }
+    }
+    
+    // Create a professional report template with proper sections
+    // Don't include visualization section by default
+    const reportTemplate = `
+# ${title}
+
+## Executive Summary
+[Brief 2-3 sentence overview of key findings]
+
+## Key Points
+- [First important point]
+- [Second important point]
+- [Third important point]
+
+## Analysis
+[Main analysis of the topic - keep this concise]
+
+## Recommendations
+[Actionable recommendations based on the analysis]
+
+## Conclusion
+[Brief conclusion summarizing next steps]
+${visualizationReferences.length > 0 && includeVisualizations ? `
+
+## Data Visualization
+${visualizationReferences.map(viz => `
+### ${viz.title}
+${viz.description}
+[Analysis of what this visualization shows]
+`).join('\n')}
+` : ''}
+`;
+    
+    // Create a prompt for the AI to generate the report content
+    const reportPrompt = `
+You are creating a concise business report about "${topic}" that needs to be formatted to display well in a preview card.
+
+Use the following conversation context to inform your report:
+${chatContext}
+
+Your report should follow this exact structure, replacing the placeholder text with actual content while keeping all headers.
+IMPORTANT: Only use a SINGLE small paragraph per section (max 2-3 sentences):
+
+# ${title}
+
+## Executive Summary
+[Brief 1-2 sentence overview]
+
+## Key Points
+- [First point - keep to one line]
+- [Second point - keep to one line]
+- [Third point - keep to one line]
+
+## Analysis
+[Main analysis in 2-3 sentences max]
+
+## Recommendations
+[Recommendations in 2-3 sentences max]
+
+## Conclusion
+[Brief 1-2 sentence conclusion]
+
+CRITICAL GUIDELINES:
+- Keep ALL content extremely concise and compact
+- The Executive Summary should be 1-2 sentences maximum
+- Each bullet point should be one line only 
+- Each section should be 2-3 sentences maximum
+- Use shorter words where possible
+- Minimize vertical space/line breaks between sections
+- Put the most important information at the very top.
+`;
+
+    // Generate the report content
+    let reportContent = '';
+    const { fullStream } = streamText({
+      model: myProvider.languageModel('gpt-4'),
+      system: 'You are an expert business report writer who creates concise, professional reports with clear structure and valuable insights. Your reports are well-formatted with proper markdown, have excellent visual hierarchy, and present information in a way that executives can quickly understand and act upon.',
+      experimental_transform: smoothStream({ chunking: 'line' }),
+      prompt: reportPrompt,
+    });
+    
+    // Now that we're about to stream text, update document visibility
+    await saveDocument({
+      id: documentId,
+      title,
+      content: `# ${title}\n\n## Executive Summary\n_Preparing report..._\n\n## Key Points\n_Loading..._\n\n## Analysis\n_Loading..._`,
+      kind: 'text',
+      userId: session.user.id,
+    });
+
+    // Make the document visible now that we're actually generating content
     dataStream.writeData({
       type: 'artifact',
       content: {
@@ -141,111 +302,6 @@ export async function buildReport(
       }
     });
     
-    // Extract context from recent messages
-    const chatContext = await extractChatContext(chatId);
-    
-    // Find relevant visualizations
-    let relevantVisualizations: any[] = [];
-    if (includeVisualizations) {
-      relevantVisualizations = await findRelevantVisualizations(topic);
-      console.log(`Found ${relevantVisualizations.length} relevant visualizations for topic: ${topic}`);
-    }
-    
-    // Prepare visualization references to include in the markdown
-    const visualizationReferences = relevantVisualizations.map(viz => {
-      try {
-        const content = JSON.parse(viz.content || '{}');
-        return {
-          id: viz.id,
-          title: viz.title,
-          description: content.description || '',
-          type: content.visualization || 'bar',
-          data: content.data || []
-        };
-      } catch (error) {
-        return { id: viz.id, title: viz.title, description: '', type: 'bar', data: [] };
-      }
-    });
-    
-    // Create a professional report template with proper sections
-    const reportTemplate = `
-# ${title}
-
-## Executive Summary
-
-[One or two paragraphs summarizing the report's key findings and recommendations]
-
-## Introduction
-
-[Brief introduction to the topic and the purpose of this report]
-
-## Analysis
-
-[Main analysis section with findings and insights]
-
-## Recommendations
-
-[Actionable recommendations based on the analysis]
-
-## Conclusion
-
-[Brief conclusion summarizing the main points and next steps]
-
-${visualizationReferences.length > 0 ? `
-## Data Visualization
-
-${visualizationReferences.map(viz => `
-### ${viz.title}
-
-${viz.description}
-
-<div class="report-visualization">
-  <div class="visualization-container">
-    <img src="/api/visualization-image?id=${viz.id}" alt="${viz.title}" title="${viz.title}" class="viz-image" />
-  </div>
-  <div class="viz-caption">${viz.title}</div>
-</div>
-
-[Analysis of what this visualization shows and its relevance to the topic]
-`).join('\n')}
-` : ''}
-`;
-    
-    // Create a prompt for the AI to generate the report content
-    const reportPrompt = `
-You are creating a professional business report about "${topic}" that needs to be well-formatted, comprehensive, and visually appealing.
-
-Use the following conversation context to inform your report:
-${chatContext}
-
-Your report should follow this exact structure, replacing the placeholder text with actual content while keeping all headers:
-${reportTemplate}
-
-${includeVisualizations && visualizationReferences.length > 0 ? `
-IMPORTANT: For each visualization in the "Data Visualization" section:
-1. Keep the heading with the visualization's title
-2. Keep the visualization HTML exactly as is, including all <div> and <img> tags
-3. Write a thoughtful analysis of what the visualization shows and its relevance to the overall topic
-` : ''}
-
-FORMATTING GUIDELINES:
-- Use proper markdown heading levels (# for main title, ## for sections, ### for subsections)
-- Use **bold** and *italic* text for emphasis on important points
-- Use bullet points and numbered lists where appropriate
-- Include proper spacing between sections for readability
-- Keep paragraphs concise (3-5 sentences maximum)
-- Use professional business language throughout
-`;
-
-    // Generate the report content
-    let reportContent = '';
-    const { fullStream } = streamText({
-      model: myProvider.languageModel('gpt-4'),
-      system: 'You are an expert business report writer who creates concise, professional reports with clear structure and valuable insights. Your reports are well-formatted with proper markdown, have excellent visual hierarchy, and present information in a way that executives can quickly understand and act upon.',
-      experimental_transform: smoothStream({ chunking: 'line' }),
-      prompt: reportPrompt,
-    });
-    
     // Process content as it streams in
     for await (const delta of fullStream) {
       if (delta.type === 'text-delta') {
@@ -254,21 +310,42 @@ FORMATTING GUIDELINES:
         // Every ~500 characters, update the saved document to show progress
         if (reportContent.length % 500 < 20) {
           try {
+            // Make sure content includes the title
+            const contentWithTitle = reportContent.startsWith('# ') ? 
+              reportContent : 
+              `# ${title}\n\n${reportContent}`;
+            
             await saveDocument({
               id: documentId,
               title,
-              content: reportContent,
+              content: contentWithTitle,
               kind: 'text',
               userId: session.user.id,
             });
             
-            // Send progress update
+            // Send progress update with more descriptive message based on size
+            const progress = Math.round(reportContent.length / 1000);
+            let progressMessage = `Generating report... (${progress}KB)`;
+            
+            // Add more descriptive messages based on progress
+            if (progress < 2) {
+              progressMessage = 'Writing executive summary...';
+            } else if (progress < 4) {
+              progressMessage = 'Developing analysis section...';
+            } else if (progress < 6) {
+              progressMessage = 'Formulating recommendations...';
+            } else if (progress < 8) {
+              progressMessage = 'Finalizing report content...';
+            } else {
+              progressMessage = 'Polishing final report details...';
+            }
+            
             dataStream.writeData({
               type: 'tool-status',
               content: {
                 toolCallId,
                 status: 'running',
-                message: `Generating report... (${Math.round(reportContent.length / 1000)}KB)`
+                message: progressMessage
               }
             });
           } catch (updateError) {
@@ -283,25 +360,15 @@ FORMATTING GUIDELINES:
       // Clean up the markdown content
       const enhancedContent = reportContent
         .trim()
-        .replace(/\n{3,}/g, '\n\n'); // Remove excessive line breaks
+        .replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
+        .replace(/^# (.*?)$/m, '# $1\n'); // Ensure there's a line break after the title
       
-      // For markdown content that doesn't already have HTML visualization divs,
-      // convert any viz: format markdown images to proper HTML
-      const processedContent = enhancedContent.replace(
-        /!\[(.*?)\]\(viz:(.*?)\)/g, 
-        (match, title, vizId) => `
-          <div class="report-visualization">
-            <div class="visualization-container">
-              <img src="/api/visualization-image?id=${vizId}" alt="${title}" title="${title}" class="viz-image" />
-            </div>
-            <div class="viz-caption">${title}</div>
-          </div>
-        `
-      );
+      // Skip visualization processing to avoid errors
+      const finalContent = enhancedContent;
       
-      // Don't wrap the content in a div with report-content class, as our document-preview component
-      // now handles the rendering directly via the Markdown component
-      const finalContent = processedContent;
+      // Log the content for debugging
+      console.log('Final content length:', finalContent.length);
+      console.log('Content starts with:', finalContent.substring(0, 100));
       
       // Save the final document
       await saveDocument({
@@ -320,18 +387,27 @@ FORMATTING GUIDELINES:
           title,
           kind: 'text',
           isVisible: true,
-          status: 'idle', 
+          status: 'completed', 
           autoFocus: true,
           shouldOpen: true
         }
       });
       
-      // Return the result for the tool
+      // Send final status for tool completion
+      dataStream.writeData({
+        type: 'tool-status',
+        content: {
+          toolCallId,
+          status: 'success',
+          message: `Report successfully generated`
+        }
+      });
+      
+      // Return the result for the tool, without visualization data
       return {
         documentId,
         title,
-        content: finalContent,
-        visualizations: visualizationReferences.map(viz => viz.id)
+        content: finalContent
       };
     } catch (saveError) {
       console.error('Error saving report document:', saveError);

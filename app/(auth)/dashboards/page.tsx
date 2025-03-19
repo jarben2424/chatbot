@@ -8,7 +8,6 @@ import {
 } from '@/components/ui/sidebar';
 import { DashboardGrid } from '@/components/dashboard/dashboard-grid';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
-import { SeamlessPageTransition } from '@/components/transitions/seamless-page-transition';
 
 export default async function DashboardsPage() {
   const session = await auth();
@@ -21,19 +20,13 @@ export default async function DashboardsPage() {
       <SidebarProvider>
         <div className="flex w-full">
           <AppSidebar user={session.user} />
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1">
             <DashboardHeader />
-            <SeamlessPageTransition 
-              variant="slide-right" 
-              loadingType="dashboard"
-              initialPath="/dashboards"
-            >
-              <div className="overflow-auto h-full w-full">
-                <div className="h-full px-4 py-6">
-                  <DashboardGrid />
-                </div>
+            <div className="flex-1 overflow-auto">
+              <div className="h-full px-4 py-6">
+                <DashboardGrid />
               </div>
-            </SeamlessPageTransition>
+            </div>
           </div>
         </div>
       </SidebarProvider>

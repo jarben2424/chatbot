@@ -136,12 +136,26 @@ export function DocumentPreview({
     }
   }, [artifact.documentId, setArtifact]);
 
+  useEffect(() => {
+    // For debugging document content
+    if (previewDocument && (previewDocument.content === null || previewDocument.content === '')) {
+      console.error('Document has no content:', previewDocument);
+    } else if (previewDocument && previewDocument.content) {
+      console.log('Document content length:', previewDocument.content.length);
+      console.log('Document content preview:', previewDocument.content.substring(0, 100) + '...');
+    }
+  }, [previewDocument]);
+
   if (artifact.isVisible) {
     if (result) {
       return (
         <DocumentToolResult
           type="create"
-          result={{ id: result.id, title: result.title, kind: result.kind }}
+          result={{ 
+            id: result.id, 
+            title: result.title || 'Document', 
+            kind: result.kind || 'text' 
+          }}
           isReadonly={isReadonly}
         />
       );
@@ -159,7 +173,7 @@ export function DocumentPreview({
   }
 
   if (isDocumentsFetching) {
-    return <LoadingSkeleton artifactKind={result.kind ?? args.kind} />;
+    return <LoadingSkeleton artifactKind={(result?.kind ?? args?.kind) || 'text'} />;
   }
 
   const document: Document | null = previewDocument
@@ -196,7 +210,7 @@ export function DocumentPreview({
   );
 }
 
-const LoadingSkeleton = ({ artifactKind }: { artifactKind: ArtifactKind }) => (
+const LoadingSkeleton = ({ artifactKind = 'text' }: { artifactKind?: ArtifactKind }) => (
   <div className="w-full">
     <div className="p-4 border rounded-t-2xl flex flex-row gap-2 items-center justify-between dark:bg-muted h-[57px] dark:border-zinc-700 border-b-0">
       <div className="flex flex-row items-center gap-3">
@@ -210,11 +224,11 @@ const LoadingSkeleton = ({ artifactKind }: { artifactKind: ArtifactKind }) => (
       </div>
     </div>
     {artifactKind === 'image' ? (
-      <div className="overflow-y-scroll border rounded-b-2xl bg-muted border-t-0 dark:border-zinc-700">
-        <div className="animate-pulse h-[257px] bg-muted-foreground/20 w-full" />
+      <div className="overflow-y-auto border rounded-b-2xl bg-muted border-t-0 dark:border-zinc-700">
+        <div className="animate-pulse h-[640px] bg-muted-foreground/20 w-full" />
       </div>
     ) : (
-      <div className="overflow-y-scroll border rounded-b-2xl p-8 pt-4 bg-muted border-t-0 dark:border-zinc-700">
+      <div className="overflow-y-auto border rounded-b-2xl p-8 pt-4 max-h-[800px] bg-muted border-t-0 dark:border-zinc-700">
         <InlineDocumentSkeleton />
       </div>
     )}
@@ -372,7 +386,7 @@ const DocumentContent = ({ document }: { document: Document }) => {
     }
     
     return (
-      <div className="report-container h-[257px] overflow-y-auto border rounded-b-2xl border-t-0 p-6 dark:border-zinc-700">
+      <div className="report-container max-h-[800px] h-auto overflow-y-auto border rounded-b-2xl border-t-0 p-4 dark:border-zinc-700">
         <style jsx global>{`
           .report-container {
             background-color: white;
@@ -380,52 +394,54 @@ const DocumentContent = ({ document }: { document: Document }) => {
           }
           
           .document-preview {
-            padding: 1.5rem 2rem;
+            padding: 0.75rem 1rem;
             max-width: 100%;
             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
           }
           
           .document-preview h1 {
-            font-size: 1.8rem;
+            font-size: 1.3rem;
             font-weight: 700;
-            margin-bottom: 1.5rem;
+            margin-bottom: 0.5rem;
             color: #1e293b;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 0.25rem;
           }
           
           .document-preview h2 {
-            font-size: 1.4rem;
+            font-size: 1.1rem;
             font-weight: 600;
-            margin-top: 2rem;
-            margin-bottom: 1rem;
+            margin-top: 0.75rem;
+            margin-bottom: 0.25rem;
             color: #334155;
           }
           
           .document-preview h3 {
-            font-size: 1.2rem;
+            font-size: 1rem;
             font-weight: 600;
-            margin-top: 1.5rem;
-            margin-bottom: 0.75rem;
+            margin-top: 0.75rem;
+            margin-bottom: 0.5rem;
             color: #475569;
           }
           
           .document-preview p {
-            margin-bottom: 1rem;
-            line-height: 1.6;
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
             color: #334155;
-            font-size: 1rem;
+            font-size: 0.9rem;
           }
           
           .document-preview ul, .document-preview ol {
-            margin-left: 1.75rem;
-            margin-bottom: 1rem;
+            margin-left: 1.25rem;
+            margin-bottom: 0.25rem;
+            margin-top: 0.25rem;
             color: #334155;
           }
           
           .document-preview li {
-            margin-bottom: 0.5rem;
-            line-height: 1.5;
+            margin-bottom: 0.15rem;
+            line-height: 1.4;
+            font-size: 0.9rem;
           }
           
           .document-preview blockquote {
@@ -468,18 +484,20 @@ const DocumentContent = ({ document }: { document: Document }) => {
           
           /* Executive summary special styling */
           .document-preview h2:first-of-type {
-            margin-top: 1.5rem;
+            margin-top: 0.25rem;
+            margin-bottom: 0.15rem;
             color: #1e40af;
-            font-size: 1.5rem;
+            font-size: 1.1rem;
             font-weight: 700;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 0.5rem;
+            padding-bottom: 0.15rem;
+            border-bottom: none;
           }
           
           .document-preview h2:first-of-type + p {
-            font-size: 1.1rem;
-            line-height: 1.7;
-            margin-top: 1rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-top: 0.25rem;
+            margin-bottom: 0.25rem;
             color: #1f2937;
           }
           
@@ -613,7 +631,7 @@ const DocumentContent = ({ document }: { document: Document }) => {
 
   // For non-report documents
   const containerClassName = cn(
-    'h-[257px] overflow-y-scroll border rounded-b-2xl dark:bg-muted border-t-0 dark:border-zinc-700',
+    'max-h-[800px] h-auto overflow-y-auto border rounded-b-2xl dark:bg-muted border-t-0 dark:border-zinc-700',
     {
       'p-4 sm:px-14 sm:py-16': document.kind === 'text',
       'p-0': document.kind === 'code',

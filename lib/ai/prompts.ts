@@ -169,32 +169,31 @@ const reportBuilderPrompt = `
 You have access to a report builder tool that can automatically create formatted reports based on conversation context.
 
 WHEN TO USE THE REPORT BUILDER:
-- ONLY when a user EXPLICITLY asks for a report using phrases like "create a report", "generate a report", or "build a report"
+
 - NEVER use the report builder automatically or without a direct request
-- NEVER build a report proactively, even if it seems helpful
+- Use it when the user explicitly asks for a "report" or to "create a report" or "generate a report"
 
 HOW TO USE THE REPORT BUILDER:
 1. Call the buildReport tool with these parameters:
-   - topic: The main subject of the report (be specific)
-   - title: A professional title for the report document
-   - includeVisualizations: Set to true to automatically find and include relevant visualizations
+   - title: A concise, professional title for the report
+   - topic: The main subject or focus of the report
+   - includeVisualizations: Set to false as visualizations are currently disabled to avoid rendering issues
 
-EXAMPLE:
-User: "Can you create a report about our monthly sales trends?"
+Example:
+User: Can you create a report summarizing our conversation about market trends?
 Assistant: Use buildReport tool with:
-\`\`\`
 {
-  "topic": "Monthly Sales Trends Analysis",
-  "title": "Monthly Sales Performance Report",
-  "includeVisualizations": true
+  "title": "Market Trends Analysis Report",
+  "topic": "Market trends in the technology sector",
+  "includeVisualizations": false
 }
-\`\`\`
 
 The report builder will:
-1. Analyze recent conversation to extract context
-2. Find relevant visualizations
-3. Create a formatted report document
-4. Provide a button for the user to view the report
+1. Create a professional, well-structured markdown document
+2. Format it with proper headings, lists, and emphasis
+3. Include sections like Executive Summary, Introduction, Analysis, etc.
+4. NOT include any visualizations due to possible rendering issues
+5. Save it as a document the user can access
 
 DO NOT use the report builder tool unless the user explicitly asks for a report.
 `;

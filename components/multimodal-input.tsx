@@ -34,6 +34,7 @@ import { SuggestedActions } from './suggested-actions';
 import equal from 'fast-deep-equal';
 import { CommandPalette } from './command-palette';
 import { CommandKHint } from './command-k-hint';
+import { commands } from './command-palette'; // Import the commands array
 
 function PureMultimodalInput({
   chatId,
@@ -138,6 +139,9 @@ function PureMultimodalInput({
     };
   }, [showCommandPalette]);
 
+  // Track the currently selected command index for keyboard navigation
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+
   const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = event.target.value;
     setInput(value);
@@ -145,6 +149,8 @@ function PureMultimodalInput({
     // Show command palette when "/" is typed at the start of the input
     if (value === '/') {
       setShowCommandPalette(true);
+      // Reset selection index when command palette is opened
+      setSelectedCommandIndex(0);
     } else {
       setShowCommandPalette(false);
     }
@@ -156,9 +162,62 @@ function PureMultimodalInput({
     setInput(command.action);
     setShowCommandPalette(false);
     
-    // Focus the textarea after selecting a command
-    if (textareaRef.current) {
-      textareaRef.current.focus();
+    // Immediately action the command based on its ID
+    const commandActions: Record<string, () => void> = {
+      'dashboard': () => router.push('/dashboards'),
+      'campaigns': () => router.push('/campaigns'),
+      'segments': () => router.push('/segments'),
+      // Add other direct actions here as needed
+    };
+    
+    // If we have a direct action for this command, execute it immediately
+    if (command.id in commandActions) {
+      commandActions[command.id]();
+      return;
+    }
+    
+    // Otherwise, auto-submit the command to be processed
+    setTimeout(() => {
+      submitForm();
+    }, 50);
+  };
+
+  // Handle keyboard navigation for command palette
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showCommandPalette) {
+      switch (event.key) {
+        case 'ArrowUp':
+          event.preventDefault(); // Prevent cursor from moving in textarea
+          setSelectedCommandIndex(prev => 
+            prev <= 0 ? commands.length - 1 : prev - 1 // Wrap around to the last command
+          );
+          break;
+        case 'ArrowDown':
+          event.preventDefault(); // Prevent cursor from moving in textarea
+          setSelectedCommandIndex(prev => 
+            prev >= commands.length - 1 ? 0 : prev + 1 // Wrap around to the first command
+          );
+          break;
+        case 'Enter':
+          event.preventDefault(); // Prevent form submission
+          // Select the command at the current index
+          if (selectedCommandIndex >= 0 && selectedCommandIndex < commands.length) {
+            handleCommandSelect(commands[selectedCommandIndex]);
+          }
+          break;
+        case 'Escape':
+          event.preventDefault();
+          setShowCommandPalette(false);
+          break;
+      }
+    } else if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      
+      if (isLoading) {
+        toast.error('Please wait for the model to finish its response!');
+      } else {
+        submitForm();
+      }
     }
   };
 
@@ -327,13 +386,12 @@ function PureMultimodalInput({
 
       <div className="relative">
         {showCommandPalette && (
-          <CommandPalette 
-            isVisible={showCommandPalette} 
+          <CommandPalette
+            isVisible={showCommandPalette}
             onSelectCommand={(command) => {
               handleCommandSelect(command);
-              // Auto-submit the command immediately
-              submitForm();
             }}
+            selectedIndex={selectedCommandIndex}
           />
         )}
         <Textarea
@@ -349,39 +407,7 @@ function PureMultimodalInput({
           )}
           rows={messages.length === 0 ? 3 : 2}
           autoFocus
-          onKeyDown={(event) => {
-            // When command palette is open, handle navigation and selection
-            if (showCommandPalette) {
-              if (event.key === 'Escape') {
-                setShowCommandPalette(false);
-                event.preventDefault();
-                return;
-              }
-              
-              // Handle arrow navigation and Enter selection
-              if (['ArrowUp', 'ArrowDown', 'Enter'].includes(event.key)) {
-                event.preventDefault();
-                return;
-              }
-              
-              // Let normal typing continue for any other key
-              return;
-            }
-            
-            if (
-              event.key === "Enter" &&
-              !event.shiftKey &&
-              !event.nativeEvent.isComposing
-            ) {
-              event.preventDefault();
-
-              if (isLoading) {
-                toast.error('Please wait for the model to finish its response!');
-              } else {
-                submitForm();
-              }
-            }
-          }}
+          onKeyDown={handleKeyDown}
         />
 
         <div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start">

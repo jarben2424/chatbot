@@ -237,8 +237,13 @@ const salesDiscountsData = [
 export default function SalesOverviewPage() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [dashboardReady, setDashboardReady] = useState(false);
 
   useEffect(() => {
+    // Keep track of whether the component is mounted
+    let isMounted = true;
+
     async function getSession() {
       try {
         const res = await fetch('/api/auth/session');
@@ -247,19 +252,58 @@ export default function SalesOverviewPage() {
           window.location.href = '/sign-in';
           return;
         }
-        setSession(sessionData);
+        
+        if (isMounted) {
+          setSession(sessionData);
+          
+          // Begin loading dashboard data in the background
+          loadDashboardData();
+        }
       } catch (error) {
         console.error('Error fetching session:', error);
-      } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    async function loadDashboardData() {
+      try {
+        // Simulate data loading with a delay to ensure we have time to 
+        // fetch and prepare all dashboard data (would be real API calls in production)
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        if (isMounted) {
+          // At this point, we have all the data ready to render the dashboard
+          setLoading(false);
+          
+          // Small delay before showing to ensure smooth transition
+          setTimeout(() => {
+            if (isMounted) {
+              setDashboardReady(true);
+            }
+          }, 100);
+        }
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
     getSession();
+    
+    // Cleanup function to prevent state updates if component unmounts
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  if (loading) {
-    return <div>Loading...</div>;
+  // If we're still loading and not ready to display the dashboard, 
+  // return null so nothing renders - this keeps the user on current page
+  if (loading || !dashboardReady) {
+    return null;
   }
 
   if (!session?.user) {
@@ -267,8 +311,8 @@ export default function SalesOverviewPage() {
   }
 
   return (
-    <div className="relative flex h-[100dvh]">
-      <SidebarProvider>
+    <SidebarProvider>
+      <div className="relative flex h-[100dvh]">
         <div className="flex w-full">
           <AppSidebar user={session.user} />
           <div className="flex-1">
@@ -704,7 +748,7 @@ export default function SalesOverviewPage() {
             </div>
           </div>
         </div>
-      </SidebarProvider>
-    </div>
+      </div>
+    </SidebarProvider>
   );
 } 

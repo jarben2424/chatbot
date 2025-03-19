@@ -18,7 +18,7 @@ interface Command {
   action: string;
 }
 
-const commands: Command[] = [
+export const commands: Command[] = [
   {
     id: 'dashboard',
     icon: <LayoutDashboardIcon className="h-4 w-4" />,
@@ -67,38 +67,19 @@ interface CommandPaletteProps {
   isVisible: boolean;
   onSelectCommand: (command: Command) => void;
   onKeyDown?: (e: KeyboardEvent<HTMLDivElement>) => void;
+  selectedIndex?: number;
 }
 
-export function CommandPalette({ isVisible, onSelectCommand, onKeyDown }: CommandPaletteProps) {
-  const [selectedIndex, setSelectedIndex] = useState(0);
-
-  // Reset selection when palette becomes visible
-  useEffect(() => {
-    if (isVisible) {
-      setSelectedIndex(0);
-    }
-  }, [isVisible]);
-
+export function CommandPalette({ 
+  isVisible, 
+  onSelectCommand, 
+  onKeyDown,
+  selectedIndex = 0
+}: CommandPaletteProps) {
   if (!isVisible) return null;
   
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setSelectedIndex(prev => (prev + 1) % commands.length);
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setSelectedIndex(prev => (prev - 1 + commands.length) % commands.length);
-        break;
-      case 'Enter':
-        e.preventDefault();
-        onSelectCommand(commands[selectedIndex]);
-        break;
-      default:
-        if (onKeyDown) onKeyDown(e);
-        break;
-    }
+    if (onKeyDown) onKeyDown(e);
   };
   
   return (

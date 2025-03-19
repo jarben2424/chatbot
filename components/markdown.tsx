@@ -2,6 +2,7 @@ import Link from 'next/link';
 import React, { memo, useEffect } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { CodeBlock } from './code-block';
 
 const components: Partial<Components> = {
@@ -199,7 +200,7 @@ const components: Partial<Components> = {
   }
 };
 
-const remarkPlugins = [remarkGfm];
+const remarkPlugins = [remarkGfm, remarkBreaks];
 
 const NonMemoizedMarkdown = ({ children }: { children: string }) => {
   // Add debugging to log markdown content
@@ -222,14 +223,45 @@ const NonMemoizedMarkdown = ({ children }: { children: string }) => {
     return null;
   }
 
+  // Preprocess markdown to fix common formatting issues
+  const preprocessedMarkdown = preprocessMarkdown(children);
+
   return (
     <div className="markdown-wrapper">
-      <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
-        {children}
+      <ReactMarkdown 
+        remarkPlugins={remarkPlugins} 
+        components={components}
+      >
+        {preprocessedMarkdown}
       </ReactMarkdown>
     </div>
   );
 };
+
+// Function to preprocess markdown content before rendering
+function preprocessMarkdown(markdown: string): string {
+  let processed = markdown;
+  
+  // Ensure proper line breaks for headings
+  processed = processed.replace(/(^|\n)(#{1,6}[^#\n]+)($|\n)/g, '$1\n$2\n$3');
+  
+  // Ensure list items have proper spacing
+  processed = processed.replace(/(^|\n)([*\-+]|\d+\.) ([^\n]+)($|\n)/g, '$1$2 $3\n$4');
+  
+  // Fix code blocks
+  processed = processed.replace(/```([^`]+)```/g, '\n```$1```\n');
+  
+  // Fix inline code with spaces
+  processed = processed.replace(/`([^`]+)`/g, '` $1 `').replace(/` \s+/g, '` ').replace(/\s+ `/g, ' `');
+  
+  // Ensure proper line breaks for paragraphs
+  processed = processed.replace(/(\w)\n(\w)/g, '$1 $2');
+  
+  // Clean up any extra newlines
+  processed = processed.replace(/\n{3,}/g, '\n\n');
+  
+  return processed.trim();
+}
 
 export const Markdown = memo(
   NonMemoizedMarkdown,

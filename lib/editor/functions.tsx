@@ -18,18 +18,44 @@ export const buildDocumentFromContent = (content: string) => {
   
   const parser = DOMParser.fromSchema(documentSchema);
   
-  // Skip creating a temporary container and add content directly to the parser
-  // This ensures all markdown styles are properly applied
+  // Create a temporary container for rendering
   const tempContainer = document.createElement('div');
   
   if (containsHtml) {
     // For HTML content, just set it directly
     tempContainer.innerHTML = content;
   } else {
-    // For regular markdown, render it through our Markdown component
-    // Render markdown directly in the temporary container
-    const stringFromMarkdown = renderToString(<Markdown>{content}</Markdown>);
-    tempContainer.innerHTML = stringFromMarkdown;
+    try {
+      // For regular markdown, render it through our Markdown component
+      const stringFromMarkdown = renderToString(<Markdown>{content}</Markdown>);
+      tempContainer.innerHTML = stringFromMarkdown;
+      
+      // Apply additional processing for markdown elements that might not be properly parsed
+      enhanceMarkdownElements(tempContainer);
+    } catch (error) {
+      console.error('Error rendering markdown:', error);
+      // Fallback to simpler processing if rendering fails
+      tempContainer.innerHTML = content
+        .split('\n')
+        .map(line => {
+          // Handle headings
+          if (line.startsWith('# ')) return `<h1>${line.substring(2)}</h1>`;
+          if (line.startsWith('## ')) return `<h2>${line.substring(3)}</h2>`;
+          if (line.startsWith('### ')) return `<h3>${line.substring(4)}</h3>`;
+          
+          // Handle bold and italic
+          let processedLine = line;
+          processedLine = processedLine.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+          processedLine = processedLine.replace(/\*(.*?)\*/g, '<em>$1</em>');
+          
+          // Handle links
+          processedLine = processedLine.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>');
+          
+          // Default to paragraph
+          return `<p>${processedLine}</p>`;
+        })
+        .join('');
+    }
   }
   
   // Process and enhance any special content like visualizations
@@ -38,6 +64,88 @@ export const buildDocumentFromContent = (content: string) => {
   // Parse the container to create the document
   return parser.parse(tempContainer);
 };
+
+// Additional function to enhance markdown elements
+function enhanceMarkdownElements(container: HTMLElement) {
+  // Process text nodes directly to ensure Markdown syntax is properly parsed
+  // even if the basic renderer missed some elements
+  
+  // Handle bold/strong
+  ensureStrongElements(container);
+  
+  // Handle italics/emphasis
+  ensureEmphasisElements(container);
+  
+  // Handle headings
+  ensureHeadingElements(container);
+  
+  // Handle code blocks
+  const preBlocks = container.querySelectorAll('pre');
+  preBlocks.forEach(pre => {
+    if (!pre.querySelector('code')) {
+      const code = document.createElement('code');
+      code.innerHTML = pre.innerHTML;
+      pre.innerHTML = '';
+      pre.appendChild(code);
+      pre.className = 'language-text';
+    }
+  });
+  
+  // Handle inline code
+  const textNodes = Array.from(container.querySelectorAll('*'))
+    .filter(el => el.childNodes.length > 0)
+    .flatMap(el => Array.from(el.childNodes))
+    .filter(node => node.nodeType === document.TEXT_NODE);
+    
+  textNodes.forEach(node => {
+    if (node.textContent?.includes('`') && node.parentElement) {
+      const regex = /`([^`]+)`/g;
+      node.parentElement.innerHTML = node.parentElement.innerHTML.replace(
+        regex, 
+        '<code>$1</code>'
+      );
+    }
+  });
+  
+  // Handle lists
+  const paragraphs = container.querySelectorAll('p');
+  let ulElement: HTMLUListElement | null = null;
+  let olElement: HTMLOListElement | null = null;
+  
+  paragraphs.forEach((p, index) => {
+    const text = p.textContent || '';
+    
+    // Unordered list items
+    if (text.match(/^\s*[\-\*]\s/)) {
+      if (!ulElement) {
+        ulElement = document.createElement('ul');
+        p.parentNode?.insertBefore(ulElement, p);
+      }
+      
+      const li = document.createElement('li');
+      li.innerHTML = text.replace(/^\s*[\-\*]\s/, '');
+      ulElement.appendChild(li);
+      p.remove();
+    } 
+    // Ordered list items
+    else if (text.match(/^\s*\d+\.\s/)) {
+      if (!olElement) {
+        olElement = document.createElement('ol');
+        p.parentNode?.insertBefore(olElement, p);
+      }
+      
+      const li = document.createElement('li');
+      li.innerHTML = text.replace(/^\s*\d+\.\s/, '');
+      olElement.appendChild(li);
+      p.remove();
+    }
+    // Reset list elements when we encounter a non-list paragraph
+    else {
+      ulElement = null;
+      olElement = null;
+    }
+  });
+}
 
 // Helper function to process visualization elements
 function processVisualizationElements(container: HTMLElement) {
@@ -145,8 +253,38 @@ function ensureHeadingElements(container: HTMLElement) {
 }
 
 export const buildContentFromDocument = (document: Node) => {
-  return defaultMarkdownSerializer.serialize(document);
+  try {
+    // Use the markdown serializer to convert the document to markdown
+    const markdown = defaultMarkdownSerializer.serialize(document);
+    
+    // Additional processing to ensure proper formatting
+    return enhanceMarkdownOutput(markdown);
+  } catch (error) {
+    console.error('Error converting document to markdown:', error);
+    // Fallback to basic serialization if the default serializer fails
+    return defaultMarkdownSerializer.serialize(document);
+  }
 };
+
+// Function to enhance the markdown output for better formatting
+function enhanceMarkdownOutput(markdown: string): string {
+  // Ensure proper line breaks between elements
+  let enhancedMarkdown = markdown
+    // Ensure headings have proper spacing
+    .replace(/^(#{1,6}.*)/gm, '\n$1\n')
+    // Ensure list items appear on their own lines
+    .replace(/^(\s*[-*+])/gm, '\n$1')
+    .replace(/^(\s*\d+\.)/gm, '\n$1')
+    // Remove extra blank lines that might have been introduced
+    .replace(/\n{3,}/g, '\n\n')
+    // Ensure proper spacing around code blocks
+    .replace(/```(.*?)```/gs, '\n```$1```\n');
+  
+  // Trim any leading/trailing whitespace
+  enhancedMarkdown = enhancedMarkdown.trim();
+  
+  return enhancedMarkdown;
+}
 
 export const createDecorations = (
   suggestions: Array<UISuggestion>,
