@@ -6,11 +6,11 @@ import Link from 'next/link';
 import { useSidebar } from '@/components/ui/sidebar';
 import { SidebarToggle } from '@/components/sidebar-toggle';
 
-interface DashboardHeaderProps {
+interface CampaignsHeaderProps {
   title?: string;
 }
 
-export function DashboardHeader({ title }: DashboardHeaderProps) {
+export function CampaignsHeader({ title }: CampaignsHeaderProps) {
   const { open } = useSidebar();
   
   return (
@@ -18,11 +18,6 @@ export function DashboardHeader({ title }: DashboardHeaderProps) {
       <div className="flex items-center h-[60px] px-4">
         <div className="flex items-center gap-2">
           <SidebarToggle />
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/dashboards">
-              <ChevronLeft className="h-4 w-4" />
-            </Link>
-          </Button>
           {title && <h1 className="text-xl font-semibold ml-2">{title}</h1>}
         </div>
       </div>
