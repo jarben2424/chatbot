@@ -7,6 +7,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { CampaignsHeader } from '@/components/campaigns/campaigns-header';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { ChevronRight, ChevronLeft, Gift } from 'lucide-react';
 
 // Sample offers data
 const offers = [
@@ -80,6 +81,16 @@ export default function SelectOffersPage() {
       }
     });
   };
+  
+  const toggleSelectAll = () => {
+    if (selectedOffers.length === offers.length) {
+      // If all are selected, deselect all
+      setSelectedOffers([]);
+    } else {
+      // Otherwise, select all
+      setSelectedOffers(offers.map(offer => offer.id));
+    }
+  };
 
   const handleNext = () => {
     // In a real application, you would save the selected offers
@@ -93,73 +104,104 @@ export default function SelectOffersPage() {
           <AppSidebar user={session.user} />
           <div className="flex-1">
             <CampaignsHeader title="Create Campaign" />
-            <div className="flex-1 overflow-auto bg-gray-50">
-              <div className="mx-auto max-w-4xl px-4 py-6">
-                <div className="mb-4">
-                  <h1 className="text-xl font-semibold mb-1">Create Campaign</h1>
-                  <p className="text-sm text-muted-foreground">Create and optimize personalized offer campaigns</p>
-                </div>
-                
+            <div className="flex-1 overflow-auto bg-slate-50/30">
+              <div className="mx-auto max-w-4xl px-4 py-8">
                 {/* Progress Steps */}
-                <div className="flex items-center justify-between mb-8 relative">
-                  <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-gray-200 -z-10"></div>
+                <div className="relative mb-10">
+                  {/* Line connecting steps */}
+                  <div className="absolute top-6 left-0 right-0 h-1 bg-gray-200 -z-10"></div>
+                  <div className="absolute top-6 left-0 w-1/4 h-1 bg-indigo-600 -z-10"></div>
                   
-                  {/* Step 1 - Completed */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-2 z-10">
-                      1
+                  <div className="flex justify-between">
+                    {/* Step 1 - Completed */}
+                    <div className="flex flex-col items-center">
+                      <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-3 shadow-md transition-all duration-300">
+                        <span className="text-base font-medium">✓</span>
+                      </div>
+                      <span className="text-sm font-medium text-indigo-600">Campaign Type</span>
                     </div>
-                    <span className="text-sm font-medium text-indigo-600">Campaign Type</span>
-                  </div>
-                  
-                  {/* Step 2 - Current */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-2 z-10">
-                      2
+                    
+                    {/* Step 2 - Current */}
+                    <div className="flex flex-col items-center">
+                      <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-3 shadow-md transition-all duration-300">
+                        <span className="text-base font-medium">2</span>
+                      </div>
+                      <span className="text-sm font-medium text-indigo-600">Select Offers</span>
                     </div>
-                    <span className="text-sm font-medium text-indigo-600">Select Offers</span>
-                  </div>
-                  
-                  {/* Step 3 - Upcoming */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
-                      3
+                    
+                    {/* Step 3 - Upcoming */}
+                    <div className="flex flex-col items-center">
+                      <div className="w-12 h-12 rounded-full bg-white border-2 border-gray-200 text-gray-400 flex items-center justify-center mb-3 transition-all duration-300">
+                        <span className="text-base font-medium">3</span>
+                      </div>
+                      <span className="text-sm text-gray-500">Target Audience</span>
                     </div>
-                    <span className="text-sm text-gray-500">Target Audience</span>
-                  </div>
-                  
-                  {/* Step 4 - Upcoming */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
-                      4
+                    
+                    {/* Step 4 - Upcoming */}
+                    <div className="flex flex-col items-center">
+                      <div className="w-12 h-12 rounded-full bg-white border-2 border-gray-200 text-gray-400 flex items-center justify-center mb-3 transition-all duration-300">
+                        <span className="text-base font-medium">4</span>
+                      </div>
+                      <span className="text-sm text-gray-500">Review & Sync</span>
                     </div>
-                    <span className="text-sm text-gray-500">Review & Sync</span>
                   </div>
                 </div>
                 
                 {/* Offers Selection */}
-                <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-                  {offers.map((offer, index) => (
-                    <div 
-                      key={offer.id}
-                      className={`p-4 flex items-center justify-between ${index !== offers.length - 1 ? 'border-b border-gray-100' : ''}`}
-                    >
-                      <div>
-                        <h3 className="font-medium">{offer.title}</h3>
-                        <p className="text-sm text-gray-500">{offer.description}</p>
-                      </div>
-                      <div 
-                        className={`w-5 h-5 rounded-full border ${selectedOffers.includes(offer.id) ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'} cursor-pointer`}
-                        onClick={() => handleSelectOffer(offer.id)}
-                      />
+                <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <h3 className="text-lg font-medium mb-1">Select Offers</h3>
+                      <p className="text-sm text-gray-500">Choose offers to include in your campaign</p>
                     </div>
-                  ))}
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={toggleSelectAll}
+                      className="border-indigo-200 hover:bg-indigo-50 text-indigo-600"
+                    >
+                      {selectedOffers.length === offers.length ? "Deselect All" : "Select All"}
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-4 mt-6">
+                    {offers.map((offer) => (
+                      <div 
+                        key={offer.id}
+                        className={`p-4 border rounded-lg flex items-center justify-between cursor-pointer transition-all ${selectedOffers.includes(offer.id) ? 'border-indigo-600 bg-indigo-50/50 shadow-sm' : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'}`}
+                        onClick={() => handleSelectOffer(offer.id)}
+                      >
+                        <div className="flex items-start">
+                          <div className="mr-4">
+                            <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                              <Gift className="h-5 w-5 text-indigo-600" />
+                            </div>
+                          </div>
+                          <div>
+                            <h3 className="font-medium">{offer.title}</h3>
+                            <p className="text-sm text-gray-500">{offer.description}</p>
+                          </div>
+                        </div>
+                        
+                        <div 
+                          className={`w-6 h-6 rounded-full flex items-center justify-center ${selectedOffers.includes(offer.id) ? 'bg-indigo-600 text-white' : 'border-2 border-gray-300'}`}
+                        >
+                          {selectedOffers.includes(offer.id) && <span className="text-xs">✓</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="mt-4 py-3 px-4 bg-indigo-50 rounded-lg text-sm text-indigo-800">
+                    <p>Selected {selectedOffers.length} of {offers.length} offers</p>
+                  </div>
                 </div>
                 
                 {/* Action Buttons */}
                 <div className="flex justify-between">
                   <Link href="/campaigns/create">
-                    <Button variant="outline">
+                    <Button variant="outline" className="bg-white hover:bg-slate-50 border-gray-200">
+                      <ChevronLeft className="mr-1 h-4 w-4" />
                       Back
                     </Button>
                   </Link>
@@ -170,6 +212,7 @@ export default function SelectOffersPage() {
                     disabled={selectedOffers.length === 0}
                   >
                     Next
+                    <ChevronRight className="ml-1 h-4 w-4" />
                   </Button>
                 </div>
               </div>

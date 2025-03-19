@@ -43,9 +43,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         {payload.map((entry: any, index: number) => (
           <p key={`item-${index}`} className="flex justify-between">
             <span>
-              {entry.name === 'aov' ? 'AOV' : 
-               entry.name === 'itemsPerOrder' ? 'Items per order' : 
-               entry.name === 'returnRate' ? 'Return Rate' : 
+            {entry.name === 'aov' ? 'AOV' : 
+             entry.name === 'itemsPerOrder' ? 'Items per order' : 
+             entry.name === 'returnRate' ? 'Return Rate' : 
                entry.name === 'frequency' ? 'Frequency' : 
                entry.name === 'totalSales' ? 'Total Sales' :
                entry.name === 'totalDiscounts' ? 'Total Discounts' : 
@@ -306,8 +306,8 @@ export default function SalesOverviewPage() {
                       <div className="flex flex-col space-y-1">
                         <div>
                           <Badge variant="outline" className="text-green-600 bg-green-50 font-medium border-green-200 px-2 py-1">
-                            ↑ 4.23%
-                          </Badge>
+                          ↑ 4.23%
+                        </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">vs. previous quarter: $5.1M</div>
                       </div>
@@ -322,8 +322,8 @@ export default function SalesOverviewPage() {
                       <div className="flex flex-col space-y-1">
                         <div>
                           <Badge variant="outline" className="text-green-600 bg-green-50 font-medium border-green-200 px-2 py-1">
-                            ↑ 0.82%
-                          </Badge>
+                          ↑ 0.82%
+                        </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">vs. previous quarter: $237.9k</div>
                       </div>
@@ -338,8 +338,8 @@ export default function SalesOverviewPage() {
                       <div className="flex flex-col space-y-1">
                         <div>
                           <Badge variant="outline" className="text-green-600 bg-green-50 font-medium border-green-200 px-2 py-1">
-                            ↑ 3.39%
-                          </Badge>
+                          ↑ 3.39%
+                        </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">vs. previous quarter: $21.24</div>
                       </div>
@@ -354,8 +354,8 @@ export default function SalesOverviewPage() {
                       <div className="flex flex-col space-y-1">
                         <div>
                           <Badge variant="outline" className="text-red-600 bg-red-50 font-medium border-red-200 px-2 py-1">
-                            ↓ 4.39%
-                          </Badge>
+                          ↓ 4.39%
+                        </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">vs. previous quarter: 1.74</div>
                       </div>
@@ -632,19 +632,19 @@ export default function SalesOverviewPage() {
                   </div>
                   <div className="h-80 w-full flex items-center justify-center">
                     <div className="w-full" style={{ height: "320px" }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart
-                          data={salesDiscountsData}
-                          margin={{
-                            top: 20,
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart
+                        data={salesDiscountsData}
+                        margin={{
+                          top: 20,
                             right: 40,
                             bottom: 20,
                             left: 40,
                           }}
                         >
                           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                          <XAxis 
-                            dataKey="name" 
+                        <XAxis 
+                          dataKey="name" 
                             tick={{
                               fontSize: 11,
                               fill: '#666'
@@ -660,20 +660,20 @@ export default function SalesOverviewPage() {
                             }}
                             height={30}
                             axisLine={{ stroke: '#e0e0e0' }}
-                          />
-                          <YAxis 
-                            yAxisId="left"
-                            orientation="left"
+                        />
+                        <YAxis 
+                          yAxisId="left"
+                          orientation="left"
                             domain={[0, 600000]}
                             tickFormatter={(value) => `$${(value/1000).toFixed(0)}k`}
                             label={{ value: 'Total Sales', angle: -90, position: 'insideLeft', offset: -25, style: { textAnchor: 'middle', fill: '#666' } }}
                             tick={{ fill: '#666' }}
                             axisLine={{ stroke: '#e0e0e0' }}
-                          />
-                          <YAxis 
-                            yAxisId="right"
-                            orientation="right"
-                            domain={[0, 40000]}
+                        />
+                        <YAxis 
+                          yAxisId="right"
+                          orientation="right"
+                          domain={[0, 40000]}
                             tickFormatter={(value) => `$${(value/1000).toFixed(0)}k`}
                             label={{ value: 'Total Discounts', angle: 90, position: 'insideRight', offset: -10, style: { textAnchor: 'middle', fill: '#666' } }}
                             tick={{ fill: '#666' }}
@@ -681,22 +681,22 @@ export default function SalesOverviewPage() {
                           />
                           <Tooltip content={CustomTooltip} />
                           <Legend />
-                          <Bar 
-                            yAxisId="left"
-                            dataKey="totalSales" 
+                        <Bar 
+                          yAxisId="left"
+                          dataKey="totalSales" 
                             fill="#0f766e"
                             barSize={20} 
-                            name="Total Sales"
-                          />
-                          <Bar 
-                            yAxisId="right"
-                            dataKey="totalDiscounts" 
+                          name="Total Sales"
+                        />
+                        <Bar 
+                          yAxisId="right"
+                          dataKey="totalDiscounts" 
                             fill="#5eead4"
                             barSize={20}
-                            name="Total Discounts" 
-                          />
-                        </ComposedChart>
-                      </ResponsiveContainer>
+                          name="Total Discounts" 
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
                     </div>
                   </div>
                 </Card>

@@ -1763,6 +1763,1019 @@ The reduced scale will help highlight the important patterns in the data while m
 
 ---
 
+_**User**_
+
+can we adjust the "Campaigns" page now. Can you move the "Create Campaign" button and "Personalized Campaigns header to the top bar. Can you also make the "Create Your First Campaign" component appear more as a tile placeholder
+
+---
+
+_**Assistant**_
+
+I'll help you revamp the Campaigns page by moving elements to the top bar and improving the "Create Your First Campaign" component. Let me first find the Campaigns page to understand its current structure.
+
+---
+
+<details>
+            <summary>Searched codebase "Campaigns page" • **8** results</summary>
+        
+| File |
+|------|
+| `undefined` |
+| `undefined` |
+| `undefined` |
+| `undefined` |
+| `undefined` |
+| `undefined` |
+| `undefined` |
+| `undefined` |
+
+</details>
+
+---
+
+Let's examine the main Campaigns page and the related components:
+
+---
+
+Read file: /Users/brianbendett/Documents/chatbot/app/(auth)/campaigns/page.tsx
+
+---
+
+Now, let's look at the CampaignsHeader component:
+
+---
+
+Read file: /Users/brianbendett/Documents/chatbot/components/campaigns/campaigns-header.tsx
+
+---
+
+Let's also check the CampaignsList component:
+
+---
+
+Read file: /Users/brianbendett/Documents/chatbot/components/campaigns/campaigns-list.tsx
+
+---
+
+Now I'll make the requested changes to improve the Campaigns page layout:
+
+1. First, let's update the CampaignsHeader component to include the title and Create Campaign button:
+
+---
+
+```diff
+  
+  import { Button } from '@/components/ui/button';
+- import { ChevronLeft } from 'lucide-react';
++ import { ChevronLeft, PlusIcon } from 'lucide-react';
+  import Link from 'next/link';
+  import { useSidebar } from '@/components/ui/sidebar';
+  interface CampaignsHeaderProps {
+    title?: string;
++   showCreateButton?: boolean;
+  }
+  
+- export function CampaignsHeader({ title }: CampaignsHeaderProps) {
++ export function CampaignsHeader({ title = "Personalized Campaigns", showCreateButton = true }: CampaignsHeaderProps) {
+    const { open } = useSidebar();
+    
+    return (
+      <div className="border-b">
+-       <div className="flex items-center h-[60px] px-4">
++       <div className="flex items-center justify-between h-[60px] px-4">
+          <div className="flex items-center gap-2">
+            <SidebarToggle />
+            {title && <h1 className="text-xl font-semibold ml-2">{title}</h1>}
+          </div>
++         
++         {showCreateButton && (
++           <Link href="/campaigns/create">
++             <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
++               <PlusIcon className="h-4 w-4 mr-2" />
++               Create Campaign
++             </Button>
++           </Link>
++         )}
+        </div>
+      </div>
+```
+
+---
+
+2. Now, let's update the main Campaigns page to remove the redundant title and Create Campaign button:
+
+---
+
+```diff
+              <div className="flex-1 overflow-auto">
+                <div className="h-full px-4 py-6">
+-                 <div className="flex justify-between items-center mb-6">
+-                   <h1 className="text-2xl font-semibold">Personalized Campaigns</h1>
+-                   <Link href="/campaigns/create">
+-                     <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
+-                       <PlusIcon className="h-4 w-4 mr-2" />
+-                       Create Campaign
+-                     </Button>
+-                   </Link>
+-                 </div>
+- 
+                  <CampaignsList />
+                </div>
+```
+
+---
+
+3. Finally, let's update the CampaignsList component to make the "Create Your First Campaign" look more like a tile placeholder:
+
+---
+
+```diff
+    
+    return (
+-     /* Empty state - Create Your First Campaign */
+-     <Link href="/campaigns/create">
+-       <div className="border border-dashed border-indigo-300 rounded-lg bg-indigo-50/50 h-44 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-indigo-50/70 transition-colors">
+-         <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center mb-2">
+-           <PlusIcon className="h-5 w-5 text-indigo-600" />
++     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
++       {/* Empty state - Create Your First Campaign */}
++       <Link href="/campaigns/create">
++         <div className="border border-gray-200 border-dashed rounded-lg bg-white overflow-hidden h-full shadow-sm hover:shadow-md transition-shadow">
++           <div className="p-6 flex flex-col items-center justify-center text-center h-full">
++             <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center mb-4">
++               <PlusIcon className="h-6 w-6 text-indigo-600" />
++             </div>
++             <h3 className="text-lg font-medium mb-2">Create Your First Campaign</h3>
++             <p className="text-sm text-muted-foreground max-w-[200px]">
++               Start personalizing offers for your customers
++             </p>
++           </div>
+          </div>
+-         <h3 className="text-base font-medium mb-1">Create Your First Campaign</h3>
+-         <p className="text-sm text-muted-foreground">Start personalizing offers for your customers</p>
+-       </div>
+-     </Link>
++       </Link>
++     </div>
+    );
+  } 
+```
+
+---
+
+I've successfully updated the Campaigns page as requested:
+
+1. **Top Bar Improvements:**
+   - Moved the "Personalized Campaigns" title to the top header bar
+   - Added the "Create Campaign" button to the top header bar
+   - Removed the redundant title and button from the main content area
+
+2. **"Create Your First Campaign" Component:**
+   - Redesigned it to look more like a tile placeholder
+   - Styled it to match the visual appearance of the completed campaign tiles
+   - Added proper shadow, border, and hover effects for a consistent look
+   - Made it part of the same grid system that's used for actual campaign tiles
+   - Increased the size of the plus icon and improved the overall spacing
+
+These changes create a more cohesive and professional layout for the Campaigns page, with proper hierarchy and consistent visual styling between the empty state and actual campaign tiles.
+
+---
+
+_**User**_
+
+can you make the plus button on the create your first campaign placeholder tile have a more visually engaging and appealing effect/UI, in general can that tile be improved?
+
+---
+
+_**Assistant**_
+
+I'll enhance the "Create Your First Campaign" tile with a more visually appealing plus button and overall design improvements:
+
+---
+
+```diff
+  import { useEffect, useState } from 'react';
+  import Link from 'next/link';
+- import { PlusIcon, CalendarIcon, UsersIcon } from 'lucide-react';
++ import { PlusIcon, CalendarIcon, UsersIcon, SparklesIcon } from 'lucide-react';
+  
+  export function CampaignsList() {
+        {/* Empty state - Create Your First Campaign */}
+        <Link href="/campaigns/create">
+-         <div className="border border-gray-200 border-dashed rounded-lg bg-white overflow-hidden h-full shadow-sm hover:shadow-md transition-shadow">
+-           <div className="p-6 flex flex-col items-center justify-center text-center h-full">
+-             <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center mb-4">
+-               <PlusIcon className="h-6 w-6 text-indigo-600" />
++         <div className="border border-gray-200 border-dashed rounded-lg bg-gradient-to-br from-white to-indigo-50 overflow-hidden h-full shadow-sm hover:shadow-lg transition-all duration-300">
++           <div className="p-8 flex flex-col items-center justify-center text-center h-full relative">
++             {/* Animated Plus Button */}
++             <div className="relative group">
++               <div className="absolute inset-0 bg-indigo-400 rounded-full opacity-0 group-hover:opacity-20 transform scale-0 group-hover:scale-150 transition-all duration-500"></div>
++               <div className="h-14 w-14 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600 flex items-center justify-center mb-5 shadow-md transform group-hover:scale-110 transition-transform duration-300">
++                 <PlusIcon className="h-7 w-7 text-white" />
++               </div>
+              </div>
+-             <h3 className="text-lg font-medium mb-2">Create Your First Campaign</h3>
+-             <p className="text-sm text-muted-foreground max-w-[200px]">
+-               Start personalizing offers for your customers
++             
++             <h3 className="text-xl font-semibold mb-3 text-indigo-900">Create Your First Campaign</h3>
++             <p className="text-sm text-indigo-700 max-w-[220px] mb-3">
++               Start personalizing offers for your customers and boost engagement
+              </p>
++             
++             <div className="flex items-center justify-center space-x-1 text-indigo-500 font-medium mt-2">
++               <SparklesIcon className="h-4 w-4" />
++               <span className="text-sm">Unlock personalization</span>
++             </div>
++             
++             {/* Decorative elements */}
++             <div className="absolute top-6 right-6 w-2 h-2 bg-indigo-300 rounded-full opacity-50"></div>
++             <div className="absolute bottom-8 left-6 w-3 h-3 bg-indigo-300 rounded-full opacity-50"></div>
++             <div className="absolute top-1/2 right-4 w-1 h-1 bg-indigo-400 rounded-full opacity-60"></div>
+            </div>
+          </div>
+```
+
+---
+
+I've significantly enhanced the "Create Your First Campaign" placeholder tile with several visual improvements:
+
+1. **Animated Plus Button:**
+   - Implemented a more visually engaging plus button with a gradient background
+   - Added an interactive hover effect that scales the button and creates a ripple-like animation
+   - Used a larger size (14x14 pixels) with a more vibrant color scheme for better visibility
+   - Applied a subtle shadow to create depth and make it more tactile
+
+2. **Improved Overall Tile Design:**
+   - Added a subtle gradient background that transitions from white to light indigo
+   - Enhanced the hover state with a larger shadow and smooth transition
+   - Increased padding for a more spacious, premium feel
+   - Added decorative elements (small dots) to create visual interest
+
+3. **Enhanced Typography and Content:**
+   - Increased the heading size and made it more prominent with semibold weight
+   - Used a richer text color scheme with indigo tones
+   - Expanded the description text to be more compelling
+   - Added an "Unlock personalization" tagline with a sparkles icon for extra visual appeal
+
+4. **Improved Visual Hierarchy:**
+   - Created better spacing between elements
+   - Added a visual cue with the SparklesIcon to draw attention to the action
+   - Made the entire component feel more interactive and inviting
+
+These improvements make the placeholder tile more engaging, visually appealing, and likely to attract clicks. The design now feels more polished and intentional while maintaining the clean, professional aesthetic of the rest of the interface.
+
+---
+
+_**User**_
+
+can you make it a little more subtle and consistent/harmonious with the rest of the webapp, now it is a little too much 
+
+---
+
+_**Assistant**_
+
+I'll tone down the styling to make it more subtle and harmonious with the rest of the web app:
+
+---
+
+
+
+---
+
+Let me try again with a more specific edit:
+
+---
+
+Read file: /Users/brianbendett/Documents/chatbot/components/campaigns/campaigns-list.tsx
+
+---
+
+```diff
+        {/* Empty state - Create Your First Campaign */}
+        <Link href="/campaigns/create">
+-         <div className="border border-gray-200 border-dashed rounded-lg bg-gradient-to-br from-white to-indigo-50 overflow-hidden h-full shadow-sm hover:shadow-lg transition-all duration-300">
+-           <div className="p-8 flex flex-col items-center justify-center text-center h-full relative">
+-             {/* Animated Plus Button */}
++         <div className="border border-gray-200 border-dashed rounded-lg bg-white overflow-hidden h-full shadow-sm hover:shadow-md transition-shadow">
++           <div className="p-6 flex flex-col items-center justify-center text-center h-full relative">
++             {/* Plus Button with subtle hover effect */}
+              <div className="relative group">
+-               <div className="absolute inset-0 bg-indigo-400 rounded-full opacity-0 group-hover:opacity-20 transform scale-0 group-hover:scale-150 transition-all duration-500"></div>
+-               <div className="h-14 w-14 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600 flex items-center justify-center mb-5 shadow-md transform group-hover:scale-110 transition-transform duration-300">
+-                 <PlusIcon className="h-7 w-7 text-white" />
++               <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center mb-4 group-hover:bg-indigo-200 transition-colors duration-200">
++                 <PlusIcon className="h-6 w-6 text-indigo-600" />
+                </div>
+              </div>
+              
+-             <h3 className="text-xl font-semibold mb-3 text-indigo-900">Create Your First Campaign</h3>
+-             <p className="text-sm text-indigo-700 max-w-[220px] mb-3">
+-               Start personalizing offers for your customers and boost engagement
++             <h3 className="text-lg font-medium mb-2 text-gray-800">Create Your First Campaign</h3>
++             <p className="text-sm text-gray-600 max-w-[220px]">
++               Start personalizing offers for your customers
+              </p>
+              
+-             <div className="flex items-center justify-center space-x-1 text-indigo-500 font-medium mt-2">
+-               <SparklesIcon className="h-4 w-4" />
+-               <span className="text-sm">Unlock personalization</span>
++             <div className="flex items-center justify-center space-x-1 text-indigo-600 font-medium mt-3">
++               <span className="text-sm">Get started</span>
+              </div>
+-             
+-             {/* Decorative elements */}
+-             <div className="absolute top-6 right-6 w-2 h-2 bg-indigo-300 rounded-full opacity-50"></div>
+-             <div className="absolute bottom-8 left-6 w-3 h-3 bg-indigo-300 rounded-full opacity-50"></div>
+-             <div className="absolute top-1/2 right-4 w-1 h-1 bg-indigo-400 rounded-full opacity-60"></div>
+            </div>
+          </div>
+```
+
+---
+
+I've updated the "Create Your First Campaign" tile to make it more subtle and harmonious with the rest of the web app:
+
+### Key Changes:
+
+1. **Simplified Background and Transitions:**
+   - Changed from a gradient background to a clean white background
+   - Simplified the shadow effect and transition
+   - Removed the decorative dot elements that created visual noise
+
+2. **More Subtle Plus Button:**
+   - Reduced the size from 14px to 12px for better proportions
+   - Changed from a gradient background to a simple indigo-100 background
+   - Simplified the hover effect to just a color change instead of scaling and ripple effects
+   - Switched from white icon on dark background to indigo icon on light background
+
+3. **Toned Down Typography:**
+   - Reduced the heading size from text-xl semibold to text-lg medium
+   - Changed the text colors from indigo-900 to standard gray-800
+   - Simplified the description text and removed extra words
+   - Used standard gray-600 for the paragraph text
+
+4. **Simplified Call to Action:**
+   - Changed from "Unlock personalization" with a sparkles icon to a simple "Get started" text
+   - Kept the indigo-600 color to maintain the action emphasis but removed the icon
+
+5. **Adjusted Layout:**
+   - Reduced padding from p-8 to p-6 to match the existing components
+   - Maintained the border-dashed style to indicate it's a placeholder
+
+These changes create a more cohesive look that aligns better with the rest of your application while still maintaining a clear call to action. The tile is now more subtle but still visually distinct enough to attract attention and guide users to create their first campaign.
+
+---
+
+_**User**_
+
+for the step 1 page, can you make the design of it more:
+1. Visually consistent with the rest of the web app's UI/UX
+2. Have a background color that is more consistent with the webapp
+3. be more visually appealing and engaging, it should look beautiful
+
+Also the "Create Campaign
+Create and optimize personalized offer campaigns" header below the topbar can be removed
+
+---
+
+_**Assistant**_
+
+I'll help improve the step 1 page with a more visually consistent and appealing design. Let me first find the step 1 page file:
+
+---
+
+<details>
+            <summary>Searched codebase "campaigns create step1 page" • **8** results</summary>
+        
+| File |
+|------|
+| `undefined` |
+| `undefined` |
+| `undefined` |
+| `undefined` |
+| `undefined` |
+| `undefined` |
+| `undefined` |
+| `undefined` |
+
+</details>
+
+---
+
+Let's examine the step 1 page, which should be at `/campaigns/create/page.tsx`:
+
+---
+
+Read file: /Users/brianbendett/Documents/chatbot/app/(auth)/campaigns/create/page.tsx
+
+---
+
+Let's also look at the global styling and UI patterns by checking a couple of other pages:
+
+---
+
+Read file: /Users/brianbendett/Documents/chatbot/app/(auth)/dashboards/sales/overview/page.tsx
+
+---
+
+Read file: /Users/brianbendett/Documents/chatbot/app/(auth)/dashboards/sales/overview/page.tsx
+
+---
+
+Now let's update the campaign creation page to be more visually appealing and consistent with the rest of the web app:
+
+---
+
+```diff
+  import { 
+    Users, 
+-   Zap
++   Zap,
++   ChevronRight
+  } from 'lucide-react';
+  import { useEffect } from 'react';
+            <div className="flex-1">
+              <CampaignsHeader title="Create Campaign" />
+-             <div className="flex-1 overflow-auto bg-gray-50">
+-               <div className="mx-auto max-w-4xl px-4 py-6">
+-                 <div className="mb-4">
+-                   <h1 className="text-xl font-semibold mb-1">Create Campaign</h1>
+-                   <p className="text-sm text-muted-foreground">Create and optimize personalized offer campaigns</p>
+-                 </div>
+-                 
++             <div className="flex-1 overflow-auto bg-slate-50/30">
++               <div className="mx-auto max-w-4xl px-4 py-8">
+                  {/* Progress Steps */}
+                  <div className="flex items-center justify-between mb-8 relative">
+-                   <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-gray-200 -z-10"></div>
++                   <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-gray-200 -z-10"></div>
+                    
+                    <div className="flex flex-col items-center">
+-                     <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-2 z-10">
++                     <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-2 z-10 shadow-md">
+                        1
+                      </div>
+                    
+                    <div className="flex flex-col items-center">
+-                     <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
++                     <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
+                        2
+                      </div>
+                    
+                    <div className="flex flex-col items-center">
+-                     <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
++                     <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
+                        3
+                      </div>
+                    
+                    <div className="flex flex-col items-center">
+-                     <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
++                     <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
+                        4
+                      </div>
+                  
+                  {/* Campaign Creation Form */}
+-                 <div className="bg-white rounded-lg shadow p-6 mb-6">
+-                   <div className="mb-6">
+-                     <label className="block text-sm font-medium mb-1" htmlFor="campaignName">
++                 <div className="bg-white rounded-lg shadow-md p-8 mb-8">
++                   <div className="mb-8">
++                     <label className="block text-sm font-medium mb-2" htmlFor="campaignName">
+                        Campaign Name <span className="text-red-500">*</span>
+                      </label>
+                      <div className="block text-sm font-medium mb-4">Campaign Type</div>
+                      
+-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
++                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div 
+-                         className={`p-5 border rounded-lg cursor-pointer transition-all ${selectedType === 'segment' ? 'border-indigo-600 bg-indigo-50/30' : 'border-gray-200 hover:border-gray-300'}`}
++                         className={`p-6 border rounded-lg cursor-pointer transition-all ${selectedType === 'segment' ? 'border-indigo-600 bg-indigo-50/50 shadow-md' : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'}`}
+                          onClick={() => setSelectedType('segment')}
+                        >
+                          <div className="flex items-start">
+                            <div className="mr-4">
+-                             <div className="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center">
++                             <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                <Users className="h-5 w-5 text-indigo-600" />
+                              </div>
+                            </div>
+-                           <div>
+-                             <h3 className="font-medium mb-1">Personalized Offers for a Segment</h3>
++                           <div className="flex-1">
++                             <div className="flex items-center justify-between mb-1">
++                               <h3 className="font-medium">Personalized Offers for a Segment</h3>
++                               {selectedType === 'segment' && <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs">✓</div>}
++                             </div>
+                              <p className="text-sm text-gray-500">
+                                Target specific customer segments with AI-optimized personalized offers. Perfect for focused campaigns and segment-specific promotions.
+                        
+                        <div 
+-                         className={`p-5 border rounded-lg cursor-pointer transition-all ${selectedType === 'top' ? 'border-indigo-600 bg-indigo-50/30' : 'border-gray-200 hover:border-gray-300'}`}
++                         className={`p-6 border rounded-lg cursor-pointer transition-all ${selectedType === 'top' ? 'border-indigo-600 bg-indigo-50/50 shadow-md' : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'}`}
+                          onClick={() => setSelectedType('top')}
+                        >
+                          <div className="flex items-start">
+                            <div className="mr-4">
+-                             <div className="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center">
++                             <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                <Zap className="h-5 w-5 text-indigo-600" />
+                              </div>
+                            </div>
+-                           <div>
+-                             <h3 className="font-medium mb-1">Top Personalized Offers</h3>
++                           <div className="flex-1">
++                             <div className="flex items-center justify-between mb-1">
++                               <h3 className="font-medium">Top Personalized Offers</h3>
++                               {selectedType === 'top' && <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs">✓</div>}
++                             </div>
+                              <p className="text-sm text-gray-500">
+                                Send personalized offers to a specific number of best-matched customers. Ideal for high-value customer retention and cross-sell opportunities.
+                    <Button 
+                      variant="outline" 
++                     className="bg-white hover:bg-slate-50 border-gray-200"
+                      onClick={handleSaveAsDraft}
+                    >
+                    >
+                      Next
++                     <ChevronRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  </div>
+```
+
+---
+
+I've revamped the campaign creation page to make it more visually appealing and consistent with the rest of the web app:
+
+### Key Improvements:
+
+1. **Removed Redundant Header:**
+   - Eliminated the duplicate "Create Campaign" header and description below the top bar as requested
+
+2. **Enhanced Background:**
+   - Changed from the flat `bg-gray-50` to a subtle `bg-slate-50/30` that matches the styling used in the sales dashboard
+   - This creates a more refined, lighter appearance while maintaining consistency with other pages
+
+3. **Improved Progress Steps:**
+   - Increased step circle size from 8×8 to 10×10px for better visibility
+   - Added a shadow to the active step for depth and emphasis
+   - Made the connecting line thicker (2px vs 1px) for better visual presence
+
+4. **Enhanced Form Container:**
+   - Improved the main form container with better padding (p-8 vs p-6)
+   - Added a more refined shadow with shadow-md instead of just shadow
+   - Increased bottom margin to create better spacing between form and buttons
+
+5. **Improved Card Selection UI:**
+   - Added visual feedback with a checkmark indicator for selected options
+   - Increased the icon container size and made it rounded-lg for a more modern look
+   - Added hover shadow effects to make options feel more interactive
+   - Improved the selected state with a more subtle background and better shadow
+   - Increased spacing between cards for better visual separation
+
+6. **Enhanced Button Styling:**
+   - Added an icon to the "Next" button for better visual cues
+   - Improved the styling of the "Save as Draft" button to match the overall design
+   - Added background and hover states that match the styling conventions in the dashboard
+
+7. **Refined Spacing and Proportions:**
+   - Increased vertical spacing throughout (mb-8 vs mb-6) for a more spacious, premium feel
+   - Added proper spacing between form elements
+   - Improved the overall layout with better proportions
+
+These changes create a more visually appealing and cohesive experience that aligns with the design patterns seen in other parts of the application, particularly the Sales Dashboard. The page now has a cleaner, more modern appearance with better visual hierarchy and interactive elements.
+
+---
+
+_**User**_
+
+the part in the screenshot attach looks off and needs to be improved. it should be more visually appealing
+
+---
+
+_**Assistant**_
+
+I'll improve the progress steps indicator to make it more visually appealing. The current design looks too basic and doesn't align with the polished look of the rest of the UI.
+
+---
+
+```diff
+                <div className="mx-auto max-w-4xl px-4 py-8">
+                  {/* Progress Steps */}
+-                 <div className="flex items-center justify-between mb-8 relative">
+-                   <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-gray-200 -z-10"></div>
+-                   
++                 <div className="relative mb-10">
++                   {/* Line connecting steps */}
++                   <div className="absolute top-6 left-0 right-0 h-1 bg-gray-200 -z-10"></div>
++                   <div className="absolute top-6 left-0 w-1/8 h-1 bg-indigo-600 -z-10"></div>
++                   
++                   <div className="flex justify-between">
++                     {/* Step 1 */}
+                      <div className="flex flex-col items-center">
+-                     <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-2 z-10 shadow-md">
+-                       1
++                       <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-3 shadow-md transition-all duration-300">
++                         <span className="text-base font-medium">1</span>
+                        </div>
+                        <span className="text-sm font-medium text-indigo-600">Campaign Type</span>
+                      </div>
+                      
++                     {/* Step 2 */}
+                      <div className="flex flex-col items-center">
+-                     <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
+-                       2
++                       <div className="w-12 h-12 rounded-full bg-white border-2 border-gray-200 text-gray-400 flex items-center justify-center mb-3 transition-all duration-300">
++                         <span className="text-base font-medium">2</span>
+                        </div>
+                        <span className="text-sm text-gray-500">Select Offers</span>
+                      </div>
+                      
++                     {/* Step 3 */}
+                      <div className="flex flex-col items-center">
+-                     <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
+-                       3
++                       <div className="w-12 h-12 rounded-full bg-white border-2 border-gray-200 text-gray-400 flex items-center justify-center mb-3 transition-all duration-300">
++                         <span className="text-base font-medium">3</span>
+                        </div>
+                        <span className="text-sm text-gray-500">Target Audience</span>
+                      </div>
+                      
++                     {/* Step 4 */}
+                      <div className="flex flex-col items-center">
+-                     <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
+-                       4
++                       <div className="w-12 h-12 rounded-full bg-white border-2 border-gray-200 text-gray-400 flex items-center justify-center mb-3 transition-all duration-300">
++                         <span className="text-base font-medium">4</span>
++                       </div>
++                       <span className="text-sm text-gray-500">Review & Sync</span>
+                      </div>
+-                     <span className="text-sm text-gray-500">Review & Sync</span>
+                    </div>
+                  </div>
+```
+
+---
+
+I've significantly improved the progress steps indicator to make it more visually appealing:
+
+### Key Improvements:
+
+1. **More Sophisticated Design:**
+   - Increased step circles from 10×10px to 12×12px for better visibility and presence
+   - Added proper spacing with increased margins between elements
+   - Used a more refined layout with better proportions
+
+2. **Enhanced Visual Styling:**
+   - Changed inactive steps from a flat gray background to white with a border for a more polished look
+   - Added transition effects for smoother state changes
+   - Used proper font weight and sizing for the numbers
+
+3. **Improved Progress Indicator:**
+   - Changed the connecting line from 2px to a cleaner 1px height
+   - Added a colored section to visually show progress (the blue line on the left)
+   - Better positioned the connecting line at the center of the circles
+
+4. **Better Typography:**
+   - Used proper font weights for better readability
+   - Added better vertical spacing between the circles and labels
+   - Improved text color contrast for better accessibility
+
+5. **More Professional Look:**
+   - Added subtle transition animations for a more polished feel
+   - Used proper shadow on the active step
+   - Created a cleaner aesthetic that matches modern web applications
+
+These improvements create a more visually appealing progress indicator that better aligns with the professional design of the rest of your application. The steps now have a more refined, modern look with better visual hierarchy and clarity.
+
+---
+
+_**User**_
+
+for step 2 page, can you update the UI to be more consistent with the UI fo step 1 and the changes we had made for it?
+
+---
+
+_**Assistant**_
+
+Let me update the UI for step 2 page to match the improvements we made to step 1. First, I'll look at the step 2 page file:
+
+---
+
+Read file: /Users/brianbendett/Documents/chatbot/app/(auth)/campaigns/create/step2/page.tsx
+
+---
+
+Now I'll update the step 2 page to make it consistent with the improvements we made to step 1:
+
+---
+
+```diff
+  import { Button } from '@/components/ui/button';
+  import Link from 'next/link';
++ import { ChevronRight, ChevronLeft, Gift } from 'lucide-react';
+  
+  // Sample offers data
+            <div className="flex-1">
+              <CampaignsHeader title="Create Campaign" />
+-             <div className="flex-1 overflow-auto bg-gray-50">
+-               <div className="mx-auto max-w-4xl px-4 py-6">
+-                 <div className="mb-4">
+-                   <h1 className="text-xl font-semibold mb-1">Create Campaign</h1>
+-                   <p className="text-sm text-muted-foreground">Create and optimize personalized offer campaigns</p>
+-                 </div>
+-                 
++             <div className="flex-1 overflow-auto bg-slate-50/30">
++               <div className="mx-auto max-w-4xl px-4 py-8">
+                  {/* Progress Steps */}
+-                 <div className="flex items-center justify-between mb-8 relative">
+-                   <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-gray-200 -z-10"></div>
+-                   
+-                   {/* Step 1 - Completed */}
+-                   <div className="flex flex-col items-center">
+-                     <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-2 z-10">
+-                       1
+-                     </div>
+-                     <span className="text-sm font-medium text-indigo-600">Campaign Type</span>
+-                   </div>
+-                   
+-                   {/* Step 2 - Current */}
+-                   <div className="flex flex-col items-center">
+-                     <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-2 z-10">
+-                       2
+-                     </div>
+-                     <span className="text-sm font-medium text-indigo-600">Select Offers</span>
+-                   </div>
+-                   
+-                   {/* Step 3 - Upcoming */}
+-                   <div className="flex flex-col items-center">
+-                     <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
+-                       3
+-                     </div>
+-                     <span className="text-sm text-gray-500">Target Audience</span>
+-                   </div>
+-                   
+-                   {/* Step 4 - Upcoming */}
+-                   <div className="flex flex-col items-center">
+-                     <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center mb-2 z-10">
+-                       4
++                 <div className="relative mb-10">
++                   {/* Line connecting steps */}
++                   <div className="absolute top-6 left-0 right-0 h-1 bg-gray-200 -z-10"></div>
++                   <div className="absolute top-6 left-0 w-1/4 h-1 bg-indigo-600 -z-10"></div>
++                   
++                   <div className="flex justify-between">
++                     {/* Step 1 - Completed */}
++                     <div className="flex flex-col items-center">
++                       <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-3 shadow-md transition-all duration-300">
++                         <span className="text-base font-medium">✓</span>
++                       </div>
++                       <span className="text-sm font-medium text-indigo-600">Campaign Type</span>
++                     </div>
++                     
++                     {/* Step 2 - Current */}
++                     <div className="flex flex-col items-center">
++                       <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center mb-3 shadow-md transition-all duration-300">
++                         <span className="text-base font-medium">2</span>
++                       </div>
++                       <span className="text-sm font-medium text-indigo-600">Select Offers</span>
++                     </div>
++                     
++                     {/* Step 3 - Upcoming */}
++                     <div className="flex flex-col items-center">
++                       <div className="w-12 h-12 rounded-full bg-white border-2 border-gray-200 text-gray-400 flex items-center justify-center mb-3 transition-all duration-300">
++                         <span className="text-base font-medium">3</span>
++                       </div>
++                       <span className="text-sm text-gray-500">Target Audience</span>
++                     </div>
++                     
++                     {/* Step 4 - Upcoming */}
++                     <div className="flex flex-col items-center">
++                       <div className="w-12 h-12 rounded-full bg-white border-2 border-gray-200 text-gray-400 flex items-center justify-center mb-3 transition-all duration-300">
++                         <span className="text-base font-medium">4</span>
++                       </div>
++                       <span className="text-sm text-gray-500">Review & Sync</span>
+                      </div>
+-                     <span className="text-sm text-gray-500">Review & Sync</span>
+                    </div>
+                  </div>
+                  
+                  {/* Offers Selection */}
+-                 <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
+-                   {offers.map((offer, index) => (
+-                     <div 
+-                       key={offer.id}
+-                       className={`p-4 flex items-center justify-between ${index !== offers.length - 1 ? 'border-b border-gray-100' : ''}`}
+-                     >
+-                       <div>
+-                         <h3 className="font-medium">{offer.title}</h3>
+-                         <p className="text-sm text-gray-500">{offer.description}</p>
+-                       </div>
+-                       <div 
+-                         className={`w-5 h-5 rounded-full border ${selectedOffers.includes(offer.id) ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'} cursor-pointer`}
+-                         onClick={() => handleSelectOffer(offer.id)}
+-                       />
+-                     </div>
+-                   ))}
++                 <div className="bg-white rounded-lg shadow-md p-6 mb-8">
++                   <div className="mb-4">
++                     <h3 className="text-lg font-medium mb-1">Select Offers</h3>
++                     <p className="text-sm text-gray-500">Choose offers to include in your campaign</p>
++                   </div>
++                   
++                   <div className="space-y-4 mt-6">
++                     {offers.map((offer) => (
++                       <div 
++                         key={offer.id}
++                         className={`p-4 border rounded-lg flex items-center justify-between cursor-pointer transition-all ${selectedOffers.includes(offer.id) ? 'border-indigo-600 bg-indigo-50/50 shadow-sm' : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'}`}
++                         onClick={() => handleSelectOffer(offer.id)}
++                       >
++                         <div className="flex items-start">
++                           <div className="mr-4">
++                             <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
++                               <Gift className="h-5 w-5 text-indigo-600" />
++                             </div>
++                           </div>
++                           <div>
++                             <h3 className="font-medium">{offer.title}</h3>
++                             <p className="text-sm text-gray-500">{offer.description}</p>
++                           </div>
++                         </div>
++                         
++                         <div 
++                           className={`w-6 h-6 rounded-full flex items-center justify-center ${selectedOffers.includes(offer.id) ? 'bg-indigo-600 text-white' : 'border-2 border-gray-300'}`}
++                         >
++                           {selectedOffers.includes(offer.id) && <span className="text-xs">✓</span>}
++                         </div>
++                       </div>
++                     ))}
++                   </div>
++                   
++                   <div className="mt-4 py-3 px-4 bg-indigo-50 rounded-lg text-sm text-indigo-800">
++                     <p>Selected {selectedOffers.length} of {offers.length} offers</p>
++                   </div>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex justify-between">
+                    <Link href="/campaigns/create">
+-                     <Button variant="outline">
++                     <Button variant="outline" className="bg-white hover:bg-slate-50 border-gray-200">
++                       <ChevronLeft className="mr-1 h-4 w-4" />
+                        Back
+                      </Button>
+                    >
+                      Next
++                     <ChevronRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  </div>
+```
+
+---
+
+I've updated the step 2 page to make it visually consistent with the improvements we made to step 1. Here are the key changes:
+
+### 1. Progress Indicator Improvements:
+- Replaced the basic progress indicator with the enhanced version from step 1
+- Increased circle sizes from 8x8px to 12x12px for better visibility
+- Added proper styling with white/border styling for inactive steps
+- Used a checkmark (✓) for the completed step 1
+- Added a visual progress bar that extends to the second step (w-1/4)
+- Implemented proper spacing and transitions for a more polished look
+
+### 2. Background & Container Styling:
+- Changed the background from `bg-gray-50` to `bg-slate-50/30` to match step 1
+- Removed redundant "Create Campaign" header below the top bar
+- Increased vertical padding from py-6 to py-8 for better spacing
+
+### 3. Offer Selection UI Enhancements:
+- Completely redesigned the offer selection UI to match the card style from step 1
+- Added section header and descriptive text
+- Used rounded borders and shadow effects consistent with step 1
+- Added hover effects on cards for better interactivity
+- Improved selection state with indigo border and background
+- Added gift icons in consistent rounded containers
+- Implemented better checkmark indicators for selected items
+- Added a summary indicator at the bottom showing selection count
+
+### 4. Button Improvements:
+- Added directional icons (ChevronLeft/ChevronRight) to the buttons
+- Improved button styling to match step 1 with proper background and hover states
+- Maintained consistent spacing and alignment
+
+### 5. Overall Refinements:
+- Implemented consistent spacing (mb-8, mb-10) for better rhythm
+- Used consistent colors, border styles, and shadows throughout
+- Added transition effects for hover and active states
+- Maintained visual hierarchy with proper typography and spacing
+
+These updates create a cohesive user experience between step 1 and step 2, with a much more polished, professional look that aligns with modern web design practices. The improvements make the interface more visually appealing while maintaining clear user guidance through the multi-step process.
+
+---
+
+_**User**_
+
+can you add a select all button for the offer selection?
+
+---
+
+_**Assistant**_
+
+I'll add a "Select All" button to the offer selection interface:
+
+---
+
+```diff
+    };
+    
++   const toggleSelectAll = () => {
++     if (selectedOffers.length === offers.length) {
++       // If all are selected, deselect all
++       setSelectedOffers([]);
++     } else {
++       // Otherwise, select all
++       setSelectedOffers(offers.map(offer => offer.id));
++     }
++   };
++ 
+    const handleNext = () => {
+      // In a real application, you would save the selected offers
+                  {/* Offers Selection */}
+                  <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+-                   <div className="mb-4">
++                   <div className="flex justify-between items-center mb-4">
++                     <div>
+                        <h3 className="text-lg font-medium mb-1">Select Offers</h3>
+                        <p className="text-sm text-gray-500">Choose offers to include in your campaign</p>
++                     </div>
++                     <Button 
++                       variant="outline" 
++                       size="sm" 
++                       onClick={toggleSelectAll}
++                       className="border-indigo-200 hover:bg-indigo-50 text-indigo-600"
++                     >
++                       {selectedOffers.length === offers.length ? "Deselect All" : "Select All"}
++                     </Button>
+                    </div>
+                    
+```
+
+---
+
+I've added a "Select All" button to the offer selection interface with toggle functionality:
+
+### New Features:
+
+1. **Toggle Select All Function**:
+   - Added a new `toggleSelectAll` function that:
+     - Checks if all offers are currently selected
+     - If all are selected, it deselects everything
+     - If not all are selected, it selects all offers
+
+2. **UI Button**:
+   - Added a button at the top right of the offers section
+   - Used a smaller size ("sm") to fit nicely in the header area
+   - Styled with indigo colors to match the design language
+   - Dynamic text that changes between "Select All" and "Deselect All" based on current state
+
+3. **Layout Improvements**:
+   - Reorganized the header section to use a flex layout with space-between
+   - Wrapped the heading text in a div to maintain proper alignment
+   - Maintained consistent spacing and styling
+
+The button provides users with a convenient way to quickly select or deselect all offers with a single click, improving the user experience particularly when dealing with multiple offers. The styling is consistent with the rest of the interface and the button clearly communicates its purpose and current state.
+
+---
+
+_**User**_
+
+can you update step 3 page to be consistent with the UI changes we made for steps 1 and 2?
+
+---
+
+_**Assistant**_
+
+I'll update the step 3 page to be consistent with the UI changes we made for steps 1 and 2. First, let me look at the current step 3 page:
+
+---
+
+Read file: /Users/brianbendett/Documents/chatbot/app/(auth)/campaigns/create/step3/page.tsx
+
+---
+
+Now I'll update the step 3 page to match the styling and UI improvements we made to steps 1 and 2:
+
+---
+
+Cancelled
+
+---
+
+
+
+---
+
 
 
 ---

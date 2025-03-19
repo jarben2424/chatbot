@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { PlusIcon, CalendarIcon, UsersIcon } from 'lucide-react';
+import { PlusIcon, CalendarIcon, UsersIcon, SparklesIcon } from 'lucide-react';
 
 export function CampaignsList() {
   const [showCompletedCampaign, setShowCompletedCampaign] = useState(false);
@@ -70,15 +70,29 @@ export function CampaignsList() {
   }
   
   return (
-    /* Empty state - Create Your First Campaign */
-    <Link href="/campaigns/create">
-      <div className="border border-dashed border-indigo-300 rounded-lg bg-indigo-50/50 h-44 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-indigo-50/70 transition-colors">
-        <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center mb-2">
-          <PlusIcon className="h-5 w-5 text-indigo-600" />
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Empty state - Create Your First Campaign */}
+      <Link href="/campaigns/create">
+        <div className="border border-gray-200 border-dashed rounded-lg bg-white overflow-hidden h-full shadow-sm hover:shadow-md transition-shadow">
+          <div className="p-6 flex flex-col items-center justify-center text-center h-full relative">
+            {/* Plus Button with subtle hover effect */}
+            <div className="relative group">
+              <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center mb-4 group-hover:bg-indigo-200 transition-colors duration-200">
+                <PlusIcon className="h-6 w-6 text-indigo-600" />
+              </div>
+            </div>
+            
+            <h3 className="text-lg font-medium mb-2 text-gray-800">Create Your First Campaign</h3>
+            <p className="text-sm text-gray-600 max-w-[220px]">
+              Start personalizing offers for your customers
+            </p>
+            
+            <div className="flex items-center justify-center space-x-1 text-indigo-600 font-medium mt-3">
+              <span className="text-sm">Get started</span>
+            </div>
+          </div>
         </div>
-        <h3 className="text-base font-medium mb-1">Create Your First Campaign</h3>
-        <p className="text-sm text-muted-foreground">Start personalizing offers for your customers</p>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 } 

@@ -23,16 +23,6 @@ export default async function CampaignsPage() {
             <CampaignsHeader />
             <div className="flex-1 overflow-auto">
               <div className="h-full px-4 py-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h1 className="text-2xl font-semibold">Personalized Campaigns</h1>
-                  <Link href="/campaigns/create">
-                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                      <PlusIcon className="h-4 w-4 mr-2" />
-                      Create Campaign
-                    </Button>
-                  </Link>
-                </div>
-
                 <CampaignsList />
               </div>
             </div>
