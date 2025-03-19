@@ -115,6 +115,10 @@ export default function ReviewSyncPage() {
 
   const handleSyncToBraze = () => {
     // In a real application, this would sync with Braze
+    // Set flag in sessionStorage to indicate campaign was created
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('campaignCreated', 'true');
+    }
     router.push('/campaigns');
   };
 

@@ -30,6 +30,8 @@ import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { SuggestedActions } from './suggested-actions';
 import equal from 'fast-deep-equal';
+import { CommandPalette } from './command-palette';
+import { CommandKHint } from './command-k-hint';
 
 function PureMultimodalInput({
   chatId,
@@ -117,9 +119,44 @@ function PureMultimodalInput({
     setLocalStorageInput(input);
   }, [input, setLocalStorageInput]);
 
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  
+  // Setup a click handler to dismiss the command palette when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showCommandPalette && textareaRef.current && !textareaRef.current.contains(event.target as Node)) {
+        setShowCommandPalette(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCommandPalette]);
+
   const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(event.target.value);
+    const value = event.target.value;
+    setInput(value);
+    
+    // Show command palette when "/" is typed at the start of the input
+    if (value === '/') {
+      setShowCommandPalette(true);
+    } else {
+      setShowCommandPalette(false);
+    }
+    
     adjustHeight();
+  };
+
+  const handleCommandSelect = (command: { id: string; label: string; action: string }) => {
+    setInput(command.action);
+    setShowCommandPalette(false);
+    
+    // Focus the textarea after selecting a command
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -245,6 +282,16 @@ function PureMultimodalInput({
       )}
 
       <div className="relative">
+        {showCommandPalette && (
+          <CommandPalette 
+            isVisible={showCommandPalette} 
+            onSelectCommand={(command) => {
+              handleCommandSelect(command);
+              // Auto-submit the command immediately
+              submitForm();
+            }}
+          />
+        )}
         <Textarea
           data-testid="multimodal-input"
           ref={textareaRef}
@@ -259,6 +306,24 @@ function PureMultimodalInput({
           rows={messages.length === 0 ? 3 : 2}
           autoFocus
           onKeyDown={(event) => {
+            // When command palette is open, handle navigation and selection
+            if (showCommandPalette) {
+              if (event.key === 'Escape') {
+                setShowCommandPalette(false);
+                event.preventDefault();
+                return;
+              }
+              
+              // Handle arrow navigation and Enter selection
+              if (['ArrowUp', 'ArrowDown', 'Enter'].includes(event.key)) {
+                event.preventDefault();
+                return;
+              }
+              
+              // Let normal typing continue for any other key
+              return;
+            }
+            
             if (
               event.key === "Enter" &&
               !event.shiftKey &&
@@ -278,6 +343,8 @@ function PureMultimodalInput({
         <div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start">
           <AttachmentsButton fileInputRef={fileInputRef} isLoading={isLoading} />
         </div>
+
+        <CommandKHint />
 
         <div className="absolute bottom-0 right-0 p-2 w-fit flex flex-row justify-end">
           {isLoading ? (

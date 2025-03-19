@@ -15,8 +15,8 @@ interface SuggestedActionsProps {
 function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
   const suggestedActions = [
     {
-      title: 'Help me create a customer segmentation strategy for my e-commerce store',
-      action: 'Help me create a customer segmentation strategy for my e-commerce store',
+      title: 'Help me create a customer segmentation strategy for my store',
+      action: 'Help me create a customer segmentation strategy for my store',
     },
     {
       title: 'Analyze this customer data and identify high-value segments',

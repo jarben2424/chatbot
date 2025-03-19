@@ -3,9 +3,10 @@ import { redirect } from 'next/navigation';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { CampaignsHeader } from '@/components/campaigns/campaigns-header';
-import { PlusIcon } from 'lucide-react';
+import { PlusIcon, CalendarIcon, UsersIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { CampaignsList } from '@/components/campaigns/campaigns-list';
 
 export default async function CampaignsPage() {
   const session = await auth();
@@ -32,16 +33,7 @@ export default async function CampaignsPage() {
                   </Link>
                 </div>
 
-                {/* Empty state - Create Your First Campaign */}
-                <Link href="/campaigns/create">
-                  <div className="border border-dashed border-indigo-300 rounded-lg bg-indigo-50/50 h-44 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-indigo-50/70 transition-colors">
-                    <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center mb-2">
-                      <PlusIcon className="h-5 w-5 text-indigo-600" />
-                    </div>
-                    <h3 className="text-base font-medium mb-1">Create Your First Campaign</h3>
-                    <p className="text-sm text-muted-foreground">Start personalizing offers for your customers</p>
-                  </div>
-                </Link>
+                <CampaignsList />
               </div>
             </div>
           </div>
