@@ -20,6 +20,7 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 import { useLocalStorage, useWindowSize } from 'usehooks-ts';
+import { useSidebar } from './ui/sidebar';
 
 import { sanitizeUIMessages } from '@/lib/utils';
 
@@ -67,6 +68,7 @@ function PureMultimodalInput({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
+  const { setOpen } = useSidebar();
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -84,7 +86,7 @@ function PureMultimodalInput({
   const resetHeight = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = '98px';
+      textareaRef.current.style.height = messages.length === 0 ? '120px' : '98px';
     }
   };
 
@@ -99,7 +101,13 @@ function PureMultimodalInput({
       // Prefer DOM value over localStorage to handle hydration
       const finalValue = domValue || localStorageInput || '';
       setInput(finalValue);
-      adjustHeight();
+      
+      // Set initial height based on whether it's the welcome screen
+      if (messages.length === 0) {
+        textareaRef.current.style.height = '120px';
+      } else {
+        adjustHeight();
+      }
     }
     // Only run once after hydration
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,6 +136,13 @@ function PureMultimodalInput({
     setLocalStorageInput('');
     resetHeight();
 
+    // Auto-open the sidebar when submitting from the welcome/fresh chat screen
+    if (messages.length === 0) {
+      setTimeout(() => {
+        setOpen(true);
+      }, 300); // Small delay to let the UI update with the new message first
+    }
+
     if (width && width > 768) {
       textareaRef.current?.focus();
     }
@@ -138,6 +153,8 @@ function PureMultimodalInput({
     setLocalStorageInput,
     width,
     chatId,
+    messages.length,
+    setOpen,
   ]);
 
   const uploadFile = async (file: File) => {
@@ -236,10 +253,10 @@ function PureMultimodalInput({
           onChange={handleInput}
           className={cx(
             'min-h-[24px] max-h-[calc(75dvh)] overflow-hidden resize-none rounded-xl border border-border !text-base bg-background/80 pb-10 shadow-sm transition-colors focus-visible:ring-1 focus-visible:ring-ring focus:border-muted-foreground/30',
-            messages.length === 0 ? '' : '',
+            messages.length === 0 ? 'min-h-[120px]' : '',
             className,
           )}
-          rows={2}
+          rows={messages.length === 0 ? 3 : 2}
           autoFocus
           onKeyDown={(event) => {
             if (

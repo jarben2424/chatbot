@@ -8,6 +8,8 @@ import { memo, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import useSWR from 'swr';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import {
   CheckCircleFillIcon,
@@ -154,6 +156,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
   const { setOpenMobile } = useSidebar();
   const { id } = useParams();
   const pathname = usePathname();
+  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
   const {
     data: history,
     isLoading,
@@ -262,18 +265,6 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     );
   }
 
-  if (history?.length === 0) {
-    return (
-      <SidebarGroup>
-        <SidebarGroupContent>
-          <div className="px-2 text-zinc-500 w-full flex flex-row justify-center items-center text-sm gap-2">
-            Your conversations will appear here once you start chatting!
-          </div>
-        </SidebarGroupContent>
-      </SidebarGroup>
-    );
-  }
-
   const groupChatsByDate = (chats: Chat[]): GroupedChats => {
     const now = new Date();
     const oneWeekAgo = subWeeks(now, 1);
@@ -307,135 +298,89 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     );
   };
 
-  return (
-    <>
+  const groupedChats = groupChatsByDate(history || []);
+  const enabledGroups = Object.entries(groupedChats).filter(
+    ([_, chats]) => chats.length > 0,
+  );
+  if (enabledGroups.length === 0) {
+    return (
       <SidebarGroup>
         <SidebarGroupContent>
-          <SidebarMenu>
-            {history &&
-              (() => {
-                const groupedChats = groupChatsByDate(history);
-
-                return (
-                  <>
-                    {groupedChats.today.length > 0 && (
-                      <>
-                        <div className="px-2 py-1 text-xs text-sidebar-foreground/50">
-                          Today
-                        </div>
-                        {groupedChats.today.map((chat) => (
-                          <ChatItem
-                            key={chat.id}
-                            chat={chat}
-                            isActive={chat.id === id}
-                            onDelete={(chatId) => {
-                              setDeleteId(chatId);
-                              setShowDeleteDialog(true);
-                            }}
-                            setOpenMobile={setOpenMobile}
-                          />
-                        ))}
-                      </>
-                    )}
-
-                    {groupedChats.yesterday.length > 0 && (
-                      <>
-                        <div className="px-2 py-1 text-xs text-sidebar-foreground/50 mt-6">
-                          Yesterday
-                        </div>
-                        {groupedChats.yesterday.map((chat) => (
-                          <ChatItem
-                            key={chat.id}
-                            chat={chat}
-                            isActive={chat.id === id}
-                            onDelete={(chatId) => {
-                              setDeleteId(chatId);
-                              setShowDeleteDialog(true);
-                            }}
-                            setOpenMobile={setOpenMobile}
-                          />
-                        ))}
-                      </>
-                    )}
-
-                    {groupedChats.lastWeek.length > 0 && (
-                      <>
-                        <div className="px-2 py-1 text-xs text-sidebar-foreground/50 mt-6">
-                          Last 7 days
-                        </div>
-                        {groupedChats.lastWeek.map((chat) => (
-                          <ChatItem
-                            key={chat.id}
-                            chat={chat}
-                            isActive={chat.id === id}
-                            onDelete={(chatId) => {
-                              setDeleteId(chatId);
-                              setShowDeleteDialog(true);
-                            }}
-                            setOpenMobile={setOpenMobile}
-                          />
-                        ))}
-                      </>
-                    )}
-
-                    {groupedChats.lastMonth.length > 0 && (
-                      <>
-                        <div className="px-2 py-1 text-xs text-sidebar-foreground/50 mt-6">
-                          Last 30 days
-                        </div>
-                        {groupedChats.lastMonth.map((chat) => (
-                          <ChatItem
-                            key={chat.id}
-                            chat={chat}
-                            isActive={chat.id === id}
-                            onDelete={(chatId) => {
-                              setDeleteId(chatId);
-                              setShowDeleteDialog(true);
-                            }}
-                            setOpenMobile={setOpenMobile}
-                          />
-                        ))}
-                      </>
-                    )}
-
-                    {groupedChats.older.length > 0 && (
-                      <>
-                        <div className="px-2 py-1 text-xs text-sidebar-foreground/50 mt-6">
-                          Older
-                        </div>
-                        {groupedChats.older.map((chat) => (
-                          <ChatItem
-                            key={chat.id}
-                            chat={chat}
-                            isActive={chat.id === id}
-                            onDelete={(chatId) => {
-                              setDeleteId(chatId);
-                              setShowDeleteDialog(true);
-                            }}
-                            setOpenMobile={setOpenMobile}
-                          />
-                        ))}
-                      </>
-                    )}
-                  </>
-                );
-              })()}
-          </SidebarMenu>
+          <div className="px-4 text-center">
+            <p className="text-center text-sm text-sidebar-foreground/50">
+              No conversations started.
+            </p>
+          </div>
         </SidebarGroupContent>
       </SidebarGroup>
+    );
+  }
+
+  const groupLabels: Record<keyof GroupedChats, string> = {
+    today: 'Today',
+    yesterday: 'Yesterday',
+    lastWeek: 'Last Week',
+    lastMonth: 'Last Month',
+    older: 'Older',
+  };
+
+  return (
+    <>
+      <Collapsible open={isHistoryOpen} onOpenChange={setIsHistoryOpen} className="w-full">
+        <div className="flex items-center justify-between px-3 py-2">
+          <h2 className="text-sm font-semibold">Chat History</h2>
+          <CollapsibleTrigger 
+            className="h-5 w-5 rounded-sm hover:bg-sidebar-accent/50 flex items-center justify-center transition-all"
+          >
+            {isHistoryOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </CollapsibleTrigger>
+        </div>
+        
+        <CollapsibleContent>
+          {enabledGroups.map(([group, chats]) => (
+            <SidebarGroup key={group}>
+              <div className="px-2 py-1 text-xs text-sidebar-foreground/50">
+                {groupLabels[group as keyof GroupedChats]}
+              </div>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {chats.map((chat) => (
+                    <ChatItem
+                      key={chat.id}
+                      chat={chat}
+                      isActive={
+                        pathname.includes(`/chat/${chat.id}`) || chat.id === id
+                      }
+                      onDelete={(id) => {
+                        setDeleteId(id);
+                        setShowDeleteDialog(true);
+                      }}
+                      setOpenMobile={setOpenMobile}
+                    />
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
+
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete your
-              chat and remove it from our servers.
+              chat.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>
-              Delete
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Continue
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

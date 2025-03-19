@@ -60,9 +60,9 @@ export function Overview() {
       {/* Centered greeting - positioned to allow proper spacing with input box */}
       <div className="w-full max-w-xl px-6">
         <div className="flex flex-col gap-2 text-left">
-          <h1 className="text-3xl md:text-4xl font-medium">
+          <h1 className="text-3xl md:text-4xl font-medium bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 bg-clip-text text-transparent">
             {displayedGreeting}
-            {!greetingComplete && <span className="inline-block animate-blink">|</span>}
+            {!greetingComplete && <span className="inline-block animate-blink text-blue-600">|</span>}
           </h1>
           <p className="text-3xl md:text-4xl text-muted-foreground">
             {displayedQuestion}

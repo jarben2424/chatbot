@@ -15,20 +15,20 @@ interface SuggestedActionsProps {
 function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
   const suggestedActions = [
     {
-      title: 'Can you create an awesome looking 3D fractal animation?',
-      action: 'Can you create an awesome looking 3D fractal animation?',
+      title: 'Help me create a customer segmentation strategy for my e-commerce store',
+      action: 'Help me create a customer segmentation strategy for my e-commerce store',
     },
     {
-      title: 'Can you create a rocket simulation for a mission to mars using real orbital mechanics?',
-      action: 'Can you create a rocket simulation for a mission to mars using real orbital mechanics?',
+      title: 'Analyze this customer data and identify high-value segments',
+      action: 'Analyze this customer data and identify high-value segments',
     },
     {
-      title: 'Can you solve the "infinity long" problem?',
-      action: 'Can you solve the "infinity long" problem?',
+      title: 'Design an email campaign sequence for our new product launch',
+      action: 'Design an email campaign sequence for our new product launch',
     },
     {
-      title: 'What would happen to the Earth\'s climate if the planet\'s axial tilt were 0 degrees?',
-      action: 'What would happen to the Earth\'s climate if the planet\'s axial tilt were 0 degrees?',
+      title: 'Generate a dashboard to track customer engagement metrics over time',
+      action: 'Generate a dashboard to track customer engagement metrics over time',
     },
   ];
 
