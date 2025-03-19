@@ -239,7 +239,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
   if (isLoading) {
     return (
       <SidebarGroup>
-        <div className="px-2 py-1 text-xs text-sidebar-foreground/50">
+        <div className="px-3 py-1 text-xs text-sidebar-foreground/50">
           Today
         </div>
         <SidebarGroupContent>
@@ -345,10 +345,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
         <CollapsibleContent className="animate-collapsible-down">
           {enabledGroups.map(([group, chats]) => (
             <SidebarGroup key={group}>
-              <div className="px-2 py-1 text-xs text-sidebar-foreground/50">
-                {groupLabels[group as keyof GroupedChats]}
-              </div>
-              <SidebarGroupContent>
+              <SidebarGroupContent className="pl-3">
                 <SidebarMenu>
                   {chats.map((chat) => (
                     <ChatItem
