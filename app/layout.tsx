@@ -3,6 +3,7 @@ import { Toaster } from 'sonner';
 
 import { ThemeProvider } from '@/components/theme-provider';
 import { SidebarProvider } from '@/hooks/use-sidebar';
+import { CommandPaletteProvider } from '@/components/command-palette-provider';
 
 import './globals.css';
 
@@ -65,8 +66,10 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <SidebarProvider>
-            <Toaster position="top-center" />
-            {children}
+            <CommandPaletteProvider>
+              <Toaster position="top-center" />
+              {children}
+            </CommandPaletteProvider>
           </SidebarProvider>
         </ThemeProvider>
       </body>
