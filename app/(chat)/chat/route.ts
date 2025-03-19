@@ -26,10 +26,15 @@ import { updateDocument } from '@/lib/ai/tools/update-document';
 import { buildReport, buildReportTool } from '@/lib/ai/tools/report-builder';
 import { checkRateLimit } from '@/lib/rate-limit';
 
-// Create a function to handle opening the artifact immediately
-const forceOpenArtifact = (dataStream: any, documentInfo: { id: string, title: string, kind: string }) => {
+// These are some helper tools we use to format the chat route response
+const getWeatherTool = getWeather;
+
+// Function to directly send commands to open artifacts
+const directlyOpenArtifact = (dataStream: any, documentInfo: { id: string; title: string; kind: string; }) => {
   try {
-    // First signal - direct artifact data
+    // Send multiple signals to ensure the artifact opens correctly
+    
+    // First signal - direct artifact with autoFocus flag
     dataStream.writeData({
       type: 'artifact',
       content: {
@@ -37,14 +42,15 @@ const forceOpenArtifact = (dataStream: any, documentInfo: { id: string, title: s
         title: documentInfo.title,
         kind: documentInfo.kind,
         isVisible: true,
-        status: 'idle'
+        status: 'idle',
+        autoFocus: true,
+        shouldOpen: true
       }
     });
     
-    // Second signal with delay - to ensure it's processed after any rendering
+    // Second signal after a delay to ensure UI has updated
     setTimeout(() => {
       try {
-        console.log('Sending delayed force-open signal');
         dataStream.writeData({
           type: 'force-artifact-visible',
           content: {
@@ -52,21 +58,47 @@ const forceOpenArtifact = (dataStream: any, documentInfo: { id: string, title: s
             title: documentInfo.title,
             kind: documentInfo.kind,
             isVisible: true,
-            status: 'idle'
+            status: 'idle',
+            autoFocus: true,
+            shouldOpen: true
           }
         });
-        
-        // Final completion signal
-        dataStream.writeData({
-          type: 'finish',
-          content: ''
-        });
       } catch (e) {
-        console.error('Error sending delayed signals:', e);
+        console.error('Error sending delayed open signal:', e);
       }
     }, 800);
+    
+    // Also send a client script to force open using JavaScript
+    dataStream.writeData({
+      type: 'client-script',
+      content: `
+        try {
+          if (typeof window !== 'undefined') {
+            console.log('Executing client-side artifact opener for ${documentInfo.id}');
+            
+            // Dispatch a custom event for the ArtifactOpener
+            const openEvent = new CustomEvent('artifact-signal', {
+              detail: {
+                documentId: '${documentInfo.id}',
+                title: '${documentInfo.title.replace(/'/g, "\\'")}',
+                kind: '${documentInfo.kind}',
+                isVisible: true,
+                autoFocus: true,
+                shouldOpen: true
+              }
+            });
+            
+            // Dispatch now and also after a small delay
+            window.dispatchEvent(openEvent);
+            setTimeout(() => window.dispatchEvent(openEvent), 1000);
+          }
+        } catch (e) {
+          console.error('Error in client artifact opener:', e);
+        }
+      `
+    });
   } catch (error) {
-    console.error('Error in forceOpenArtifact:', error);
+    console.error('Error in directlyOpenArtifact:', error);
   }
 };
 
@@ -97,7 +129,7 @@ export async function POST(request: Request) {
     // Save chat and message
     const chat = await getChatById({ id });
     if (!chat) {
-      const title = await generateTitleFromUserMessage({ message: userMessage });
+      const title = await generateTitleFromUserMessage({ message: typeof userMessage === 'string' ? userMessage : userMessage.content });
       await saveChat({ 
         id, 
         userId: session.user.id, 
@@ -110,10 +142,12 @@ export async function POST(request: Request) {
       messages: [{ 
         id: generateUUID(),
         chatId: id,
-        role: userMessage.role,
-        content: typeof userMessage.content === 'string' 
-          ? { text: userMessage.content } 
-          : userMessage.content,
+        role: typeof userMessage === 'string' ? 'user' : userMessage.role,
+        content: typeof userMessage === 'string' 
+          ? { text: userMessage } 
+          : typeof userMessage.content === 'string'
+            ? { text: userMessage.content }
+            : userMessage.content,
         createdAt: new Date(),
       }],
     });
@@ -139,7 +173,7 @@ export async function POST(request: Request) {
             ],
             tools: {
               ...dataTools,
-              getWeather,
+              getWeather: getWeatherTool,
               createDocument: createDocument({ session, dataStream }),
               updateDocument: updateDocument({ session, dataStream }),
               buildReport: {
@@ -159,23 +193,17 @@ export async function POST(request: Request) {
                       }
                     });
                     
-                    const result = await buildReport(args, { 
+                    // Generate the report and get the response
+                    const report = await buildReport(args, { 
                       toolCallId: options?.toolCallId || '', 
                       dataStream, 
                       session, 
                       chatId: id 
                     });
                     
-                    console.log('Report build successful, returning result:', result);
+                    console.log('Report build successful:', report);
                     
-                    // Use the dedicated function to force open the artifact
-                    forceOpenArtifact(dataStream, {
-                      id: result.id,
-                      title: result.title,
-                      kind: result.kind
-                    });
-                    
-                    // Add a final tool-status update indicating completion
+                    // Update tool status to complete
                     dataStream.writeData({
                       type: 'tool-status',
                       content: {
@@ -185,17 +213,23 @@ export async function POST(request: Request) {
                       }
                     });
                     
-                    // Return a simple string response for the successful report creation
-                    return `I've created a report titled "${args.title}" that you can now view and edit.`;
+                    // Add UI to open the document
+                    dataStream.writeData({
+                      type: 'artifact',
+                      content: {
+                        documentId: report.documentId,
+                        title: report.title,
+                        kind: report.kind,
+                        isVisible: true,
+                        status: 'idle'
+                      }
+                    });
+                    
+                    // Return the document info as the tool result
+                    return report;
                   } catch (error) {
-                    console.error('Report builder error:', error);
-                    
-                    // Return a more helpful error message
-                    if (error instanceof Error && error.message.includes('No such languageModel')) {
-                      return `I was unable to create the report due to a configuration issue. Please try a different request or contact the administrator.`;
-                    }
-                    
-                    return `I was unable to create the report due to an error. Please try again later.`;
+                    console.error('Error building report:', error);
+                    return `Error building report: ${error instanceof Error ? error.message : String(error)}`;
                   }
                 }
               },

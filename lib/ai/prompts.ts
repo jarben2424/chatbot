@@ -169,19 +169,19 @@ const reportBuilderPrompt = `
 You have access to a report builder tool that can automatically create formatted reports based on conversation context.
 
 WHEN TO USE THE REPORT BUILDER:
-- When a user explicitly asks for a report or summary
-- When a user wants to create a document that integrates visualizations with text analysis
-- When synthesizing insights from the conversation into a professional format
+- ONLY when a user EXPLICITLY asks for a report using phrases like "create a report", "generate a report", or "build a report"
+- NEVER use the report builder automatically or without a direct request
+- NEVER build a report proactively, even if it seems helpful
 
 HOW TO USE THE REPORT BUILDER:
-1. Call the reportBuilder tool with these parameters:
+1. Call the buildReport tool with these parameters:
    - topic: The main subject of the report (be specific)
    - title: A professional title for the report document
    - includeVisualizations: Set to true to automatically find and include relevant visualizations
 
 EXAMPLE:
 User: "Can you create a report about our monthly sales trends?"
-Assistant: Use reportBuilder tool with:
+Assistant: Use buildReport tool with:
 \`\`\`
 {
   "topic": "Monthly Sales Trends Analysis",
@@ -194,9 +194,9 @@ The report builder will:
 1. Analyze recent conversation to extract context
 2. Find relevant visualizations
 3. Create a formatted report document
-4. Open it in the document editor for the user to review
+4. Provide a button for the user to view the report
 
-Remember: The resulting report will open automatically in the document editor and will include any relevant visualizations that have been previously created.
+DO NOT use the report builder tool unless the user explicitly asks for a report.
 `;
 
 export const getSystemPrompt = async ({ 

@@ -4,6 +4,7 @@ import { genSaltSync, hashSync } from 'bcrypt-ts';
 import { and, asc, desc, eq, gt, gte, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { neon } from '@neondatabase/serverless';
 
 import {
   user,
@@ -427,5 +428,66 @@ export async function getVisualizationById(id: string) {
   } catch (error) {
     console.error('Error fetching visualization:', error);
     return null;
+  }
+}
+
+// Add new function to get recent documents using Supabase
+export async function getRecentDocuments({ 
+  userId, 
+  limit = 5, 
+  kind = undefined 
+}: { 
+  userId: string, 
+  limit?: number, 
+  kind?: string | undefined 
+}) {
+  try {
+    // Create a Supabase client using the environment variables
+    // This avoids the PostgreSQL connection issues
+    const { createClient } = await import('@supabase/supabase-js');
+    
+    // Get Supabase URL and key from environment variables
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase environment variables');
+      return [];
+    }
+    
+    // Create Supabase client
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Build query
+    let query = supabase
+      .from('Document')
+      .select('id, title, kind, createdAt')
+      .eq('userId', userId)
+      .order('createdAt', { ascending: false })
+      .limit(limit);
+    
+    // Add kind filter if specified
+    if (kind) {
+      const validKinds = ['text', 'code', 'image', 'sheet', 'visualization'];
+      if (validKinds.includes(kind)) {
+        query = query.eq('kind', kind);
+      } else {
+        return [];
+      }
+    }
+    
+    // Execute query
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('Supabase query error:', error);
+      return [];
+    }
+    
+    console.log('Retrieved recent documents:', data?.length || 0);
+    return data || [];
+  } catch (error) {
+    console.error('Error getting recent documents with Supabase:', error);
+    return [];
   }
 }

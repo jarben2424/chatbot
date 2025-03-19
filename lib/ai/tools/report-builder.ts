@@ -4,9 +4,6 @@ import { Session } from 'next-auth';
 import { generateUUID } from '@/lib/utils';
 import { getMessagesByChatId, saveDocument } from '@/lib/db/queries';
 import { document } from '@/lib/db/schema';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { neon } from '@neondatabase/serverless';
-import { eq, desc } from 'drizzle-orm';
 import { myProvider } from '@/lib/ai/providers';
 import { streamText, smoothStream } from 'ai';
 
@@ -17,42 +14,38 @@ interface ReportBuilderProps {
 }
 
 // Helper function to find visualizations in the database
-async function findRelevantVisualizations(topic: string, limit: number = 3) {
+async function findRelevantVisualizations(topic: string, limit: number = 1) {
   try {
-    // Create db connection
-    const db = drizzle(neon(process.env.DATABASE_URL!), { schema: { document } });
+    // Create Supabase client using the environment variables
+    const { createClient } = await import('@supabase/supabase-js');
     
-    // Query all visualization documents
-    const visualizations = await db
-      .select({
-        id: document.id,
-        title: document.title,
-        content: document.content,
-        createdAt: document.createdAt
-      })
-      .from(document)
-      .where(eq(document.kind, 'visualization'))
-      .orderBy(desc(document.createdAt))
-      .limit(20);
+    // Get Supabase URL and key from environment variables
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     
-    // Filter visualizations based on relevance to the topic
-    // In a production system, you might use embeddings for better matching
-    const relevantVisualizations = visualizations.filter(viz => {
-      try {
-        const content = JSON.parse(viz.content || '{}');
-        const title = viz.title.toLowerCase();
-        const description = content.description || '';
-        
-        // Simple keyword matching
-        const keywords = topic.toLowerCase().split(' ');
-        return keywords.some(keyword => 
-          title.includes(keyword) || 
-          description.toLowerCase().includes(keyword)
-        );
-      } catch (error) {
-        return false;
-      }
-    }).slice(0, limit);
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase environment variables');
+      return [];
+    }
+    
+    // Create Supabase client
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Query all visualization documents, ordered by most recent first
+    const { data: visualizations, error } = await supabase
+      .from('Document')
+      .select('id, title, content, createdAt')
+      .eq('kind', 'visualization')
+      .order('createdAt', { ascending: false })
+      .limit(5); // Get a few to filter for relevance
+    
+    if (error) {
+      console.error('Supabase query error:', error);
+      return [];
+    }
+    
+    // Just get the most recent visualization since that's likely most relevant
+    const relevantVisualizations = visualizations?.length > 0 ? [visualizations[0]] : [];
     
     return relevantVisualizations;
   } catch (error) {
@@ -88,7 +81,7 @@ async function extractChatContext(chatId: string, messageLimit: number = 10) {
   }
 }
 
-// The report builder tool definition
+// The report builder tool definition - simplified to match Vercel AI SDK patterns
 export const buildReportTool = tool({
   description: 'Create a comprehensive report based on conversation context and available visualizations',
   parameters: z.object({
@@ -98,8 +91,7 @@ export const buildReportTool = tool({
   }),
   execute: async ({ topic, title, includeVisualizations }) => {
     // This is a dummy implementation that will be replaced in the route handler
-    return `Report tool usage requires the proper session and data context.
-    Contact the developer to ensure the report builder is configured correctly.`;
+    return `Report tool usage requires the proper session and data context.`;
   }
 });
 
@@ -125,26 +117,28 @@ export async function buildReport(
     // Generate a unique ID for the document
     const documentId = generateUUID();
     
-    // Signal the start of report creation
-    dataStream.writeData({
-      type: 'kind',
-      content: 'text'
+    // First, create and save an empty document with placeholder content
+    console.log('Creating initial document with ID:', documentId);
+    await saveDocument({
+      id: documentId,
+      title,
+      content: `# ${title}\n\nGenerating report...`,
+      kind: 'text',
+      userId: session.user.id,
     });
     
+    // Send initial signal that document is created
     dataStream.writeData({
-      type: 'id',
-      content: documentId
-    });
-    
-    dataStream.writeData({
-      type: 'title',
-      content: title
-    });
-    
-    // Reset the content stream
-    dataStream.writeData({
-      type: 'clear',
-      content: ''
+      type: 'artifact',
+      content: {
+        documentId,
+        title,
+        kind: 'text',
+        isVisible: true,
+        status: 'idle',
+        autoFocus: true,
+        shouldOpen: true
+      }
     });
     
     // Extract context from recent messages
@@ -173,33 +167,82 @@ export async function buildReport(
       }
     });
     
+    // Create a professional report template with proper sections
+    const reportTemplate = `
+# ${title}
+
+## Executive Summary
+
+[One or two paragraphs summarizing the report's key findings and recommendations]
+
+## Introduction
+
+[Brief introduction to the topic and the purpose of this report]
+
+## Analysis
+
+[Main analysis section with findings and insights]
+
+## Recommendations
+
+[Actionable recommendations based on the analysis]
+
+## Conclusion
+
+[Brief conclusion summarizing the main points and next steps]
+
+${visualizationReferences.length > 0 ? `
+## Data Visualization
+
+${visualizationReferences.map(viz => `
+### ${viz.title}
+
+${viz.description}
+
+<div class="report-visualization">
+  <div class="visualization-container">
+    <img src="/api/visualization-image?id=${viz.id}" alt="${viz.title}" title="${viz.title}" class="viz-image" />
+  </div>
+  <div class="viz-caption">${viz.title}</div>
+</div>
+
+[Analysis of what this visualization shows and its relevance to the topic]
+`).join('\n')}
+` : ''}
+`;
+    
     // Create a prompt for the AI to generate the report content
     const reportPrompt = `
-Create a professional report about "${topic}" based on the following conversation context:
+You are creating a professional business report about "${topic}" that needs to be well-formatted, comprehensive, and visually appealing.
 
+Use the following conversation context to inform your report:
 ${chatContext}
 
-${includeVisualizations && visualizationReferences.length > 0 ? `
-Include references to the following visualizations:
-${visualizationReferences.map((visualization, i) => 
-  `${i+1}. ${visualization.title}: ${visualization.description} (Visualization ID: ${visualization.id})`
-).join('\n')}
+Your report should follow this exact structure, replacing the placeholder text with actual content while keeping all headers:
+${reportTemplate}
 
-For each visualization, include a section with the heading matching its title, and add a placeholder for the image with:
-${visualizationReferences.map(viz => `![${viz.title}](viz:${viz.id})`).join('\n')}
+${includeVisualizations && visualizationReferences.length > 0 ? `
+IMPORTANT: For each visualization in the "Data Visualization" section:
+1. Keep the heading with the visualization's title
+2. Keep the visualization HTML exactly as is, including all <div> and <img> tags
+3. Write a thoughtful analysis of what the visualization shows and its relevance to the overall topic
 ` : ''}
 
-Structure the report with appropriate headings, subheadings, and bullet points where relevant.
-Focus on providing valuable insights and a professional analysis.
+FORMATTING GUIDELINES:
+- Use proper markdown heading levels (# for main title, ## for sections, ### for subsections)
+- Use **bold** and *italic* text for emphasis on important points
+- Use bullet points and numbered lists where appropriate
+- Include proper spacing between sections for readability
+- Keep paragraphs concise (3-5 sentences maximum)
+- Use professional business language throughout
 `;
 
-    // Stream the report content generation
+    // Generate the report content
     let reportContent = '';
-    
     const { fullStream } = streamText({
-      model: myProvider.languageModel('gpt-3.5-turbo'),
-      system: 'You are an expert report writer who creates concise, professional business reports with clear structure and valuable insights. Include proper markdown formatting with headings, subheadings, and lists where appropriate.',
-      experimental_transform: smoothStream({ chunking: 'word' }),
+      model: myProvider.languageModel('gpt-4'),
+      system: 'You are an expert business report writer who creates concise, professional reports with clear structure and valuable insights. Your reports are well-formatted with proper markdown, have excellent visual hierarchy, and present information in a way that executives can quickly understand and act upon.',
+      experimental_transform: smoothStream({ chunking: 'line' }),
       prompt: reportPrompt,
     });
     
@@ -208,73 +251,68 @@ Focus on providing valuable insights and a professional analysis.
       if (delta.type === 'text-delta') {
         reportContent += delta.textDelta;
         
-        // Stream content to the UI
-        try {
-          dataStream.writeData({
-            type: 'content-update',
-            content: delta.textDelta
-          });
-        } catch (streamError) {
-          console.error('Error streaming content update:', streamError);
-          // Continue processing even if streaming fails
+        // Every ~500 characters, update the saved document to show progress
+        if (reportContent.length % 500 < 20) {
+          try {
+            await saveDocument({
+              id: documentId,
+              title,
+              content: reportContent,
+              kind: 'text',
+              userId: session.user.id,
+            });
+            
+            // Send progress update
+            dataStream.writeData({
+              type: 'tool-status',
+              content: {
+                toolCallId,
+                status: 'running',
+                message: `Generating report... (${Math.round(reportContent.length / 1000)}KB)`
+              }
+            });
+          } catch (updateError) {
+            console.error('Error updating document during streaming:', updateError);
+          }
         }
       }
     }
     
-    // Save the report document
+    // Final save of the complete document with proper formatting
     try {
+      // Clean up the markdown content
+      const enhancedContent = reportContent
+        .trim()
+        .replace(/\n{3,}/g, '\n\n'); // Remove excessive line breaks
+      
+      // For markdown content that doesn't already have HTML visualization divs,
+      // convert any viz: format markdown images to proper HTML
+      const processedContent = enhancedContent.replace(
+        /!\[(.*?)\]\(viz:(.*?)\)/g, 
+        (match, title, vizId) => `
+          <div class="report-visualization">
+            <div class="visualization-container">
+              <img src="/api/visualization-image?id=${vizId}" alt="${title}" title="${title}" class="viz-image" />
+            </div>
+            <div class="viz-caption">${title}</div>
+          </div>
+        `
+      );
+      
+      // Don't wrap the content in a div with report-content class, as our document-preview component
+      // now handles the rendering directly via the Markdown component
+      const finalContent = processedContent;
+      
+      // Save the final document
       await saveDocument({
         id: documentId,
         title,
-        content: reportContent,
+        content: finalContent,
         kind: 'text',
         userId: session.user.id,
       });
       
-      console.log(`Successfully created report with ID: ${documentId}`);
-      
-      // Signal to open the artifact in the UI immediately
-      console.log('Sending artifact signal to open document in UI:', { 
-        documentId, 
-        title, 
-        kind: 'text' 
-      });
-
-      // Create a client-side script to force open the artifact
-      const clientScript = `
-        (function() {
-          try {
-            // Create and dispatch a custom event to open the artifact
-            var openEvent = new CustomEvent('openArtifact', {
-              detail: {
-                documentId: '${documentId}',
-                title: '${title}',
-                kind: 'text',
-                timestamp: ${Date.now()}
-              }
-            });
-            
-            console.log('Dispatching openArtifact event from inline script');
-            window.dispatchEvent(openEvent);
-            
-            // Try again after a short delay to ensure it works
-            setTimeout(function() {
-              console.log('Dispatching delayed openArtifact event');
-              window.dispatchEvent(openEvent);
-            }, 500);
-          } catch (error) {
-            console.error('Error in inline script:', error);
-          }
-        })();
-      `;
-
-      // Add script to the document stream
-      dataStream.writeData({
-        type: 'client-script',
-        content: clientScript
-      });
-
-      // Send regular artifact signals as backup
+      // Send final signal to ensure document is opened
       dataStream.writeData({
         type: 'artifact',
         content: {
@@ -282,21 +320,17 @@ Focus on providing valuable insights and a professional analysis.
           title,
           kind: 'text',
           isVisible: true,
-          status: 'idle',
-          content: reportContent
+          status: 'idle', 
+          autoFocus: true,
+          shouldOpen: true
         }
       });
-
-      // Finish signal to indicate streaming is complete
-      dataStream.writeData({
-        type: 'finish',
-        content: ''
-      });
       
+      // Return the result for the tool
       return {
-        id: documentId,
+        documentId,
         title,
-        kind: 'text',
+        content: finalContent,
         visualizations: visualizationReferences.map(viz => viz.id)
       };
     } catch (saveError) {

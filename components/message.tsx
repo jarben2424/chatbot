@@ -25,6 +25,20 @@ import { QueryDisplay } from './data-visualization/query-display';
 import { VisualizationPanel } from './data-visualization/visualization-panel';
 import { useArtifactSelector } from '@/hooks/use-artifact';
 
+// Add type declaration for debugArtifactOpener
+declare global {
+  interface Window {
+    debugArtifactOpener?: {
+      setArtifactForId: (id: string, title: string) => boolean | void;
+      logCurrentState: () => void;
+      forceVisibility: () => string;
+    };
+  }
+}
+
+// Add type for tool names
+type ToolName = 'queryData' | 'visualizeData' | 'getWeather' | 'createDocument' | 'updateDocument' | 'requestSuggestions' | 'buildReport';
+
 const PurePreviewMessage = ({
   chatId,
   message,
@@ -152,11 +166,12 @@ const PurePreviewMessage = ({
               <div className="flex flex-col gap-4">
                 {message.toolInvocations.map((toolInvocation) => {
                   const { toolName, toolCallId, state, args } = toolInvocation;
+                  const typedToolName = toolName as ToolName;
 
                   if (state === 'result') {
                     const { result } = toolInvocation;
 
-                    if (toolName === 'queryData') {
+                    if (typedToolName === 'queryData') {
                       return (
                         <div key={toolCallId} className="mt-4">
                           <QueryDisplay 
@@ -167,7 +182,7 @@ const PurePreviewMessage = ({
                           />
                         </div>
                       );
-                    } else if (toolName === 'visualizeData') {
+                    } else if (typedToolName === 'visualizeData') {
                       return (
                         <div key={toolCallId} className="mt-4">
                           <VisualizationPanel 
@@ -181,13 +196,13 @@ const PurePreviewMessage = ({
                           />
                         </div>
                       );
-                    } else if (toolName === 'getWeather') {
+                    } else if (typedToolName === 'getWeather') {
                       return (
                         <div key={toolCallId}>
                           <Weather weatherAtLocation={result} />
                         </div>
                       );
-                    } else if (toolName === 'createDocument') {
+                    } else if (typedToolName === 'createDocument') {
                       return (
                         <DocumentPreview
                           key={toolCallId}
@@ -195,7 +210,7 @@ const PurePreviewMessage = ({
                           result={result}
                         />
                       );
-                    } else if (toolName === 'updateDocument') {
+                    } else if (typedToolName === 'updateDocument') {
                       return (
                         <DocumentToolResult
                           key={toolCallId}
@@ -204,7 +219,7 @@ const PurePreviewMessage = ({
                           isReadonly={isReadonly}
                         />
                       );
-                    } else if (toolName === 'requestSuggestions') {
+                    } else if (typedToolName === 'requestSuggestions') {
                       return (
                         <DocumentToolResult
                           key={toolCallId}
@@ -212,6 +227,38 @@ const PurePreviewMessage = ({
                           result={result}
                           isReadonly={isReadonly}
                         />
+                      );
+                    } else if (typedToolName === 'buildReport') {
+                      return (
+                        <div key={toolCallId} className="mt-4 p-4 bg-blue-50 rounded-md border border-blue-100">
+                          <div className="flex flex-col">
+                            <h3 className="text-lg font-semibold text-blue-800 mb-2">
+                              📄 Report Generated: {result.title}
+                            </h3>
+                            <p className="text-sm text-gray-600 mb-3">
+                              A report has been created based on your conversation
+                              {result.visualizations?.length > 0 && `, with ${result.visualizations.length} relevant visualizations included`}.
+                            </p>
+                            <div className="flex gap-2 mt-2">
+                              <a 
+                                href={`/document/${result.documentId}`}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  // Try to set the artifact via window.debugArtifactOpener if available
+                                  if (window.debugArtifactOpener?.setArtifactForId) {
+                                    window.debugArtifactOpener.setArtifactForId(result.documentId, result.title);
+                                  } else {
+                                    // Directly update location
+                                    window.location.href = `/document/${result.documentId}`;
+                                  }
+                                }}
+                              >
+                                View Report
+                              </a>
+                            </div>
+                          </div>
+                        </div>
                       );
                     } else {
                       return (
@@ -223,25 +270,59 @@ const PurePreviewMessage = ({
                     <div
                       key={toolCallId}
                       className={cx({
-                        skeleton: ['getWeather'].includes(toolName),
+                        skeleton: ['getWeather'].includes(typedToolName),
                       })}
                     >
-                      {toolName === 'getWeather' ? (
+                      {typedToolName === 'getWeather' ? (
                         <Weather />
-                      ) : toolName === 'createDocument' ? (
+                      ) : typedToolName === 'createDocument' ? (
                         <DocumentPreview isReadonly={isReadonly} args={args} />
-                      ) : toolName === 'updateDocument' ? (
+                      ) : typedToolName === 'updateDocument' ? (
                         <DocumentToolCall
                           type="update"
                           args={args}
                           isReadonly={isReadonly}
                         />
-                      ) : toolName === 'requestSuggestions' ? (
+                      ) : typedToolName === 'requestSuggestions' ? (
                         <DocumentToolCall
                           type="request-suggestions"
                           args={args}
                           isReadonly={isReadonly}
                         />
+                      ) : typedToolName === 'buildReport' ? (
+                        <div key={toolCallId} className="mt-4 p-4 bg-blue-50 rounded-md border border-blue-100">
+                          <div className="flex flex-col">
+                            <div className="flex items-center space-x-3 mb-3">
+                              <div className="rounded-full bg-blue-200 h-6 w-6 flex items-center justify-center">
+                                <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                              </div>
+                              <div className="flex flex-col">
+                                <h3 className="text-sm font-medium text-blue-800">
+                                  Generating Report: {args.title}
+                                </h3>
+                                <p className="text-xs text-gray-600">
+                                  Creating comprehensive report on {args.topic}...
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {/* Progress bar */}
+                            <div className="w-full bg-blue-100 rounded-full h-2 mb-2">
+                              <div 
+                                className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                                style={{ width: '0%' }} // This will be animated by CSS
+                              />
+                            </div>
+                            
+                            {/* Status message */}
+                            <p className="text-xs text-blue-700">
+                              Analyzing conversation context and finding relevant visualizations...
+                            </p>
+                          </div>
+                        </div>
                       ) : null}
                     </div>
                   );
@@ -286,7 +367,7 @@ export const PreviewMessage = memo(
 );
 
 export const ThinkingMessage = () => {
-  const role = 'assistant';
+  const role = 'assistant' as const;
 
   return (
     <motion.div

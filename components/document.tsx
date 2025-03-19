@@ -1,7 +1,8 @@
 import { memo, useEffect } from 'react';
+import Link from 'next/link';
 
 import type { ArtifactKind } from './artifact';
-import { FileIcon, LoaderIcon, MessageIcon, PencilEditIcon } from './icons';
+import { FileIcon, LoaderIcon, MessageIcon, PencilEditIcon, FullscreenIcon } from './icons';
 import { toast } from 'sonner';
 import { useArtifact } from '@/hooks/use-artifact';
 
@@ -27,14 +28,14 @@ interface DocumentToolResultProps {
   type: 'create' | 'update' | 'request-suggestions';
   result: {
     id: string;
-    title: string;
-    kind: ArtifactKind;
+    title?: string;
+    kind?: string;
     error?: string;
   };
   isReadonly: boolean;
 }
 
-function PureDocumentToolResult({
+export function DocumentToolResult({
   type,
   result,
   isReadonly,
@@ -51,62 +52,77 @@ function PureDocumentToolResult({
   }, [result.error]);
 
   return (
-    <button
-      type="button"
-      className="bg-background cursor-pointer border py-2 px-3 rounded-xl w-fit flex flex-row gap-3 items-start"
-      onClick={(event) => {
-        if (isReadonly) {
-          toast.error(
-            'Viewing files in shared chats is currently not supported.',
-          );
-          return;
+    <div className="border rounded-2xl overflow-hidden bg-zinc-50 dark:bg-zinc-900 dark:border-zinc-800 chat-document-card">
+      <style jsx>{`
+        /* Responsive styles for document cards in chat when a document is expanded */
+        @media (min-width: 768px) {
+          :global(.expanded-document) .chat-document-card {
+            max-width: calc(100% - 2rem);
+            width: 100%;
+          }
         }
-
-        const rect = event.currentTarget.getBoundingClientRect();
-
-        const boundingBox = {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        };
-
-        setArtifact({
-          documentId: result.id,
-          kind: result.kind,
-          content: '',
-          title: result.title,
-          isVisible: true,
-          status: 'idle',
-          boundingBox,
-        });
-      }}
-    >
-      <div className="text-muted-foreground mt-1">
-        {type === 'create' ? (
+      `}</style>
+      <div className="p-4 flex justify-between items-center gap-2 border-b dark:border-zinc-800">
+        <div className="flex items-center gap-2">
           <FileIcon />
-        ) : type === 'update' ? (
-          <PencilEditIcon />
-        ) : type === 'request-suggestions' ? (
-          <MessageIcon />
-        ) : null}
+          <div className="font-medium truncate">{result.title || ''}</div>
+        </div>
+        <div className="flex items-center">
+          <Link
+            href={`/document/${result.id}`}
+            className="hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-2 rounded-md"
+            onClick={(e) => {
+              // Try to use the debug-artifact-opener if it exists
+              // @ts-ignore
+              if (window?.debugArtifactOpener?.setArtifactForId) {
+                e.preventDefault();
+                // @ts-ignore
+                window.debugArtifactOpener.setArtifactForId(
+                  result.id,
+                  result.title || '',
+                );
+              }
+            }}
+          >
+            <FullscreenIcon size={18} />
+          </Link>
+        </div>
       </div>
-      <div className="text-left">
-        {`${getActionText(type, 'past')} "${result.title}"`}
+      <div className="p-4 flex gap-2 justify-end">
+        <div className="flex flex-1 justify-start">
+          {/* Empty div to maintain spacing */}
+        </div>
+        <Link
+          href={`/document/${result.id}`}
+          className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md"
+          onClick={(e) => {
+            // Try to use the debug-artifact-opener if it exists
+            // @ts-ignore
+            if (window?.debugArtifactOpener?.setArtifactForId) {
+              e.preventDefault();
+              // @ts-ignore
+              window.debugArtifactOpener.setArtifactForId(result.id, result.title || '');
+            }
+          }}
+        >
+          <span className="text-sm font-medium">Open Document</span>
+        </Link>
       </div>
-    </button>
+    </div>
   );
 }
 
-export const DocumentToolResult = memo(PureDocumentToolResult, () => true);
-
 interface DocumentToolCallProps {
   type: 'create' | 'update' | 'request-suggestions';
-  args: { title: string; error?: string };
+  args: { 
+    title?: string; 
+    id?: string;
+    error?: string;
+  };
   isReadonly: boolean;
 }
 
-function PureDocumentToolCall({
+export function DocumentToolCall({
   type,
   args,
   isReadonly,
@@ -114,59 +130,33 @@ function PureDocumentToolCall({
   const { setArtifact } = useArtifact();
 
   return (
-    <button
-      type="button"
-      className="cursor pointer w-fit border py-2 px-3 rounded-xl flex flex-row items-start justify-between gap-3"
-      onClick={(event) => {
-        if (isReadonly) {
-          toast.error(
-            'Viewing files in shared chats is currently not supported.',
-          );
-          return;
+    <div className="border rounded-2xl overflow-hidden bg-zinc-50 dark:bg-zinc-900 dark:border-zinc-800 chat-document-card">
+      <style jsx>{`
+        /* Responsive styles for document cards in chat when a document is expanded */
+        @media (min-width: 768px) {
+          :global(.expanded-document) .chat-document-card {
+            max-width: calc(100% - 2rem);
+            width: 100%;
+          }
         }
-
-        const rect = event.currentTarget.getBoundingClientRect();
-
-        const boundingBox = {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        };
-
-        setArtifact((currentArtifact) => ({
-          ...currentArtifact,
-          isVisible: true,
-          boundingBox,
-        }));
-        
-        // Handle error message if present
-        if (args.error) {
-          setTimeout(() => {
-            toast.info(args.error);
-          }, 500);
-        }
-      }}
-    >
-      <div className="flex flex-row gap-3 items-start">
-        <div className="text-zinc-500 mt-1">
-          {type === 'create' ? (
-            <FileIcon />
-          ) : type === 'update' ? (
-            <PencilEditIcon />
-          ) : type === 'request-suggestions' ? (
-            <MessageIcon />
-          ) : null}
-        </div>
-
-        <div className="text-left">
-          {`${getActionText(type, 'present')} ${args.title ? `"${args.title}"` : ''}`}
+      `}</style>
+      <div className="p-4 flex justify-between items-center gap-2 border-b dark:border-zinc-800">
+        <div className="flex items-center gap-2">
+          <div className="animate-spin">
+            <LoaderIcon />
+          </div>
+          <div className="font-medium truncate">{args.title}</div>
         </div>
       </div>
-
-      <div className="animate-spin mt-1">{<LoaderIcon />}</div>
-    </button>
+      <div className="p-4 flex flex-col gap-2">
+        <div className="text-xs text-zinc-500 dark:text-zinc-400 animate-pulse">
+          {type === 'create'
+            ? 'Creating document...'
+            : type === 'update'
+              ? 'Updating document...'
+              : 'Generating suggestions...'}
+        </div>
+      </div>
+    </div>
   );
 }
-
-export const DocumentToolCall = memo(PureDocumentToolCall, () => true);
