@@ -116,11 +116,11 @@ export function AppSidebar({ user }: { user: User | undefined }) {
           <Link
             key={item.name}
             href={item.href}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-accent"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:bg-primary/5 hover:text-primary group"
             onClick={() => setOpenMobile(false)}
           >
-            <item.icon className="h-4 w-4" />
-            {item.name}
+            <item.icon className="h-4 w-4 transition-colors group-hover:text-primary" />
+            <span className="transition-colors">{item.name}</span>
           </Link>
         ))}
       </div>
