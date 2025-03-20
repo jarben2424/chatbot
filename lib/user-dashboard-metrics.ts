@@ -1,6 +1,7 @@
 'use client'
 
 import { createClient } from '@/utils/supabase/client';
+import { UIVisualizationType } from './client-visualization-types';
 
 export interface UserDashboardMetric {
   id: string;
@@ -9,7 +10,7 @@ export interface UserDashboardMetric {
   description?: string;
   question?: string;
   sqlQuery: string;
-  visualizationType: 'highlight' | 'chart' | 'table';
+  visualizationType: UIVisualizationType;
   displayOrder: number;
   isActive: boolean;
   createdAt: string;

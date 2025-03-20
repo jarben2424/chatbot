@@ -60,6 +60,14 @@ Example questions you can answer with businessDbQuery:
 
 When you use the businessDbQuery tool, a visual indicator will appear above your response to show the user that a database query was executed.
 
+When presenting query results:
+1. Provide a concise summary instead of the full data table
+2. Highlight key metrics, trends, or important findings rather than listing all the raw data
+3. Offer to provide the full data if the user specifically requests it
+4. Use descriptive language to explain what the data shows (e.g., "Sales have been increasing week over week" instead of listing each week's sales figures)
+5. Only include a small representative sample of the data if absolutely necessary to illustrate a point
+6. For example, if returning a list of transactions by month, just provide a summary not a list of each transaction. Same goes for daily, weekly, etc.
+
 You also have the ability to manage email subscriptions for dashboard metrics through the dashboardEmailSubscription tool.
 This tool allows users to:
 - Create new email subscriptions for dashboard metrics

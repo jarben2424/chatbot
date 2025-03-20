@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/app/(auth)/auth';
 import { createClient } from '@/utils/supabase/server';
 import { UserDashboardMetric } from '@/lib/user-dashboard-metrics';
+import { 
+  DatabaseVisualizationType, 
+  UIVisualizationType,
+  mapToDatabaseVisualizationType
+} from '@/lib/visualization-types';
+
+// Define a server-specific function to map database types to UI types
+// This avoids the 'use client' directive issue
+function mapVisualizationTypeForResponse(dbType: DatabaseVisualizationType): UIVisualizationType {
+  switch (dbType) {
+    case 'chart':
+      // Default to line-chart - can be refined based on data characteristics
+      return 'line-chart';
+    case 'highlight':
+    case 'table':
+      return dbType as UIVisualizationType;
+    default:
+      return 'table'; // Fallback
+  }
+}
 
 // GET handler to retrieve user dashboard metrics
 export async function GET(req: NextRequest) {
@@ -79,13 +99,18 @@ export async function GET(req: NextRequest) {
             }
           }
 
+          // Map visualization type to UI-compatible format
+          const visualizationType = mapVisualizationTypeForResponse(
+            (metric.customvisualizationtype || data.visualizationtype) as DatabaseVisualizationType
+          );
+
           processedMetrics.push({
             id: metric.id,
             userId: session.user.id,
             title: metric.customtitle || data.title,
             description: metric.customdescription || data.description,
             sqlQuery,
-            visualizationType: (metric.customvisualizationtype || data.visualizationtype),
+            visualizationType,
             displayOrder: metric.displayorder,
             isActive: metric.isactive,
             createdAt: metric.createdat,
@@ -104,6 +129,11 @@ export async function GET(req: NextRequest) {
             continue;
           }
 
+          // Map visualization type to UI-compatible format
+          const visualizationType = mapVisualizationTypeForResponse(
+            (metric.customvisualizationtype || data.visualizationtype) as DatabaseVisualizationType
+          );
+
           processedMetrics.push({
             id: metric.id,
             userId: session.user.id,
@@ -111,7 +141,7 @@ export async function GET(req: NextRequest) {
             description: metric.customdescription || data.description,
             question: data.question,
             sqlQuery: data.sqlquery,
-            visualizationType: (metric.customvisualizationtype || data.visualizationtype),
+            visualizationType,
             displayOrder: metric.displayorder,
             isActive: metric.isactive,
             createdAt: metric.createdat,
@@ -217,7 +247,7 @@ export async function POST(req: NextRequest) {
         isactive: true,
         customtitle: customTitle,
         customdescription: customDescription,
-        customvisualizationtype: customVisualizationType,
+        customvisualizationtype: customVisualizationType ? mapToDatabaseVisualizationType(customVisualizationType) : null,
         parameters,
         createdat: now,
         updatedat: now

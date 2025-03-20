@@ -2,23 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { LayoutDashboard, Check, BarChart, LineChart, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, Check, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from './ui/input';
 import { toast } from 'sonner';
-import { VisualizationType } from '@/lib/local-storage';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
+import { UIVisualizationType } from '@/lib/client-visualization-types';
 import { createClient } from '@/utils/supabase/client';
 
 interface AddToDashboardButtonProps {
   question: string;
   sqlQuery: string;
   result?: any; // Add result prop to analyze for chart type suggestions
+  initialVisualizationType?: string;
 }
 
 // Helper function to guess the best visualization type based on result data
-function suggestVisualizationType(result: any): VisualizationType {
+function suggestVisualizationType(result: any): UIVisualizationType {
   if (!result) {
     return 'table';
   }
@@ -85,12 +84,13 @@ function suggestVisualizationType(result: any): VisualizationType {
   return 'table';
 }
 
-export function AddToDashboardButton({ question, sqlQuery, result }: AddToDashboardButtonProps) {
+export function AddToDashboardButton({ question, sqlQuery, result, initialVisualizationType }: AddToDashboardButtonProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
-  const [visualizationType, setVisualizationType] = useState<VisualizationType>('table');
+  // Set default visualization type based on the initialVisualizationType or suggest one
+  const [visualizationType, setVisualizationType] = useState<UIVisualizationType>('table');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   
@@ -105,13 +105,19 @@ export function AddToDashboardButton({ question, sqlQuery, result }: AddToDashbo
     checkAuth();
   }, []);
   
-  // Suggest visualization type when dialog opens or result changes
+  // Set visualization type when dialog opens
   useEffect(() => {
-    if (open && result) {
-      setVisualizationType(suggestVisualizationType(result));
+    if (open) {
+      // Prefer initialVisualizationType if provided (from current UI selection)
+      if (initialVisualizationType && ['table', 'line-chart', 'bar-chart', 'highlight'].includes(initialVisualizationType)) {
+        setVisualizationType(initialVisualizationType as UIVisualizationType);
+      } else if (result) {
+        // Otherwise, suggest based on data
+        setVisualizationType(suggestVisualizationType(result));
+      }
     }
-  }, [open, result]);
-
+  }, [open, result, initialVisualizationType]);
+  
   // Get the base URL for API calls
   const getBaseUrl = () => {
     return typeof window !== 'undefined'
@@ -211,7 +217,7 @@ export function AddToDashboardButton({ question, sqlQuery, result }: AddToDashbo
             title: title || undefined,
             question,
             sqlQuery,
-            visualizationType,
+            visualizationType: initialVisualizationType || visualizationType,
             category: 'general',
           }),
           credentials: 'include',
@@ -239,7 +245,7 @@ export function AddToDashboardButton({ question, sqlQuery, result }: AddToDashbo
           sourceType: 'chat_generated_metric',
           sourceId: chatMetricId,
           customTitle: title || null,
-          customVisualizationType: visualizationType !== 'table' ? visualizationType : null,
+          customVisualizationType: (initialVisualizationType || visualizationType) !== 'table' ? (initialVisualizationType || visualizationType) : null,
           category: 'general',
         }),
         credentials: 'include',
@@ -305,56 +311,9 @@ export function AddToDashboardButton({ question, sqlQuery, result }: AddToDashbo
               </p>
             </div>
             
-            <div className="space-y-3">
-              <Label>Visualization Type</Label>
-              <RadioGroup 
-                value={visualizationType} 
-                onValueChange={(value: string) => setVisualizationType(value as VisualizationType)}
-                className="flex flex-col space-y-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="highlight" id="highlight" />
-                  <Label htmlFor="highlight" className="flex items-center">
-                    <AlertCircle className="h-4 w-4 mr-2" />
-                    Highlight (for single values)
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="line-chart" id="line-chart" />
-                  <Label htmlFor="line-chart" className="flex items-center">
-                    <LineChart className="h-4 w-4 mr-2" />
-                    Line Chart (for time series data)
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="bar-chart" id="bar-chart" />
-                  <Label htmlFor="bar-chart" className="flex items-center">
-                    <BarChart className="h-4 w-4 mr-2" />
-                    Bar Chart (for categorical data)
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="table" id="table" />
-                  <Label htmlFor="table" className="flex items-center">
-                    <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <line x1="3" y1="9" x2="21" y2="9" />
-                      <line x1="9" y1="21" x2="9" y2="9" />
-                    </svg>
-                    Table (default)
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-            
             <div className="bg-muted p-3 rounded-md">
               <p className="text-xs font-medium mb-1">Question:</p>
               <p className="text-xs">{question}</p>
-              
-              <p className="text-xs font-medium mt-3 mb-1">SQL Query:</p>
-              <pre className="text-xs overflow-auto whitespace-pre-wrap">
-                {sqlQuery}
-              </pre>
             </div>
             
             {/* Display API errors if any */}

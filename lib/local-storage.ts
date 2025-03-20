@@ -1,6 +1,8 @@
 'use client';
 
-export type VisualizationType = 'highlight' | 'line-chart' | 'bar-chart' | 'table';
+import { UIVisualizationType } from './client-visualization-types';
+
+export type VisualizationType = UIVisualizationType;
 
 export interface LocalDashboardQuery {
   id: string;

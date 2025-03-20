@@ -57,7 +57,7 @@ interface UserMetric {
   title: string;
   description?: string;
   sqlQuery: string;
-  visualizationType: 'highlight' | 'chart' | 'table';
+  visualizationType: VisualizationType; // Use the imported VisualizationType
   displayOrder: number;
 }
 
@@ -145,7 +145,7 @@ export default function MyDashboardPage() {
         title: metric.title,
         description: metric.description,
         sqlQuery: metric.sqlQuery,
-        visualizationType: metric.visualizationType,
+        visualizationType: mapVisualizationType(metric.visualizationType),
         displayOrder: metric.displayOrder
       }));
       
@@ -192,20 +192,34 @@ export default function MyDashboardPage() {
       const endTime = performance.now();
       console.log(`[My Dashboard] Query execution time: ${(endTime - startTime).toFixed(2)}ms`);
       
-      // Check the structure of the result
-      console.log(`[My Dashboard] Query result structure:`, Object.keys(result));
+      // Debug the result structure
+      console.log(`[My Dashboard] FULL RESULT:`, result);
+      console.log(`[My Dashboard] Result keys:`, Object.keys(result));
+      
       if (result.results) {
-        console.log(`[My Dashboard] Results count: ${result.results.length}`);
+        console.log(`[My Dashboard] Results type:`, typeof result.results);
+        console.log(`[My Dashboard] Results structure:`, result.results);
+        
+        if (typeof result.results === 'object' && result.results.data) {
+          console.log(`[My Dashboard] Transformed data detected with ${result.results.data.length} rows`);
+        } else if (Array.isArray(result.results)) {
+          console.log(`[My Dashboard] Array data detected with ${result.results.length} rows`);
+        }
       } else {
-        console.log(`[My Dashboard] No results array in response:`, result);
+        console.log(`[My Dashboard] No results found in response`);
       }
       
+      // Store the results - pass the data directly without modification
       setResults(prev => ({
         ...prev,
-        [metric.id]: { query: metric.sqlQuery, data: result.results || [] }
+        [metric.id]: { 
+          query: metric.sqlQuery, 
+          data: result.results || [],
+          timestamp: new Date().toISOString()
+        }
       }));
       
-      console.log(`[My Dashboard] Query completed and stored for metric: ${metric.title}`);
+      console.log(`[My Dashboard] Query completed and stored for metric: ${metric.title}`, result.results);
     } catch (error) {
       console.error(`[My Dashboard] Failed to run query for metric ${metric.title}:`, error);
     } finally {
@@ -400,30 +414,43 @@ export default function MyDashboardPage() {
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={items.map(item => item.id)}>
-              <div className="flex flex-wrap gap-4">
-                {items.map((item) => (
-                  <div key={item.id} className="w-full md:w-[calc(33.333%-1rem)]">
-                    <SortableCard 
-                      id={item.id}
+              <div className="grid grid-cols-3 gap-4" style={{ gridAutoRows: '200px' }}>
+                {items.map((item, index) => {
+                  const isChart = item.visualizationType === 'line-chart' || 
+                                item.visualizationType === 'bar-chart' || 
+                                item.visualizationType === 'table';
+                  
+                  return (
+                    <div 
+                      key={item.id} 
+                      style={{
+                        gridColumn: isChart ? 'span 2' : 'span 1',
+                        gridRow: isChart ? 'span 2' : 'span 1',
+                      }}
                     >
-                      <DashboardHighlightCard 
+                      <SortableCard 
                         id={item.id}
-                        title={item.title || 'Custom Metric'}
-                        description={item.description || ''}
-                        visualizationType={mapVisualizationType(item.visualizationType)}
-                        isLoading={loading || !results[item.id]?.data}
-                        data={results[item.id]?.data || []}
-                        onRunQuery={() => runQuery(item)}
-                        showActions={true}
-                        onDelete={() => handleDeleteMetric(item.id, item.title)}
-                      />
-                    </SortableCard>
-                  </div>
-                ))}
+                        className="h-full"
+                      >
+                        <DashboardHighlightCard 
+                          id={item.id}
+                          title={item.title || 'Custom Metric'}
+                          description={item.description || ''}
+                          visualizationType={item.visualizationType}
+                          isLoading={loading || runningQueries.has(item.id)}
+                          data={results[item.id]?.data || []}
+                          onRunQuery={() => runQuery(item)}
+                          showActions={true}
+                          onDelete={() => handleDeleteMetric(item.id, item.title)}
+                        />
+                      </SortableCard>
+                    </div>
+                  );
+                })}
                 
-                <div className="w-full md:w-[calc(33.333%-1rem)]">
+                <div style={{ gridColumn: 'span 1', gridRow: 'span 1' }}>
                   <Card 
-                    className="border-2 border-dashed border-muted bg-transparent flex flex-col items-center justify-center p-6 hover:border-primary/40 transition-colors cursor-pointer"
+                    className="border-2 border-dashed border-muted bg-transparent flex flex-col items-center justify-center p-6 hover:border-primary/40 transition-colors cursor-pointer h-full"
                     onClick={() => window.location.href = '/chat'}
                   >
                     <div className="flex flex-col items-center text-muted-foreground">

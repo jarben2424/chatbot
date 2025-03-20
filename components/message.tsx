@@ -47,6 +47,7 @@ const PurePreviewMessage = ({
   index: number;
 }) => {
   const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [currentVisualizationType, setCurrentVisualizationType] = useState<string>('table');
   // Determine if this is a database query message based on messageType or toolInvocations
   const isDbQueryMessage = message.messageType === 'db_query' || 
     message.toolInvocations?.some(ti => 
@@ -189,6 +190,7 @@ const PurePreviewMessage = ({
                             data={result.results}
                             query={result.query}
                             visualizationType={result.visualizationType}
+                            onViewTypeChange={(viewType) => setCurrentVisualizationType(viewType)}
                           />
                         </div>
                       );
@@ -203,7 +205,7 @@ const PurePreviewMessage = ({
                   
                   // Handle all other tool invocations
                   return (
-                    <div key={toolCallId} className="mt-3">
+                    <div key={toolCallId} className="mt-1">
                       {isEmailSubscriptionTool && state === 'result' && <EmailSubscriptionIndicator action={subscriptionAction} />}
                       
                       {state === 'result' ? (
@@ -292,6 +294,7 @@ const PurePreviewMessage = ({
                 message={message}
                 vote={vote}
                 isLoading={isLoading}
+                currentVisualizationType={currentVisualizationType}
               />
             )}
           </div>

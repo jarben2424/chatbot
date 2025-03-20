@@ -92,7 +92,24 @@ export async function POST(req: NextRequest) {
       ? question.substring(0, 47) + '...' 
       : question);
     
+    // Map the UI visualization type to a database-compatible visualization type
+    const mapVisualizationType = (uiType: string): string => {
+      switch (uiType) {
+        case 'line-chart':
+        case 'bar-chart':
+          return 'chart';
+        case 'highlight':
+        case 'table':
+          return uiType;
+        default:
+          return 'table'; // default fallback
+      }
+    };
+    
+    const dbVisualizationType = mapVisualizationType(visualizationType);
+    
     console.log('Inserting chat generated metric for user ID:', session.user.id);
+    console.log('Mapped visualization type from', visualizationType, 'to', dbVisualizationType);
     
     // Insert the new metric
     const { data, error } = await supabase
@@ -103,7 +120,7 @@ export async function POST(req: NextRequest) {
         description: question,
         question,
         sqlquery: sqlQuery,
-        visualizationtype: visualizationType || 'table',
+        visualizationtype: dbVisualizationType,
         category: category || 'general',
         conversationid: conversationId || null,
         createdat: new Date().toISOString(),

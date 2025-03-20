@@ -23,16 +23,24 @@ interface SqlToolResult {
   results: any;
 }
 
+// Extended type for tool invocations with results
+interface ToolInvocationWithResult extends ToolInvocation {
+  result?: any;
+  args?: any;
+}
+
 export function PureMessageActions({
   chatId,
   message,
   vote,
   isLoading,
+  currentVisualizationType,
 }: {
   chatId: string;
   message: Message;
   vote: Vote | undefined;
   isLoading: boolean;
+  currentVisualizationType?: string;
 }) {
   const { mutate } = useSWRConfig();
   const [_, copyToClipboard] = useCopyToClipboard();
@@ -49,7 +57,7 @@ export function PureMessageActions({
   // Get the database tool invocation if it exists
   const dbQueryTool = message.toolInvocations?.find(ti => 
     (ti.toolName === 'businessDbQuery' || ti.toolName === 'textToSql') && 
-    ti.state === 'result') as (ToolInvocation & { result?: any }) | undefined;
+    ti.state === 'result') as ToolInvocationWithResult | undefined;
   
   // Only show the dashboard button when actual query results are available
   const hasQueryResults = dbQueryTool && 
@@ -64,7 +72,7 @@ export function PureMessageActions({
     toolInvocations: message.toolInvocations?.map(ti => ({ 
       toolName: ti.toolName, 
       state: ti.state,
-      hasResult: !!ti.result 
+      hasResult: !!(ti as ToolInvocationWithResult).result 
     }))
   });
   
@@ -159,6 +167,7 @@ export function PureMessageActions({
             question={(dbQueryTool?.args as any)?.question || ''}
             sqlQuery={hasQueryResults ? (dbQueryTool?.result as any).query || '' : ''}
             result={hasQueryResults ? (dbQueryTool?.result as any).rows || [] : []}
+            initialVisualizationType={currentVisualizationType}
           />
         )}
         

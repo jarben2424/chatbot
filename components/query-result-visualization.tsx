@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -27,13 +27,15 @@ interface QueryResultVisualizationProps {
   query?: string;
   className?: string;
   visualizationType?: string;
+  onViewTypeChange?: (viewType: VisualizationType) => void;
 }
 
 export function QueryResultVisualization({
   data,
   query,
   className,
-  visualizationType
+  visualizationType,
+  onViewTypeChange
 }: QueryResultVisualizationProps) {
   // Determine the initial view type based on the data structure or provided type
   const initialViewType = visualizationType || getInitialViewType(data);
@@ -81,6 +83,13 @@ export function QueryResultVisualization({
     return colors[index % colors.length];
   };
 
+  // Call the callback when viewType changes
+  useEffect(() => {
+    if (onViewTypeChange) {
+      onViewTypeChange(viewType);
+    }
+  }, [viewType, onViewTypeChange]);
+
   // Render based on the view type and data structure
   const renderVisualization = () => {
     if (!data) return <div>No data available</div>;
@@ -96,17 +105,27 @@ export function QueryResultVisualization({
     if (viewType === 'line-chart' && data.data && data.xKey && data.yKeys) {
       return (
         <ResponsiveContainer width="100%" height={350}>
-          <LineChart data={data.data} margin={{ top: 20, right: 30, left: 20, bottom: 70 }}>
+          <LineChart data={data.data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey={data.xKey} 
               angle={-45} 
               textAnchor="end"
-              height={70}
+              height={50}
               interval={0}
               tick={{ fontSize: 12 }}
+              tickFormatter={(value) => {
+                // Format date to MM-DD
+                if (value && typeof value === 'string' && value.includes('-')) {
+                  const parts = value.split('-');
+                  if (parts.length >= 3) {
+                    return `${parts[1]}-${parts[2].split(' ')[0]}`;
+                  }
+                }
+                return value;
+              }}
             />
-            <YAxis />
+            <YAxis tick={{ fontSize: 12 }} />
             <Tooltip />
             <Legend />
             {data.yKeys.map((key: string, index: number) => (
@@ -116,6 +135,7 @@ export function QueryResultVisualization({
                 dataKey={key} 
                 name={key.replace(/_/g, ' ')}
                 stroke={getColor(index)}
+                strokeWidth={2.5}
                 activeDot={{ r: 8 }}
               />
             ))}
@@ -128,17 +148,27 @@ export function QueryResultVisualization({
     if (viewType === 'bar-chart' && data.data && data.xKey && data.yKeys) {
       return (
         <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={data.data} margin={{ top: 20, right: 30, left: 20, bottom: 70 }}>
+          <BarChart data={data.data} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey={data.xKey}
               angle={-45} 
               textAnchor="end"
-              height={70}
+              height={50}
               interval={0}
               tick={{ fontSize: 12 }}
+              tickFormatter={(value) => {
+                // Format date to MM-DD
+                if (value && typeof value === 'string' && value.includes('-')) {
+                  const parts = value.split('-');
+                  if (parts.length >= 3) {
+                    return `${parts[1]}-${parts[2].split(' ')[0]}`;
+                  }
+                }
+                return value;
+              }}
             />
-            <YAxis />
+            <YAxis tick={{ fontSize: 12 }} />
             <Tooltip />
             <Legend />
             {data.yKeys.map((key: string, index: number) => (
@@ -214,15 +244,7 @@ export function QueryResultVisualization({
   // Return the visualization component with view toggle options
   return (
     <Card className={cn("", className)}>
-      {query && (
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-medium">Query Results</CardTitle>
-          <CardDescription className="text-xs font-mono whitespace-pre-wrap">
-            {query}
-          </CardDescription>
-        </CardHeader>
-      )}
-      <CardContent>
+      <CardContent className="pt-6">
         <div className="flex justify-end mb-4 space-x-2">
           {/* Only show relevant toggles based on the data structure */}
           {(data?.data && data?.xKey && data?.yKeys) && (

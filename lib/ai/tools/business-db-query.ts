@@ -329,6 +329,7 @@ ORDER BY total_revenue DESC`
 
 // Additional rules (kept as an array for clarity)
 const ADDITIONAL_RULES = [
+  'For all time based queries that exceed the current time (e.g. "this year"), only use values on or before the current date',
   'When the query needs to filter strings, always use ILIKE %..% unless exact match explicitly requested',
   'Use \\ as escape character; use \\\\ for literal \\',
   'Use average functions for averages, excluding nulls; avoid SUM()/COUNT()',
@@ -401,12 +402,23 @@ async function generateSqlQuery(question: string): Promise<string> {
       apiKey: process.env.OPENAI_API_KEY,
     });
     
+    // Get current date information for context
+    const now = new Date();
+    const currentDay = now.getDate();
+    const currentMonth = now.getMonth() + 1; // JavaScript months are 0-indexed
+    const currentYear = now.getFullYear();
+    const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()];
+    const monthName = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][now.getMonth()];
+    
+    // Add date context to the question
+    const questionWithContext = `Today is ${dayOfWeek}, ${monthName} ${currentDay}, ${currentYear} (day: ${currentDay}, month: ${currentMonth}, year: ${currentYear}). Please consider this date context when generating SQL. User question: ${question}`;
+    
     // Use OpenAI API directly
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: getSystemPrompt() },
-        { role: 'user', content: question }
+        { role: 'user', content: questionWithContext }
       ],
       temperature: 0.1, // Low temperature for more deterministic responses
       max_tokens: 1000, // Adjust as needed for longer queries
