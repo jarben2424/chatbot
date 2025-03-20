@@ -3,6 +3,8 @@ import {
   createDataStreamResponse,
   smoothStream,
   streamText,
+  type ToolCall,
+  type ToolInvocation,
 } from 'ai';
 import { auth } from '@/app/(auth)/auth';
 import { systemPrompt } from '@/lib/ai/prompts';
@@ -68,9 +70,17 @@ export async function POST(request: Request) {
       }
     }
 
+    // Save the message to the database
     await saveMessages({
-      messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
+      messages: [{ 
+        ...userMessage, 
+        createdAt: new Date(), 
+        chatId: id, 
+        messageType: 'default'
+      }],
     });
+
+    console.log("Saved user message with chatId:", id, "and default messageType");
 
     return createDataStreamResponse({
       execute: (dataStream) => {
@@ -111,19 +121,62 @@ export async function POST(request: Request) {
                   reasoning,
                 });
 
+                // Log the messages for debugging
+                console.log("Processing assistant message with tools:", 
+                  sanitizedResponseMessages.map(m => ({
+                    id: m.id,
+                    role: m.role,
+                    toolInvocations: (m as any).toolInvocations?.map((t: ToolInvocation) => ({
+                      toolName: t.toolName,
+                      state: t.state
+                    }))
+                  }))
+                );
+
+                // Directly inspect the messages to identify any database queries
+                for (const msg of sanitizedResponseMessages) {
+                  if (msg.role === 'assistant') {
+                    const toolInvocations = (msg as any).toolInvocations || [];
+                    console.log(`Message ${msg.id} has ${toolInvocations.length} tool invocations`);
+                    
+                    for (const ti of toolInvocations) {
+                      console.log(`Tool: ${ti.toolName}, State: ${ti.state}`);
+                      if ((ti.toolName === 'businessDbQuery' || ti.toolName === 'textToSql') && ti.state === 'result') {
+                        console.log(`Found database query tool invocation in message ${msg.id}`);
+                      }
+                    }
+                  }
+                }
+
                 await saveMessages({
                   messages: sanitizedResponseMessages.map((message) => {
-                    return {
+                    // Use the messageType that was already set during sanitization
+                    // This avoids redoing the logic we already did in sanitizeResponseMessages
+                    const messageType = (message as any).messageType || 'default';
+                    
+                    console.log(`Saving ${message.role} message with id: ${message.id}, type: ${messageType}`);
+                    
+                    // Make sure to return a new object with the messageType property explicitly set
+                    const dbMessage = {
                       id: message.id,
                       chatId: id,
                       role: message.role,
                       content: message.content,
+                      messageType: messageType,
                       createdAt: new Date(),
                     };
+                    
+                    console.log(`Message being saved:`, {
+                      id: dbMessage.id,
+                      role: dbMessage.role,
+                      messageType: dbMessage.messageType
+                    });
+                    
+                    return dbMessage;
                   }),
                 });
               } catch (error) {
-                console.error('Failed to save chat');
+                console.error('Failed to save chat', error);
               }
             }
           },

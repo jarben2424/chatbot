@@ -715,51 +715,64 @@ function transformForBarChart(results: SnowflakeRow[]): any {
 }
 
 /**
- * Transforms query results for highlight visualization
- * Used for single value metrics
+ * Transforms query results for a highlight (KPI) visualization
  */
-function transformForHighlight(results: SnowflakeRow[]): any {
-  if (!results || results.length === 0) return { value: 'N/A', label: 'No data' };
-  
+function transformForHighlight(results: any[]): any {
+  if (!results || results.length === 0) {
+    return { value: 'No data', label: 'No results found' };
+  }
+
   const row = results[0];
-  const columns = Object.keys(row);
+  const keys = Object.keys(row);
   
-  // If there's only one column, use that for the value and generate a label
-  if (columns.length === 1) {
-    const column = columns[0];
-    return {
-      value: row[column],
-      label: column.charAt(0).toUpperCase() + column.slice(1).replace(/_/g, ' ').toLowerCase()
+  if (keys.length === 1) {
+    // Single value with no header
+    const key = keys[0];
+    return { 
+      value: formatValue(row[key]), 
+      label: key.replace(/_/g, ' '),
+      rawValue: row[key]
     };
-  }
-  
-  // If there are two columns, use one for label and one for value
-  if (columns.length === 2) {
-    const numericColumnIndex = typeof row[columns[0]] === 'number' ? 0 : 1;
-    const textColumnIndex = numericColumnIndex === 0 ? 1 : 0;
+  } else if (keys.length === 2) {
+    // Assume first column is label, second is value
+    const [labelKey, valueKey] = keys;
+    return { 
+      value: formatValue(row[valueKey]), 
+      label: row[labelKey] || valueKey.replace(/_/g, ' '),
+      rawValue: row[valueKey]
+    };
+  } else {
+    // Take the first numeric column as the value
+    const numericKey = keys.find(key => typeof row[key] === 'number');
+    const labelKey = keys.find(key => key !== numericKey && typeof row[key] === 'string');
     
-    return {
-      value: row[columns[numericColumnIndex]],
-      label: row[columns[textColumnIndex]]
+    return { 
+      value: numericKey ? formatValue(row[numericKey]) : 'N/A', 
+      label: labelKey ? row[labelKey] : numericKey?.replace(/_/g, ' ') || 'Value',
+      rawValue: numericKey ? row[numericKey] : null
     };
   }
+}
+
+/**
+ * Helper function to format values nicely
+ */
+function formatValue(value: any): string {
+  if (value === null || value === undefined) return 'N/A';
   
-  // For more complex data, prioritize numeric values
-  const numericColumns = columns.filter(col => typeof row[col] === 'number');
-  const textColumns = columns.filter(col => typeof row[col] === 'string');
-  
-  if (numericColumns.length > 0 && textColumns.length > 0) {
-    return {
-      value: row[numericColumns[0]],
-      label: row[textColumns[0]]
-    };
+  if (typeof value === 'number') {
+    // Add commas for thousands and format decimals consistently
+    if (value % 1 === 0) {
+      return value.toLocaleString();
+    } else {
+      return value.toLocaleString(undefined, { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+      });
+    }
   }
   
-  // Default case
-  return {
-    value: row[columns[0]],
-    label: columns[0].charAt(0).toUpperCase() + columns[0].slice(1).replace(/_/g, ' ').toLowerCase()
-  };
+  return String(value);
 }
 
 /**

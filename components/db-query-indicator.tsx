@@ -14,7 +14,7 @@ export function DbQueryIndicator({
   query?: string 
 }) {
   return (
-    <div className="flex items-center mb-2">
+    <div className="flex items-center">
       <Tooltip>
         <TooltipTrigger asChild>
           <Badge variant="secondary" className="px-2 py-0.5 text-xs gap-1 flex items-center">

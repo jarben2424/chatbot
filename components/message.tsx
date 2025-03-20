@@ -20,7 +20,6 @@ import { DocumentPreview } from './document-preview';
 import { MessageReasoning } from './message-reasoning';
 import { DbQueryIndicator } from './db-query-indicator';
 import { EmailSubscriptionIndicator } from './email-subscription-indicator';
-import { AddToDashboardButton } from './add-to-dashboard-button';
 import { DashboardSubscriptionButton } from './dashboard-subscription-button';
 import { QueryResultVisualization } from './query-result-visualization';
 
@@ -48,7 +47,20 @@ const PurePreviewMessage = ({
   index: number;
 }) => {
   const [mode, setMode] = useState<'view' | 'edit'>('view');
+  // Determine if this is a database query message based on messageType or toolInvocations
+  const isDbQueryMessage = message.messageType === 'db_query' || 
+    message.toolInvocations?.some(ti => 
+      (ti.toolName === 'businessDbQuery' || ti.toolName === 'textToSql') && 
+      ti.state === 'result');
+  
+  // Find the database query tool invocation if it exists
+  const dbQueryTool = message.toolInvocations?.find(ti => 
+    (ti.toolName === 'businessDbQuery' || ti.toolName === 'textToSql') && 
+    ti.state === 'result') as { toolName: string; state: 'result'; result: any } | undefined;
 
+  // This flag indicates if we have the original query results or just the messageType indicator
+  const hasQueryDetails = !!dbQueryTool?.result?.query;
+  
   return (
     <AnimatePresence>
       <motion.div
@@ -58,6 +70,17 @@ const PurePreviewMessage = ({
         animate={{ y: 0, opacity: 1 }}
         data-role={message.role}
       >
+        {/* Display Database Query Indicator outside the message content */}
+        {message.role === 'assistant' && isDbQueryMessage && (
+          <div className="mb-4">
+            {hasQueryDetails ? (
+              <DbQueryIndicator query={dbQueryTool.result.query} />
+            ) : (
+              <DbQueryIndicator query="Query information lost after page refresh" />
+            )}
+          </div>
+        )}
+        
         <div
           className={cn(
             'flex gap-4 w-full group-data-[role=user]/message:ml-auto group-data-[role=user]/message:max-w-2xl',
@@ -75,7 +98,7 @@ const PurePreviewMessage = ({
             </div>
           )}
 
-          <div className="flex flex-col gap-4 w-full">
+          <div className="flex flex-col w-full">
             {message.experimental_attachments && (
               <div
                 data-testid={`message-attachments-${index}`}
@@ -97,8 +120,9 @@ const PurePreviewMessage = ({
               />
             )}
 
+            {/* Message content */}
             {(message.content || message.reasoning) && mode === 'view' && (
-              <div className="flex flex-row gap-2 items-start">
+              <div className="flex flex-row gap-2 items-start mb-4">
                 {message.role === 'user' && !isReadonly && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -123,7 +147,12 @@ const PurePreviewMessage = ({
                       message.role === 'user',
                   })}
                 >
-                  <Markdown>{message.content as string}</Markdown>
+                  {/* Always display message content */}
+                  {message.content && (
+                    <div className="pt-0.5">
+                      <Markdown>{message.content as string}</Markdown>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -142,26 +171,43 @@ const PurePreviewMessage = ({
               </div>
             )}
 
+            {/* Tool Invocations */}
             {message.toolInvocations && message.toolInvocations.length > 0 && (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col">
                 {message.toolInvocations.map((toolInvocation) => {
                   const { toolName, toolCallId, state, args } = toolInvocation;
-
-                  // Display the DB Query indicator for businessDbQuery tools
                   const isDbQueryTool = toolName === 'businessDbQuery' || toolName === 'textToSql';
-                  const dbQuery = state === 'result' && isDbQueryTool ? toolInvocation.result?.query : null;
                   
-                  // Display the Email Subscription indicator for dashboardEmailSubscription tool
+                  // Skip rendering DB query tools here since we're handling them differently based on messageType
+                  if (isDbQueryTool && state === 'result') {
+                    // Show visualization only if it's not a highlight type and needs a visualization
+                    const result = toolInvocation.state === 'result' ? toolInvocation.result : null;
+                    if (result && result.visualizationType !== 'highlight') {
+                      return (
+                        <div key={toolCallId} className="mb-4">
+                          <QueryResultVisualization 
+                            data={result.results}
+                            query={result.query}
+                            visualizationType={result.visualizationType}
+                          />
+                        </div>
+                      );
+                    }
+                    // For highlight type, we just display the content at the top level
+                    return null;
+                  }
+                  
+                  // Determine if this is an email subscription message
                   const isEmailSubscriptionTool = toolName === 'dashboardEmailSubscription';
                   const subscriptionAction = state === 'result' && isEmailSubscriptionTool ? toolInvocation.result?.action : null;
                   
+                  // Handle all other tool invocations
                   return (
-                    <div key={toolCallId}>
-                      {isDbQueryTool && state === 'result' && <DbQueryIndicator query={dbQuery} />}
+                    <div key={toolCallId} className="mt-3">
                       {isEmailSubscriptionTool && state === 'result' && <EmailSubscriptionIndicator action={subscriptionAction} />}
                       
                       {state === 'result' ? (
-                        <div>
+                        <>
                           {toolName === 'getWeather' ? (
                             <Weather weatherAtLocation={toolInvocation.result} />
                           ) : toolName === 'createDocument' ? (
@@ -181,22 +227,6 @@ const PurePreviewMessage = ({
                               result={toolInvocation.result}
                               isReadonly={isReadonly}
                             />
-                          ) : toolName === 'businessDbQuery' || toolName === 'textToSql' ? (
-                            <div className="bg-muted p-4 rounded-md">
-                              <div className="flex justify-between items-start mb-2">
-                                <h4 className="text-sm font-medium">Database Query Results</h4>
-                                <AddToDashboardButton 
-                                  question={args.question}
-                                  sqlQuery={toolInvocation.result.query}
-                                  result={toolInvocation.result.results}
-                                />
-                              </div>
-                              <QueryResultVisualization 
-                                data={toolInvocation.result.results}
-                                query={toolInvocation.result.query}
-                                visualizationType={toolInvocation.result.visualizationType}
-                              />
-                            </div>
                           ) : toolName === 'dashboardEmailSubscription' ? (
                             <div className="bg-muted p-4 rounded-md">
                               <div className="flex justify-between items-start mb-2">
@@ -218,7 +248,7 @@ const PurePreviewMessage = ({
                           ) : (
                             <pre>{JSON.stringify(toolInvocation.result, null, 2)}</pre>
                           )}
-                        </div>
+                        </>
                       ) : (
                         <div
                           className={cx({
@@ -242,7 +272,7 @@ const PurePreviewMessage = ({
                               isReadonly={isReadonly}
                             />
                           ) : toolName === 'businessDbQuery' || toolName === 'textToSql' ? (
-                            <div className="bg-muted p-4 rounded-md animate-pulse">
+                            <div className="animate-pulse">
                               <p className="text-sm">Running database query...</p>
                             </div>
                           ) : null}
@@ -254,6 +284,7 @@ const PurePreviewMessage = ({
               </div>
             )}
 
+            {/* Message Actions */}
             {!isReadonly && (
               <MessageActions
                 key={`action-${message.id}`}
@@ -277,6 +308,8 @@ export const PreviewMessage = memo(
     if (prevProps.message.reasoning !== nextProps.message.reasoning)
       return false;
     if (prevProps.message.content !== nextProps.message.content) return false;
+    if (prevProps.message.messageType !== nextProps.message.messageType)
+      return false;
     if (
       !equal(
         prevProps.message.toolInvocations,
@@ -312,8 +345,8 @@ export const ThinkingMessage = () => {
           <SparklesIcon size={14} />
         </div>
 
-        <div className="flex flex-col gap-2 w-full">
-          <div className="flex flex-col gap-4 text-muted-foreground">
+        <div className="flex flex-col gap-4 w-full">
+          <div className="pt-0.5 text-muted-foreground">
             Thinking...
           </div>
         </div>

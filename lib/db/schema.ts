@@ -38,6 +38,7 @@ export const message = pgTable('Message', {
   chatId: uuid('chatId')
     .notNull()
     .references(() => chat.id),
+  messageType: text('messageType').default('default'),
   role: varchar('role').notNull(),
   content: json('content').notNull(),
   createdAt: timestamp('createdAt').notNull(),

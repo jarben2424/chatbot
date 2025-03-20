@@ -64,6 +64,7 @@ Columns:
 
 id (uuid, NOT NULL, default: gen_random_uuid())
 chatId (uuid, NOT NULL)
+messageType (text)
 role (character varying, NOT NULL)
 content (jsonb, NOT NULL)
 createdAt (timestamp without time zone, NOT NULL)
