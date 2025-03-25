@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CampaignHeader } from '../../_components/campaign-header';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -58,11 +57,10 @@ export default function CreateCampaignPage() {
   return (
     <>
       <div className="flex flex-col min-w-0 h-dvh bg-background">
-        <CampaignHeader />
         <div className="flex-1 flex flex-col p-8 max-w-4xl mx-auto w-full">
           <div className="mb-8">
             <h1 className="text-3xl font-bold">Create Campaign</h1>
-            <p className="text-muted-foreground mt-2">Step {step} of 3: Campaign Setup</p>
+            <p className="text-muted-foreground">Step {step} of 5 - Campaign Setup</p>
           </div>
           
           <Card>

@@ -94,7 +94,7 @@ export default function CampaignSegmentPage() {
   const handleNext = () => {
     // In a production app, we would save the selected segment
     // to a global state or backend before proceeding
-    router.push('/campaigns');
+    router.push('/campaigns/create/matching');
   };
   
   const handlePromptBlur = () => {
@@ -135,10 +135,10 @@ export default function CampaignSegmentPage() {
         <div className="flex-1 flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full pb-24">
           <div className="mb-4 md:mb-8">
             <h1 className="text-3xl font-bold">Create Campaign</h1>
-            <p className="text-muted-foreground mt-2">Step {step} of 3: Choose Target Segment</p>
+            <p className="text-muted-foreground mt-2">Step {step} of 5 - Choose Target Segment</p>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-24">
             {/* Option 1: Choose existing segment */}
             <Card className={`border ${!useAiSegment ? 'border-primary' : ''}`}>
               <CardHeader>
@@ -314,7 +314,7 @@ export default function CampaignSegmentPage() {
               disabled={!isFormValid}
               className="gap-1"
             >
-              Finish <ChevronRightIcon className="h-4 w-4" />
+              Next Step <ChevronRightIcon className="h-4 w-4" />
             </Button>
           </div>
         </div>

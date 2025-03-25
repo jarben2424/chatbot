@@ -23,7 +23,7 @@ import {
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
-export function AppSidebar({ user }: { user: User | undefined }) {
+export function AppSidebar({ user }: { user?: User | undefined }) {
   const router = useRouter();
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
@@ -36,6 +36,11 @@ export function AppSidebar({ user }: { user: User | undefined }) {
       setDashboardsOpen(true);
     }
   }, [pathname]);
+
+  // Don't render sidebar on campaign creation pages
+  if (pathname?.includes('/campaigns/create')) {
+    return null;
+  }
 
   const navigationItems = [
     {

@@ -380,7 +380,7 @@ export default function CampaignOffersPage() {
         <div className="flex-1 flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full pb-24">
           <div className="mb-4 md:mb-8">
             <h1 className="text-3xl font-bold">Create Campaign</h1>
-            <p className="text-muted-foreground mt-2">Step {step} of 3: Select Offers</p>
+            <p className="text-muted-foreground">Step {step} of 5 - Select Offers</p>
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 flex-1">
