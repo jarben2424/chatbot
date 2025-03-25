@@ -2,7 +2,6 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import snowflake from 'snowflake-sdk';
 import { OpenAI } from 'openai';
-import { createClient } from '@/utils/supabase/server';
 
 // Define types for Snowflake results and connections
 type SnowflakeConnection = snowflake.Connection;
@@ -15,6 +14,24 @@ type QueryResult = {
 type ErrorResult = {
   error: string;
   details: string;
+}
+
+// Connection pool for Snowflake
+const connectionPool: { [key: string]: snowflake.Connection } = {};
+const connectionUsage: { [key: string]: number } = {}; // Track last usage timestamp
+const MAX_POOL_SIZE = 10; // Maximum number of connections to keep in the pool
+const MAX_RETRIES = 2;
+const CONNECTION_IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+// Periodic cleanup of idle connections (run every 5 minutes)
+if (typeof setInterval !== 'undefined') {
+  setInterval(async () => {
+    try {
+      await cleanupIdleConnections();
+    } catch (error) {
+      console.error('Error during idle connection cleanup:', error);
+    }
+  }, 5 * 60 * 1000);
 }
 
 /**
@@ -39,29 +56,59 @@ export const businessDbQuery = tool({
       throw new Error('Missing required Snowflake environment variables');
     }
 
-    // Create Snowflake connection
-    const connection: SnowflakeConnection = snowflake.createConnection({
-      account,
-      username,
-      password,
-      warehouse,
-      database,
-    });
-
-    // Connect to Snowflake with proper error handling
+    // Initialize connection variable to ensure it's defined
+    let connection: SnowflakeConnection | undefined = undefined;
+    const connectionKey = `${username}@${account}`;
+    
     try {
-      await new Promise<SnowflakeConnection>((resolve, reject) => {
-        connection.connect((err, conn) => {
-          if (err) {
-            console.error('Unable to connect to Snowflake:', err);
-            reject(new Error(`Failed to connect to Snowflake: ${err.message}`));
+      // Try to get an existing connection from the pool or create a new one
+      for (let attempt = 0; attempt < MAX_RETRIES + 1; attempt++) {
+        try {
+          // Try to get an existing connection from the pool
+          if (connectionPool[connectionKey] && await isConnectionValid(connectionPool[connectionKey])) {
+            console.log('Using existing Snowflake connection from pool');
+            connection = connectionPool[connectionKey];
+            updateConnectionUsage(connectionKey);
           } else {
-            console.log('Successfully connected to Snowflake');
-            resolve(conn);
+            // Create a new connection
+            console.log('Creating new Snowflake connection');
+            // Remove any stale connection from pool if exists
+            if (connectionPool[connectionKey]) {
+              try {
+                await destroyConnection(connectionPool[connectionKey]);
+              } catch (err) {
+                console.error('Error destroying stale connection:', err);
+              }
+              delete connectionPool[connectionKey];
+            }
+            
+            connection = snowflake.createConnection({
+              account,
+              username,
+              password,
+              warehouse,
+              database,
+            });
+            
+            // Connect with retry logic
+            await connectWithRetry(connection);
+            
+            // Store in connection pool
+            addToPool(connectionKey, connection);
           }
-        });
-      });
-
+          
+          // If we reach here, we have a valid connection
+          break;
+        } catch (err) {
+          console.error(`Connection attempt ${attempt + 1} failed:`, err);
+          if (attempt === MAX_RETRIES) {
+            throw err; // Re-throw on last attempt
+          }
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        }
+      }
+      
       // Generate SQL query from natural language question
       const sqlQuery = await generateSqlQuery(question);
       
@@ -71,7 +118,7 @@ export const businessDbQuery = tool({
       }
       
       // Execute the query with a timeout
-      const results = await executeQuery(connection, sqlQuery);
+      const results = await executeQuery(connection as SnowflakeConnection, sqlQuery);
       
       // Determine the visualization type based on the result structure
       const visualizationType = suggestVisualizationType(results);
@@ -94,19 +141,51 @@ export const businessDbQuery = tool({
         results: transformedResults,
         visualizationType,
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in business DB query execution:', error);
+      
+      // Clean up connection only if we have a connection error
+      if (connection && (
+          error.code === 407002 || 
+          (error.message && (
+            error.message.includes('terminated connection') || 
+            error.message.includes('Unable to perform operation')
+          ))
+      )) {
+        try {
+          console.log('Destroying failed connection due to connection error');
+          if (connection) {
+            await destroyConnection(connection);
+          }
+          // Connection is already removed from pool in executeQuery
+        } catch (destroyError) {
+          console.error('Error destroying Snowflake connection:', destroyError);
+        }
+      }
+      
       return {
-        error: `Failed to execute query: ${error instanceof Error ? error.message : String(error)}`,
-        details: error instanceof Error ? error.toString() : String(error)
+        error: 'Failed to execute query',
+        details: error.message || 'Unknown error',
       };
     } finally {
-      // Always destroy the connection when done
-      connection.destroy(function(err) {
-        if (err) {
-          console.error('Error destroying Snowflake connection:', err);
+      // Only remove connections from the pool if they're invalid
+      // Valid connections should remain in the pool for reuse
+      if (connection && !await isConnectionValid(connection)) {
+        try {
+          console.log('Cleaning up invalid connection from pool');
+          const connectionKey = Object.keys(connectionPool).find(
+            key => connectionPool[key] === connection
+          );
+          
+          if (connectionKey) {
+            await destroyConnection(connection);
+            delete connectionPool[connectionKey];
+            delete connectionUsage[connectionKey];
+          }
+        } catch (err) {
+          console.error('Error cleaning up invalid connection:', err);
         }
-      });
+      }
     }
   },
 });
@@ -265,7 +344,7 @@ const QUERY_REQUIREMENTS = [
   'Queries will run on Snowflake',
   'Filter out records with _FIVETRAN_DELETED = true in ALL queries',
   'Timestamps are stored in UTC; convert them using CONVERT_TIMEZONE(\'UTC\', \'America/Los_Angeles\', transaction_timestamp) when filtering by date',
-  'ALWAYS filter for program_id = 1614 when querying hang_loyalty_public.transactions',
+  'ALWAYS filter for program_id = 1614 in ALL queries',
   'Use clear column aliases for better readability',
   'Limit result sets to a reasonable number of rows (e.g., LIMIT 1000)',
   'For time-based queries, ensure proper timestamp conversion and timezone handling',
@@ -281,60 +360,376 @@ const EXAMPLE_QUERIES = [
   {
     question: 'How many transactions did we have in November 2024 at our Nashville Midtown location?',
     sql: `SELECT COUNT(*) AS transaction_count
-FROM hang_loyalty_public.transactions
-WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transactions.transaction_timestamp) >= '2024-11-01'
-  AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transactions.transaction_timestamp) < '2024-12-01'
-  AND transactions.location = 'Nashville - Midtown'
-  AND transactions.program_id = 1614
-  AND transactions._FIVETRAN_DELETED = false`
+          FROM hang_loyalty_public.transactions
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transactions.transaction_timestamp) >= DATE_TRUNC('month', DATEADD(MONTH, -4, CURRENT_DATE))
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transactions.transaction_timestamp) < DATE_TRUNC('month', DATEADD(MONTH, -3, CURRENT_DATE))
+            AND transactions.location = 'Nashville - Midtown'
+            AND transactions.program_id = 1614
+            AND transactions._FIVETRAN_DELETED = false`
   },
   {
     question: 'What was our most popular location last week based on transaction count?',
     sql: `SELECT location, COUNT(*) AS transaction_count
-FROM hang_loyalty_public.transactions
-WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) >= DATEADD(DAY, -7, CURRENT_DATE)
-  AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) < CURRENT_DATE
-  AND transactions.program_id = 1614
-  AND transactions._FIVETRAN_DELETED = false
-GROUP BY location
-ORDER BY transaction_count DESC
-LIMIT 1`
+          FROM hang_loyalty_public.transactions
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) >= DATEADD(DAY, -7, CURRENT_DATE)
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) < CURRENT_DATE
+            AND transactions.program_id = 1614
+            AND transactions._FIVETRAN_DELETED = false
+          GROUP BY location
+          ORDER BY transaction_count DESC
+          LIMIT 1`
   },
   {
     question: 'How many orders did we have today?',
     sql: `SELECT COUNT(DISTINCT id) AS num_orders 
-FROM hang_loyalty_public.transactions 
-WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp)::date = CURRENT_DATE
-  AND program_id = 1614
-  AND _FIVETRAN_DELETED = false`
+          FROM hang_loyalty_public.transactions 
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp)::date = CURRENT_DATE
+            AND program_id = 1614
+            AND _FIVETRAN_DELETED = false`
   },
   {
     question: 'What are some unique item names?',
     sql: `SELECT DISTINCT name AS item_name
-FROM hang_loyalty_public.menu_items
-WHERE _FIVETRAN_DELETED = false
-ORDER BY item_name
-LIMIT 50`
+          FROM hang_loyalty_public.menu_items
+          WHERE _FIVETRAN_DELETED = false
+          ORDER BY item_name
+          LIMIT 50`
   },
   {
-    question: 'What\'s our total revenue by location?',
-    sql: `SELECT location, SUM(amount) AS total_revenue
-FROM hang_loyalty_public.transactions
-WHERE program_id = 1614
-  AND _FIVETRAN_DELETED = false
-GROUP BY location
-ORDER BY total_revenue DESC`
+    question: "What's our total revenue by location?",
+    sql: `SELECT location, SUM(value - total_deferred_items) AS total_revenue
+          FROM hang_loyalty_public.transactions
+          WHERE program_id = 1614
+            AND _FIVETRAN_DELETED = false
+          GROUP BY location
+          ORDER BY total_revenue DESC`
+  },
+  {
+    question: "How many total transactions do we have?",
+    sql: `SELECT COUNT(*) AS total_transactions
+          FROM hang_loyalty_public.transactions
+          WHERE program_id = 1614
+            AND _FIVETRAN_DELETED = false`
+  },
+  {
+    question: "What were my daily sales totals in December 2024?",
+    sql: `SELECT CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp)::date AS transaction_date,
+                  SUM(value - total_deferred_items) AS total_sales
+          FROM hang_loyalty_public.transactions
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) >= DATE_TRUNC('month', DATEADD(MONTH, -3, CURRENT_DATE))
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) < DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+            AND program_id = 1614
+            AND _FIVETRAN_DELETED = false
+          GROUP BY transaction_date
+          ORDER BY transaction_date`
+  },
+  {
+    question: "What were my total discounts for Nashville - Midtown in November 2024?",
+    sql: `SELECT SUM(total_discount) AS total_discount_amount
+          FROM hang_loyalty_public.transactions
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) >= DATE_TRUNC('month', DATEADD(MONTH, -4, CURRENT_DATE))
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) < DATE_TRUNC('month', DATEADD(MONTH, -3, CURRENT_DATE))
+            AND location = 'Nashville - Midtown'
+            AND program_id = 1614
+            AND _FIVETRAN_DELETED = false`
+  },
+  {
+    question: "What were my total Doordash sales for December 2024 at Atlanta - West?",
+    sql: `SELECT SUM(value - total_deferred_items) AS doordash_sales
+          FROM hang_loyalty_public.transactions
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) >= DATE_TRUNC('month', DATEADD(MONTH, -3, CURRENT_DATE))
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) < DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+            AND location = 'Atlanta - West'
+            AND detailed_source ILIKE '%doordash%'
+            AND program_id = 1614
+            AND _FIVETRAN_DELETED = false`
+  },
+  {
+    question: "What was my AOV on Doordash in December 2024?",
+    sql: `SELECT AVG(value - total_deferred_items) AS avg_order_value
+          FROM hang_loyalty_public.transactions
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) >= DATE_TRUNC('month', DATEADD(MONTH, -3, CURRENT_DATE))
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) < DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+            AND detailed_source ILIKE '%doordash%'
+            AND program_id = 1614
+            AND _FIVETRAN_DELETED = false`
+  },
+  {
+    question: "How many orders did the average customer make in December 2024?",
+    sql: `SELECT COUNT(DISTINCT t.id) / NULLIF(COUNT(DISTINCT ct.customer_id), 0) AS avg_orders_per_customer
+          FROM hang_loyalty_public.transactions t
+          JOIN hang_loyalty_public.customer_transactions ct ON ct.transaction_id = t.id
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) >= DATE_TRUNC('month', DATEADD(MONTH, -3, CURRENT_DATE))
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) < DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+            AND t.program_id = 1614
+            AND t._FIVETRAN_DELETED = false
+            AND ct._FIVETRAN_DELETED = false`
+  },
+  {
+    question: "What was my AOV for December 2024?",
+    sql: `SELECT AVG(value - total_deferred_items) AS average_order_value
+          FROM hang_loyalty_public.transactions
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) >= DATE_TRUNC('month', DATEADD(MONTH, -3, CURRENT_DATE))
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) < DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+            AND program_id = 1614
+            AND _FIVETRAN_DELETED = false`
+  },
+  {
+    question: "Can you show me the number of daily orders in December 2024?",
+    sql: `SELECT CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp)::date AS transaction_date,
+                  COUNT(DISTINCT id) AS num_orders
+          FROM hang_loyalty_public.transactions
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) >= DATE_TRUNC('month', DATEADD(MONTH, -3, CURRENT_DATE))
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) < DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+            AND program_id = 1614
+            AND _FIVETRAN_DELETED = false
+          GROUP BY transaction_date
+          ORDER BY transaction_date`
+  },
+  {
+    question: "What was the item count per order each day in December 2024?",
+    sql: `SELECT CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)::date AS transaction_date,
+                  SUM(tli.quantity) / COUNT(DISTINCT t.id) AS avg_items_per_order
+          FROM hang_loyalty_public.transactions t
+          LEFT JOIN hang_loyalty_public.transaction_line_items tli ON tli.transaction_id = t.id
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) >= DATE_TRUNC('month', DATEADD(MONTH, -3, CURRENT_DATE))
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) < DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+            AND t.program_id = 1614
+            AND t._FIVETRAN_DELETED = false
+          GROUP BY transaction_date
+          ORDER BY transaction_date`
+  },
+  {
+    question: "What were my total sales for Fried Jumbo Tenders Plate in January 2025?",
+    sql: `WITH filtered_line_items AS (
+            SELECT transaction_id, value AS line_item_total
+            FROM hang_loyalty_public.transaction_line_items
+            WHERE display_name = 'Fried Jumbo Tenders Plate'
+              AND _FIVETRAN_DELETED = false
+          )
+          SELECT SUM(fli.line_item_total) AS total_sales
+          FROM filtered_line_items fli
+          JOIN hang_loyalty_public.transactions t ON t.id = fli.transaction_id
+          WHERE DATE_TRUNC('month', CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)) = DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+            AND t.program_id = 1614
+            AND t._FIVETRAN_DELETED = false`
+  },
+  {
+    question: "What were my weekly sales by channel for 2024?",
+    sql: `SELECT DATE_TRUNC('week', CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)) AS week,
+                  t.detailed_source AS channel,
+                  SUM(t.value - t.total_deferred_items) AS total_sales
+          FROM hang_loyalty_public.transactions t
+          JOIN hang_loyalty_public.customer_transactions ct ON ct.transaction_id = t.id
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) >= DATE_TRUNC('year', DATEADD(YEAR, -1, CURRENT_DATE))
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) < DATE_TRUNC('year', CURRENT_DATE)
+            AND t.program_id = 1614
+            AND t._FIVETRAN_DELETED = false
+            AND ct._FIVETRAN_DELETED = false
+          GROUP BY week, channel
+          ORDER BY week, channel`
+  },
+  {
+    question: "What were my weekly discounts by location for 2024?",
+    sql: `SELECT DATE_TRUNC('week', CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp)) AS week,
+                  location,
+                  SUM(total_discount) AS total_discounts
+          FROM hang_loyalty_public.transactions
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) >= DATE_TRUNC('year', DATEADD(YEAR, -1, CURRENT_DATE))
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', transaction_timestamp) < DATE_TRUNC('year', CURRENT_DATE)
+            AND program_id = 1614
+            AND _FIVETRAN_DELETED = false
+          GROUP BY week, location
+          ORDER BY week, location`
+  },
+  {
+    question: "What were my daily Fried Jumbo Tenders Plate sales by location in January 2025?",
+    sql: `WITH filtered_line_items AS (
+            SELECT transaction_id, value AS line_item_total
+            FROM hang_loyalty_public.transaction_line_items
+            WHERE display_name = 'Fried Jumbo Tenders Plate'
+              AND _FIVETRAN_DELETED = false
+          )
+          SELECT DATE_TRUNC('day', CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)) AS transaction_date,
+                  t.location,
+                  SUM(fli.line_item_total) AS total_sales
+          FROM filtered_line_items fli
+          JOIN hang_loyalty_public.transactions t ON t.id = fli.transaction_id
+          WHERE DATE_TRUNC('month', CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)) = DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+            AND t.program_id = 1614
+            AND t._FIVETRAN_DELETED = false
+          GROUP BY transaction_date, t.location
+          ORDER BY transaction_date, t.location`
+  },
+  {
+    question: "Show me overall sales performance by channel in 2024",
+    sql: `SELECT t.detailed_source AS channel,
+                  SUM(t.value - t.total_deferred_items) AS total_sales,
+                  COUNT(DISTINCT t.id) / NULLIF(COUNT(DISTINCT ct.customer_id), 0) AS purchases_per_customer,
+                  SUM(t.total_discount) AS total_discount
+          FROM hang_loyalty_public.transactions t
+          JOIN hang_loyalty_public.customer_transactions ct ON ct.transaction_id = t.id
+          WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) >= DATE_TRUNC('year', DATEADD(YEAR, -1, CURRENT_DATE))
+            AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) < DATE_TRUNC('year', CURRENT_DATE)
+            AND t.program_id = 1614
+            AND t._FIVETRAN_DELETED = false
+            AND ct._FIVETRAN_DELETED = false
+          GROUP BY t.detailed_source
+          ORDER BY t.detailed_source`
+  },
+  {
+    question: "What was the 7-day return rate for customers each day in December 2024?",
+    sql: `WITH primary_transactions AS (
+            SELECT CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)::DATE AS transaction_date,
+                    ct.customer_id
+            FROM hang_loyalty_public.transactions t
+            JOIN hang_loyalty_public.customer_transactions ct ON ct.transaction_id = t.id
+            WHERE t._FIVETRAN_DELETED = false AND ct._FIVETRAN_DELETED = false
+              AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) >= DATE_TRUNC('month', DATEADD(MONTH, -3, CURRENT_DATE))
+              AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) < DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+              AND t.program_id = 1614
+          ),
+          daily_customers AS (
+            SELECT transaction_date AS day, customer_id
+            FROM primary_transactions
+            GROUP BY transaction_date, customer_id
+          ),
+          customer_returns AS (
+            SELECT dc.day, dc.customer_id,
+                    CASE WHEN EXISTS (
+                      SELECT 1 FROM hang_loyalty_public.transactions t
+                      JOIN hang_loyalty_public.customer_transactions ct ON ct.transaction_id = t.id
+                      WHERE ct.customer_id = dc.customer_id
+                        AND t._FIVETRAN_DELETED = false AND ct._FIVETRAN_DELETED = false
+                        AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)::DATE > dc.day
+                        AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)::DATE <= dc.day + INTERVAL '7 day'
+                        AND t.program_id = 1614
+                    ) THEN 1 ELSE 0 END AS returned_within_7d
+            FROM daily_customers dc
+          )
+          SELECT day, AVG(returned_within_7d::FLOAT) AS return_rate_7d
+          FROM customer_returns
+          GROUP BY day
+          ORDER BY day`
+  },
+  {
+    question: "What were my daily sales by channel for Plates in January 2025?",
+    sql: `WITH filtered_line_items AS (
+            SELECT transaction_id, value AS line_item_total
+            FROM hang_loyalty_public.transaction_line_items
+            WHERE group_display_name = 'Plates'
+              AND _FIVETRAN_DELETED = false
+          )
+          SELECT DATE_TRUNC('day', CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)) AS transaction_date,
+                  t.detailed_source AS channel,
+                  SUM(fli.line_item_total) AS total_sales
+          FROM filtered_line_items fli
+          JOIN hang_loyalty_public.transactions t ON t.id = fli.transaction_id
+          WHERE DATE_TRUNC('month', CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)) = DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+            AND t.program_id = 1614
+            AND t._FIVETRAN_DELETED = false
+          GROUP BY transaction_date, channel
+          ORDER BY transaction_date, channel`
+  },
+  {
+    question: "Show me daily sales of the Fried Jumbo Tenders Plate compared to the Fried 3 Tenders Plate in January 2025",
+    sql: `WITH filtered_line_items AS (
+            SELECT transaction_id, value AS line_item_total, display_name
+            FROM hang_loyalty_public.transaction_line_items
+            WHERE display_name IN ('Fried Jumbo Tenders Plate', 'Fried 3 Tenders Plate')
+              AND _FIVETRAN_DELETED = false
+          )
+          SELECT DATE_TRUNC('day', CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)) AS day,
+                  MAX(CASE WHEN fli.display_name = 'Fried Jumbo Tenders Plate' THEN fli.line_item_total END) AS jumbo_plate_sales,
+                  MAX(CASE WHEN fli.display_name = 'Fried 3 Tenders Plate' THEN fli.line_item_total END) AS regular_plate_sales
+          FROM filtered_line_items fli
+          JOIN hang_loyalty_public.transactions t ON t.id = fli.transaction_id
+          WHERE DATE_TRUNC('month', CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)) = DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+            AND t.program_id = 1614
+            AND t._FIVETRAN_DELETED = false
+          GROUP BY day
+          ORDER BY day`
+  },
+  {
+    question: "Which items did people most often buy with the Fried Jumbo Tenders Plate in December 2024?",
+    sql: `WITH initial_purchases AS (
+            SELECT ct.customer_id, t.id AS transaction_id, t.transaction_timestamp, tli.display_name AS initial_line_item
+            FROM hang_loyalty_public.transactions t
+            JOIN hang_loyalty_public.transaction_line_items tli ON tli.transaction_id = t.id
+            JOIN hang_loyalty_public.customer_transactions ct ON ct.transaction_id = t.id
+            WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) >= DATE_TRUNC('month', DATEADD(MONTH, -3, CURRENT_DATE))
+              AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) < DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+              AND tli.display_name = 'Fried Jumbo Tenders Plate'
+              AND t.program_id = 1614
+              AND t._FIVETRAN_DELETED = false AND tli._FIVETRAN_DELETED = false AND ct._FIVETRAN_DELETED = false
+          ),
+          accomp_line_items AS (
+            SELECT ip.customer_id, ip.initial_line_item, tli.display_name AS accompanying_item
+            FROM initial_purchases ip
+            JOIN hang_loyalty_public.transaction_line_items tli ON tli.transaction_id = ip.transaction_id
+            WHERE tli.display_name <> ip.initial_line_item AND tli._FIVETRAN_DELETED = false
+          )
+          SELECT initial_line_item AS "Item", accompanying_item AS "Accompanying Item",
+                  COUNT(DISTINCT customer_id) AS "Instances"
+          FROM accomp_line_items
+          GROUP BY initial_line_item, accompanying_item
+          HAVING COUNT(DISTINCT customer_id) > 10
+          ORDER BY "Instances" DESC`
+  },
+  {
+    question: "Show me the repeat purchase behavior for Plates compared to Extras in December 2024",
+    sql: `WITH base_minutes AS (
+            SELECT MIN(minute_ts) AS min_ts, MAX(minute_ts) AS max_ts
+            FROM precomputes.all_minutes
+            WHERE minute_ts >= DATE_TRUNC('month', DATEADD(MONTH, -3, CURRENT_DATE)) 
+              AND minute_ts < DATE_TRUNC('month', DATEADD(MONTH, -2, CURRENT_DATE))
+          ),
+          base_first_purchases AS (
+            SELECT ct.customer_id, tli.group_display_name AS category,
+                    MIN(CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp)) AS first_purchase_date
+            FROM hang_loyalty_public.transactions t
+            JOIN hang_loyalty_public.transaction_line_items tli ON tli.transaction_id = t.id
+            JOIN hang_loyalty_public.customer_transactions ct ON ct.transaction_id = t.id
+            WHERE CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) >= (SELECT min_ts FROM base_minutes)
+              AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) <= (SELECT max_ts FROM base_minutes)
+              AND tli.group_display_name IN ('Plates', 'Extras')
+              AND t.program_id = 1614
+              AND t._FIVETRAN_DELETED = false AND tli._FIVETRAN_DELETED = false AND ct._FIVETRAN_DELETED = false
+            GROUP BY ct.customer_id, tli.group_display_name
+          ),
+          repeat_purchases AS (
+            SELECT fp.customer_id, fp.category,
+                    CASE WHEN EXISTS (
+                      SELECT 1 FROM hang_loyalty_public.transactions t
+                      JOIN hang_loyalty_public.customer_transactions ct ON ct.transaction_id = t.id
+                      JOIN hang_loyalty_public.transaction_line_items tli ON tli.transaction_id = t.id
+                      WHERE ct.customer_id = fp.customer_id
+                        AND t._FIVETRAN_DELETED = false AND ct._FIVETRAN_DELETED = false AND tli._FIVETRAN_DELETED = false
+                        AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', t.transaction_timestamp) > fp.first_purchase_date
+                        AND tli.group_display_name = fp.category
+                        AND t.program_id = 1614
+                    ) THEN 1 ELSE 0 END AS has_repeat
+            FROM base_first_purchases fp
+          )
+          SELECT fp.category AS "Category", COUNT(DISTINCT fp.customer_id) AS total_customers,
+                  SUM(COALESCE(rp.has_repeat, 0)) AS repeat_customers,
+                  (SUM(COALESCE(rp.has_repeat, 0)) / NULLIF(COUNT(DISTINCT fp.customer_id), 0))::FLOAT AS repeat_purchase_rate
+          FROM base_first_purchases fp
+          LEFT JOIN repeat_purchases rp ON fp.customer_id = rp.customer_id AND fp.category = rp.category
+          GROUP BY fp.category`
   }
 ];
 
 // Additional rules (kept as an array for clarity)
 const ADDITIONAL_RULES = [
+  'When using relative time in a question (e.g., "today"), stick to relative terms rather than absolute dates. These queries are saved and reused later, so they should consistently refer to the same relative time period.',
   'For all time based queries that exceed the current time (e.g. "this year"), only use values on or before the current date',
   'When the query needs to filter strings, always use ILIKE %..% unless exact match explicitly requested',
   'Use \\ as escape character; use \\\\ for literal \\',
   'Use average functions for averages, excluding nulls; avoid SUM()/COUNT()',
   'Subqueries without IN must return one row using MIN/MAX/ANY_VALUE',
   'SAMPLE(10) means 10%; use ROWS for specific row counts',
+  'Always sort dates ascending',
   'For simple arrays after flattening, use value directly',
   'Flatten JSON arrays with CROSS JOIN LATERAL FLATTEN; use <alias>.value',
   'Extract JSON object values with c[\'key1\'] or c:key2',
@@ -442,11 +837,13 @@ async function generateSqlQuery(question: string): Promise<string> {
 }
 
 /**
- * Validates a SQL query for security 
+ * Validates a SQL query for security, supporting SELECT queries including those with CTEs
+ * @param sqlQuery The SQL query string to validate
+ * @returns boolean True if the query is safe and valid, false otherwise
  */
 function validateQuery(sqlQuery: string): boolean {
-  // Convert to lowercase for case-insensitive checks
-  const lowerCaseQuery = sqlQuery.toLowerCase();
+  // Remove leading/trailing whitespace and convert to lowercase for case-insensitive checks
+  const normalizedQuery = sqlQuery.trim().toLowerCase();
   
   // Check for destructive or administrative commands
   const disallowedCommands = [
@@ -456,49 +853,124 @@ function validateQuery(sqlQuery: string): boolean {
   ];
   
   for (const command of disallowedCommands) {
-    if (lowerCaseQuery.includes(command)) {
+    if (normalizedQuery.includes(command)) {
       console.error(`Query validation failed: contains disallowed command '${command}'`);
       return false;
     }
   }
   
-  // Ensure the query is a SELECT statement
-  if (!lowerCaseQuery.trim().startsWith('select')) {
-    console.error('Query validation failed: not a SELECT statement');
+  // Check if the query is a valid SELECT statement (direct or CTE-based)
+  if (normalizedQuery.startsWith('select')) {
+    // Direct SELECT query, no further checks needed for structure
+    return true;
+  } else if (normalizedQuery.startsWith('with')) {
+    // Handle CTEs: ensure at least one SELECT follows the WITH clause(s)
+    // Split into tokens to find the main query after CTE definitions
+    const parts = normalizedQuery.split(/\bwith\b|\bselect\b/);
+    let foundSelect = false;
+    
+    for (let i = 1; i < parts.length; i++) { // Start at 1 to skip initial empty part or CTE name
+      const part = parts[i].trim();
+      if (part.length > 0 && !part.startsWith('as (') && !part.startsWith(',')) {
+        // This should be the main query after CTEs
+        foundSelect = true;
+        break;
+      }
+    }
+    
+    if (!foundSelect) {
+      console.error('Query validation failed: CTE query lacks a valid SELECT statement');
+      return false;
+    }
+    
+    // Additional check: ensure no disallowed commands appear after CTEs
+    const postCteSection = normalizedQuery.substring(normalizedQuery.indexOf('select'));
+    for (const command of disallowedCommands) {
+      if (postCteSection.includes(command)) {
+        console.error(`Query validation failed: contains disallowed command '${command}' after CTE`);
+        return false;
+      }
+    }
+    
+    return true;
+  } else {
+    console.error('Query validation failed: must start with SELECT or WITH for CTEs');
     return false;
   }
-  
-  // Additional validation rules can be added here based on specific requirements
-  return true;
 }
 
 /**
  * Executes a SQL query against Snowflake with a timeout
  */
 async function executeQuery(connection: SnowflakeConnection, sqlQuery: string): Promise<SnowflakeRow[]> {
+  console.log(`[SQL QUERY]: ${sqlQuery}`);  // Log all SQL queries
+  
   return new Promise((resolve, reject) => {
-    let timeoutId: NodeJS.Timeout;
+    // Check connection status first
+    if (!connection.isUp()) {
+      console.error('Connection is not active, cannot execute query');
+      reject(new Error('Connection is not active or has been terminated'));
+      return;
+    }
     
-    // Set a timeout for query execution (30 seconds)
-    const timeout = 30000;
-    timeoutId = setTimeout(() => {
+    // Create a timeout (120 seconds = 2 minutes)
+    const timeout = 120000;
+    let timeoutId: NodeJS.Timeout | null = setTimeout(() => {
+      timeoutId = null;
+      console.error(`[SQL TIMEOUT]: Query execution timed out after ${timeout / 1000} seconds`);
+      console.error(`[SQL TIMEOUT QUERY]: ${sqlQuery}`);
       reject(new Error(`Query execution timed out after ${timeout / 1000} seconds`));
     }, timeout);
     
-    connection.execute({
+    // Create options object with proper typing
+    const options: snowflake.StatementOption = {
       sqlText: sqlQuery,
-      complete: (err, stmt, rows) => {
-        clearTimeout(timeoutId);
+      complete: (err: any, stmt: any, rows: any) => {
+        // Clear the timeout if it's still active
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        
+        // Get query ID for better logging if available
+        const queryId = stmt?.getStatementId ? stmt.getStatementId() : 'unknown';
         
         if (err) {
-          console.error('Error executing SQL query:', err);
+          // If error indicates connection issue, mark the connection for replacement
+          if (err.code === 407002 || 
+              (err.message && (
+                err.message.includes('terminated connection') || 
+                err.message.includes('Unable to perform operation')
+              ))
+            ) {
+            console.error(`[SQL CONNECTION ERROR] Query ${queryId}: Connection error detected`);
+            try {
+              // Remove from pool so a new connection is created next time
+              const connectionKey = Object.keys(connectionPool).find(
+                key => connectionPool[key] === connection
+              );
+              if (connectionKey) {
+                console.log(`Removing failed connection from pool: ${connectionKey}`);
+                delete connectionPool[connectionKey];
+                delete connectionUsage[connectionKey];
+              }
+            } catch (poolErr) {
+              console.error('Error cleaning up connection pool:', poolErr);
+            }
+          }
+          
+          console.error(`[SQL ERROR] Query ${queryId}:`, err);
+          console.error(`[SQL ERROR QUERY]: ${sqlQuery}`);
           reject(err);
         } else {
-          console.log(`Query executed successfully, returned ${rows?.length || 0} rows`);
+          console.log(`[SQL SUCCESS] Query ${queryId}: returned ${rows?.length || 0} rows`);
           resolve(rows || []);
         }
       }
-    });
+    };
+    
+    // Execute the query
+    connection.execute(options);
   });
 }
 
@@ -708,15 +1180,7 @@ function transformForBarChart(results: SnowflakeRow[]): any {
   // Limit the number of categories to prevent overcrowding
   let formattedData = results;
   if (results.length > 10) {
-    // Sort by the first numeric column in descending order and take top 10
-    const sortColumn = numericColumns[0];
-    if (sortColumn) {
-      formattedData = [...results]
-        .sort((a, b) => (b[sortColumn] as number) - (a[sortColumn] as number))
-        .slice(0, 10);
-    } else {
-      formattedData = results.slice(0, 10);
-    }
+    formattedData = results.slice(0, 10);
   }
   
   return {
@@ -832,6 +1296,12 @@ async function saveChatGeneratedMetric({
     
     console.log('Inserting metric into database with user ID:', session.user.id);
     
+    // Normalize visualization type - convert bar-chart and others to just 'chart'
+    let normalizedVisualizationType = visualizationType || 'table';
+    if (normalizedVisualizationType === 'bar-chart' || normalizedVisualizationType === 'line-chart') {
+      normalizedVisualizationType = 'chart';
+    }
+    
     // Insert directly into Supabase with the user's ID explicitly set
     const { data, error } = await supabase
       .from('ChatGeneratedMetrics')
@@ -841,7 +1311,7 @@ async function saveChatGeneratedMetric({
         description: question,
         question,
         sqlquery: sqlQuery,
-        visualizationtype: visualizationType || 'table',
+        visualizationtype: normalizedVisualizationType,
         category: category || 'general',
         conversationid: conversationId || null,
         createdat: new Date().toISOString(),
@@ -857,5 +1327,132 @@ async function saveChatGeneratedMetric({
     }
   } catch (error) {
     console.error('Error in saveChatGeneratedMetric:', error);
+  }
+}
+
+// Check if a connection is valid with a test query
+async function isConnectionValid(connection: SnowflakeConnection): Promise<boolean> {
+  try {
+    if (!connection.isUp()) {
+      return false;
+    }
+    
+    // Perform a lightweight test query to validate the connection
+    return new Promise((resolve) => {
+      connection.execute({
+        sqlText: 'SELECT 1 AS test',
+        complete: (err, stmt, rows) => {
+          if (err) {
+            console.error('Connection validation query failed:', err);
+            resolve(false);
+          } else {
+            resolve(true);
+          }
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error checking connection validity:', error);
+    return false;
+  }
+}
+
+// Add a connection to the pool with LRU management
+function addToPool(key: string, connection: SnowflakeConnection): void {
+  // If pool is at capacity, evict least recently used connection
+  if (Object.keys(connectionPool).length >= MAX_POOL_SIZE) {
+    const lruKey = Object.keys(connectionUsage).reduce((a, b) => 
+      connectionUsage[a] < connectionUsage[b] ? a : b
+    );
+    
+    console.log(`Pool at capacity, evicting least recently used connection: ${lruKey}`);
+    destroyConnection(connectionPool[lruKey]);
+    delete connectionPool[lruKey];
+    delete connectionUsage[lruKey];
+  }
+  
+  // Add new connection to pool
+  connectionPool[key] = connection;
+  connectionUsage[key] = Date.now();
+  console.log(`Added connection to pool: ${key}`);
+}
+
+// Update usage timestamp for a connection
+function updateConnectionUsage(key: string): void {
+  connectionUsage[key] = Date.now();
+}
+
+// Connect to Snowflake with retry logic
+async function connectWithRetry(connection: SnowflakeConnection, retryCount = 0): Promise<void> {
+  return new Promise((resolve, reject) => {
+    
+    // Increased timeout from 30 seconds to 2 minutes
+    const timeout = 120000;
+    connection.connect((err) => {
+      if (err) {
+        console.error(`Connection attempt ${retryCount + 1} failed:`, err);
+        
+        if (retryCount < MAX_RETRIES) {
+          console.log(`Retrying connection, attempt ${retryCount + 2}/${MAX_RETRIES + 1}`);
+          setTimeout(() => {
+            connectWithRetry(connection, retryCount + 1)
+              .then(resolve)
+              .catch(reject);
+          }, 1000 * (retryCount + 1)); // Exponential backoff
+        } else {
+          console.error('Maximum connection retry attempts reached');
+          reject(err);
+        }
+      } else {
+        console.log('Successfully connected to Snowflake');
+        resolve();
+      }
+    });
+  });
+}
+
+// Helper to safely destroy a connection
+async function destroyConnection(connection: SnowflakeConnection): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      if (connection && typeof connection.destroy === 'function') {
+        connection.destroy((err) => {
+          if (err) {
+            console.error('Error destroying Snowflake connection:', err);
+          } else {
+            console.log('Successfully destroyed Snowflake connection');
+          }
+          resolve();
+        });
+      } else {
+        resolve();
+      }
+    } catch (error) {
+      console.error('Error destroying Snowflake connection:', error);
+      resolve();
+    }
+  });
+}
+
+// Clean up idle connections
+async function cleanupIdleConnections(): Promise<void> {
+  const now = Date.now();
+  const idleConnections: string[] = [];
+
+  for (const connectionKey in connectionPool) {
+    if (connectionUsage[connectionKey] && now - connectionUsage[connectionKey] > CONNECTION_IDLE_TIMEOUT) {
+      idleConnections.push(connectionKey);
+    }
+  }
+
+  for (const connectionKey of idleConnections) {
+    try {
+      await destroyConnection(connectionPool[connectionKey]);
+      delete connectionPool[connectionKey];
+      delete connectionUsage[connectionKey];
+      console.log(`Cleaned up idle connection: ${connectionKey}`);
+    } catch (error) {
+      console.error(`Error cleaning up idle connection ${connectionKey}:`, error);
+    }
   }
 }

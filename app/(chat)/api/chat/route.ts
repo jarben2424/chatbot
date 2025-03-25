@@ -3,7 +3,6 @@ import {
   createDataStreamResponse,
   smoothStream,
   streamText,
-  type ToolCall,
   type ToolInvocation,
 } from 'ai';
 import { auth } from '@/app/(auth)/auth';
@@ -100,7 +99,10 @@ export async function POST(request: Request) {
                   'businessDbQuery',
                   'dashboardEmailSubscription',
                 ],
-          experimental_transform: smoothStream({ chunking: 'word' }),
+          experimental_transform: smoothStream({ 
+            chunking: 'word',
+            delayInMs: 0, // No delay between tool calls
+          }),
           experimental_generateMessageId: generateUUID,
           tools: {
             getWeather,

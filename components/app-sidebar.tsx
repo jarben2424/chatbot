@@ -73,8 +73,6 @@ export function AppSidebar({ user }: { user: User | undefined }) {
       name: 'View Campaigns',
       href: '/campaigns',
       icon: Megaphone,
-      disabled: true,
-      tag: 'Coming Soon'
     },
     {
       name: 'Open AI Tools',

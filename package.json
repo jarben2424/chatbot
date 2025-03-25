@@ -21,9 +21,11 @@
     "test:api": "node scripts/test-api.js"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^1.2.0",
     "@ai-sdk/fireworks": "0.1.12",
     "@ai-sdk/openai": "1.2.0",
-    "@ai-sdk/react": "^1.1.20",
+    "@ai-sdk/react": "^1.2.0",
+    "@anthropic-ai/sdk": "^0.39.0",
     "@codemirror/lang-javascript": "^6.2.2",
     "@codemirror/lang-python": "^6.1.6",
     "@codemirror/state": "^6.5.0",
@@ -102,7 +104,7 @@
     "@playwright/test": "^1.50.1",
     "@tailwindcss/typography": "^0.5.15",
     "@types/d3-scale": "^4.0.8",
-    "@types/node": "^22.8.6",
+    "@types/node": "^22.13.13",
     "@types/papaparse": "^5.3.15",
     "@types/pdf-parse": "^1.1.4",
     "@types/react": "^18",
@@ -113,10 +115,10 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-import-resolver-typescript": "^3.6.3",
     "eslint-plugin-tailwindcss": "^3.17.5",
+    "node-fetch": "^2.6.9",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.19.1",
-    "typescript": "^5.6.3",
-    "node-fetch": "^2.6.9"
+    "typescript": "^5.6.3"
   }
 }
