@@ -9,6 +9,7 @@ import {
   primaryKey,
   foreignKey,
   boolean,
+  integer,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('User', {
@@ -129,3 +130,47 @@ export const dashboardQuery = pgTable('DashboardQuery', {
 });
 
 export type DashboardQuery = InferSelectModel<typeof dashboardQuery>;
+
+export const report = pgTable('Report', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  userId: uuid('userId')
+    .notNull()
+    .references(() => user.id),
+  title: text('title').notNull(),
+  description: text('description'),
+  type: varchar('type', { enum: ['dashboard_update', 'anomaly_detection', 'recommendation'] }).notNull(),
+  content: json('content').notNull(),
+  schedule: varchar('schedule', { enum: ['daily', 'weekly', 'monthly', 'custom'] }).notNull(),
+  customSchedule: text('customSchedule'),
+  isActive: boolean('isActive').notNull().default(true),
+  createdAt: timestamp('createdAt').notNull(),
+  updatedAt: timestamp('updatedAt').notNull(),
+  lastSentAt: timestamp('lastSentAt'),
+});
+
+export type Report = InferSelectModel<typeof report>;
+
+export const reportRecipient = pgTable('ReportRecipient', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  reportId: uuid('reportId')
+    .notNull()
+    .references(() => report.id),
+  email: varchar('email', { length: 64 }).notNull(),
+  name: varchar('name', { length: 64 }),
+  createdAt: timestamp('createdAt').notNull(),
+});
+
+export type ReportRecipient = InferSelectModel<typeof reportRecipient>;
+
+export const reportHistory = pgTable('ReportHistory', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  reportId: uuid('reportId')
+    .notNull()
+    .references(() => report.id),
+  status: varchar('status', { enum: ['success', 'failure'] }).notNull(),
+  sentAt: timestamp('sentAt').notNull(),
+  recipientCount: integer('recipientCount').notNull(),
+  content: json('content').notNull(),
+});
+
+export type ReportHistory = InferSelectModel<typeof reportHistory>;

@@ -331,7 +331,7 @@ export default function CampaignOffersPage() {
               <div className="flex items-center flex-wrap gap-2">
                 <span className="font-medium">{offer.title}</span>
                 {offer.popular && (
-                  <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100 border-none text-xs">
+                  <Badge variant="outline" className="bg-primary/10 text-primary border-none text-xs">
                     Popular
                   </Badge>
                 )}
@@ -376,7 +376,6 @@ export default function CampaignOffersPage() {
   return (
     <>
       <div className="flex flex-col min-w-0 h-dvh bg-background">
-        <CampaignHeader />
         <div className="flex-1 flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full pb-24">
           <div className="mb-4 md:mb-8">
             <h1 className="text-3xl font-bold">Create Campaign</h1>
@@ -386,108 +385,92 @@ export default function CampaignOffersPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 flex-1">
             {/* LEFT COLUMN - Selected Offers */}
             <div className="flex flex-col">
-              <Card className="flex-1">
-                <CardHeader className="pb-3">
-                  <CardTitle>Selected Offers ({selectedOffers.length})</CardTitle>
-                  <CardDescription>
-                    These offers will be included in your campaign
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {selectedOffers.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-48 text-center">
-                      <p className="text-muted-foreground">No offers selected yet</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Add offers from the available list
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      {selectedOffers.map(offer => renderOfferCard(offer, true))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <div className="mb-4">
+                <h2 className="text-xl font-semibold">Selected Offers ({selectedOffers.length})</h2>
+                <p className="text-sm text-muted-foreground mt-1.5">
+                  These offers will be included in your campaign
+                </p>
+              </div>
+              <div className="flex-1 rounded-lg border p-4">
+                {selectedOffers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-center">
+                    <p className="text-muted-foreground">No offers selected yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Add offers from the available list
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {selectedOffers.map(offer => renderOfferCard(offer, true))}
+                  </div>
+                )}
+              </div>
             </div>
             
             {/* RIGHT COLUMN - Available Offers */}
             <div className="flex flex-col">
-              <Card className="flex-1">
-                <CardHeader className="pb-3">
-                  <CardTitle>Available Offers</CardTitle>
-                  <CardDescription>
-                    Select offers to add to your campaign
-                  </CardDescription>
-                  <div className="pt-2 space-y-3">
-                    <div className="relative">
-                      <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search offers..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-8"
-                      />
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <div className="flex-1 min-w-[180px]">
-                        <Select value={valueFilter} onValueChange={setValueFilter}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Filter by value" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all-values">All Values</SelectItem>
-                            <SelectItem value="low">Low Value ({"<"} $5)</SelectItem>
-                            <SelectItem value="medium">Medium Value ($5-$15)</SelectItem>
-                            <SelectItem value="high">High Value ({">"}$15)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex-1 min-w-[180px]">
-                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Filter by category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all-categories">All Categories</SelectItem>
-                            <SelectItem value="food-beverage">Food & Beverage</SelectItem>
-                            <SelectItem value="discount">Discounts</SelectItem>
-                            <SelectItem value="service">Services</SelectItem>
-                            <SelectItem value="loyalty">Loyalty & Rewards</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {(searchTerm || valueFilter || categoryFilter) && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={clearFilters}
-                          className="text-xs h-10"
-                        >
-                          Clear Filters
-                        </Button>
-                      )}
-                    </div>
+              <div className="mb-4">
+                <h2 className="text-xl font-semibold">Available Offers</h2>
+                <p className="text-sm text-muted-foreground mt-1.5">
+                  Select offers to add to your campaign
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-2 mb-4">
+                <div className="relative flex-1">
+                  <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search offers..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 w-full"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={valueFilter}
+                    onValueChange={setValueFilter}
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Filter by value" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All values</SelectItem>
+                      <SelectItem value="low">Low value</SelectItem>
+                      <SelectItem value="medium">Medium value</SelectItem>
+                      <SelectItem value="high">High value</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={categoryFilter}
+                    onValueChange={setCategoryFilter}
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="Filter by category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All categories</SelectItem>
+                      <SelectItem value="food-beverage">Food & Beverage</SelectItem>
+                      <SelectItem value="discounts">Discounts</SelectItem>
+                      <SelectItem value="memberships">Memberships</SelectItem>
+                      <SelectItem value="services">Services</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="flex-1 space-y-3 overflow-y-auto rounded-lg border p-4">
+                {filteredOffers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-center">
+                    <p className="text-muted-foreground">No matching offers found</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Try adjusting your search or filters
+                    </p>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  {filteredOffers.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-48 text-center">
-                      <p className="text-muted-foreground">No offers match your filters</p>
-                      <Button 
-                        variant="link" 
-                        onClick={clearFilters}
-                        className="mt-2"
-                      >
-                        Clear Filters
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-1 max-h-[500px] overflow-y-auto pr-2">
-                      {filteredOffers.map(offer => renderOfferCard(offer))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                ) : (
+                  filteredOffers.map(offer => renderOfferCard(offer, false))
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -505,7 +488,7 @@ export default function CampaignOffersPage() {
             <Button 
               onClick={handleNext} 
               disabled={!hasSelectedOffers}
-              className="gap-1"
+              className="gap-1 bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               Next Step <ChevronRightIcon className="h-4 w-4" />
             </Button>

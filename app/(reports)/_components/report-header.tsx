@@ -6,6 +6,27 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { XIcon } from 'lucide-react';
 import { SidebarToggle } from '@/components/sidebar-toggle';
+import { useReportState } from '../_context/report-context';
+import { toast } from 'sonner';
+
+// Check if report context is available
+function useOptionalReportState() {
+  try {
+    return {
+      hasContext: true,
+      ...useReportState()
+    };
+  } catch (error) {
+    // Return default values if context isn't available
+    return {
+      hasContext: false,
+      reportState: {},
+      saveReport: async () => {},
+      isDirty: false,
+      setIsDirty: () => {}
+    };
+  }
+}
 
 // Directly define the toast interface we need
 interface ToastProps {
@@ -24,54 +45,43 @@ function useToast() {
   };
 }
 
-// Temporary campaign context interface until the build system recognizes our files
-interface CampaignState {
+// Temporary report context interface
+interface ReportState {
   id?: string;
-  name: string;
-  campaignType: string;
-  status: string;
+  title: string;
+  type: string;
+  isActive: boolean;
   // Other fields omitted for brevity
 }
 
-// Simplified context hook for initial build
-function useCampaignState() {
-  return {
-    campaignState: {} as CampaignState,
-    saveCampaign: async () => {
-      console.log('Saving campaign...');
-      return Promise.resolve();
-    }
-  };
-}
-
-export function CampaignHeader() {
+export function ReportHeader() {
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const { hasContext, reportState, saveReport, isDirty } = useOptionalReportState();
   const { toast } = useToast();
-  const { campaignState, saveCampaign } = useCampaignState();
   
-  const isCreationFlow = pathname?.includes('/campaigns/create');
+  const isCreationFlow = pathname?.includes('/reports/create') || pathname?.includes('/reports/edit');
   
   const handleExit = () => {
     // Exit without saving
-    router.push('/campaigns');
+    router.push('/reports');
   };
   
   const handleSaveAndExit = async () => {
     setIsSaving(true);
     try {
-      await saveCampaign();
+      await saveReport();
       toast({
-        title: "Campaign saved",
+        title: "Report saved",
         description: "Your progress has been saved successfully.",
       });
-      router.push('/campaigns');
+      router.push('/reports');
     } catch (error) {
       toast({
-        title: "Error saving campaign",
-        description: "There was a problem saving your campaign progress.",
+        title: "Error saving report",
+        description: "There was a problem saving your report progress.",
         variant: "destructive",
       });
       console.error(error);
@@ -84,7 +94,7 @@ export function CampaignHeader() {
     <>
       <header className="flex sticky top-0 bg-background py-1.5 items-center px-2 md:px-2 gap-2">
         {isCreationFlow ? (
-          // X button for campaign creation flow
+          // X button for report creation flow
           <Button 
             variant="outline" 
             size="icon" 
@@ -94,7 +104,7 @@ export function CampaignHeader() {
             <XIcon className="h-5 w-5" />
           </Button>
         ) : (
-          // Sidebar toggle for regular campaigns page, using the same component as chat header
+          // Sidebar toggle for regular reports page, using the same component as chat header
           <SidebarToggle />
         )}
       </header>
@@ -102,9 +112,9 @@ export function CampaignHeader() {
       <Dialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Exit Campaign Creation?</DialogTitle>
+            <DialogTitle>Exit Report Creation?</DialogTitle>
             <DialogDescription>
-              Your progress in creating this campaign hasn't been saved. Would you like to save your progress before exiting?
+              Your progress in creating this report hasn't been saved. Would you like to save your progress before exiting?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">

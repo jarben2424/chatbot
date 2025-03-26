@@ -78,6 +78,29 @@ export function AppSidebar({ user }: { user?: User | undefined }) {
       name: 'View Campaigns',
       href: '/campaigns',
       icon: Megaphone,
+      shortcut: '⌘C'
+    },
+    {
+      name: 'Reports',
+      href: '/reports',
+      icon: () => (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4"
+        >
+          <rect width="18" height="18" x="3" y="3" rx="2" />
+          <path d="M3 9h18" />
+          <path d="M9 21V9" />
+          <path d="m9 3 2 2 2-2" />
+        </svg>
+      ),
+      shortcut: '⌘R'
     },
     {
       name: 'Open AI Tools',
@@ -110,13 +133,13 @@ export function AppSidebar({ user }: { user?: User | undefined }) {
       shadow-[2px_0_5px_rgba(0,0,0,0.1)] flex flex-col h-full">
       <SidebarHeader className="h-[60px] flex items-center py-1.5 px-0">
         <SidebarMenu>
-          <div className="flex flex-row justify-between items-center pr-1 pl-2">
+          <div className="flex flex-row justify-between items-center px-2">
             <Link
               href="/"
               onClick={() => {
                 setOpenMobile(false);
               }}
-              className="flex items-center ml-2"
+              className="flex items-center"
             >
               <Image
                 src={theme === 'dark' 
@@ -139,7 +162,7 @@ export function AppSidebar({ user }: { user?: User | undefined }) {
                     router.refresh();
                   }}
                   variant="outline"
-                  className="md:px-2 md:h-fit mr-2"
+                  className="md:px-2 md:h-fit"
                 >
                   <PlusIcon size={16} />
                 </Button>

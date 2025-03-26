@@ -1,8 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { CampaignHeader } from '../../../_components/campaign-header';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -12,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { useToast } from "@/components/ui/use-toast";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -19,13 +19,47 @@ import {
   ExternalLinkIcon,
   CheckIcon,
   SparklesIcon,
-  MailIcon
+  MailIcon,
+  SaveIcon
 } from 'lucide-react';
 
 export default function CampaignIntegrationPage() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const router = useRouter();
-  
+  const { toast } = useToast();
+
+  // Use real campaign data from the campaign creation flow
+  const [campaignData, setCampaignData] = useState({
+    name: '',
+    campaignType: '',
+    selectedOfferIds: [],
+    useAiSegment: false,
+    selectedSegmentId: '',
+    aiSegmentPrompt: '',
+    audienceSize: 0,
+    matchingComplete: false,
+    matchCount: 0
+  });
+
+  // Load campaign data from localStorage on component mount
+  useEffect(() => {
+    try {
+      // Get campaign info from localStorage (set in previous steps)
+      const storedCampaignData = localStorage.getItem('campaignData');
+      
+      if (storedCampaignData) {
+        const parsedData = JSON.parse(storedCampaignData);
+        setCampaignData(prevData => ({
+          ...prevData,
+          ...parsedData
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading campaign data:', error);
+    }
+  }, []);
+
   const handleBack = () => {
     router.push('/campaigns/create/matching');
   };
@@ -35,13 +69,68 @@ export default function CampaignIntegrationPage() {
     // For now, just redirect to the campaigns listing
     router.push('/campaigns');
   };
+
+  const handleSaveForLater = async () => {
+    setIsSaving(true);
+    
+    try {
+      // Get complete campaign data from localStorage
+      const storedData = localStorage.getItem('campaignData') || '{}';
+      const campaignDetails = JSON.parse(storedData);
+      
+      // Send campaign data to your API
+      const response = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          ...campaignDetails,
+          integrationType: selectedOption === 'klaviyo' ? 'klaviyo' : 
+                           selectedOption === 'export' ? 'export' : null,
+          status: 'draft',
+          integrationSettings: selectedOption === 'klaviyo' ? { listId: 'default' } : 
+                              selectedOption === 'export' ? { format: 'csv' } : {}
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to save campaign: ${errorText}`);
+      }
+      
+      // Parse the response to get the saved campaign
+      const savedCampaign = await response.json();
+      
+      // Clear the campaign data from localStorage
+      localStorage.removeItem('campaignData');
+      
+      // Show success message
+      toast({
+        title: "Campaign saved successfully",
+        description: "You can access it later from your campaigns list.",
+        variant: "default",
+      });
+      
+      // Redirect to campaigns list with the draft tab selected
+      router.push('/campaigns?tab=draft');
+    } catch (error) {
+      console.error('Error saving campaign:', error);
+      
+      // Show error message
+      toast({
+        title: "Error saving campaign",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
   
   const step = 5;
   
   return (
     <>
       <div className="flex flex-col min-w-0 h-dvh bg-background">
-        <CampaignHeader />
         <div className="flex-1 flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full pb-24">
           <div className="mb-4 md:mb-8">
             <h1 className="text-3xl font-bold">Create Campaign</h1>
@@ -64,7 +153,7 @@ export default function CampaignIntegrationPage() {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-8">
             {/* Klaviyo integration card */}
             <Card 
               className={`border-2 cursor-pointer hover:border-[#5640E8]/40 transition-all ${
@@ -162,6 +251,55 @@ export default function CampaignIntegrationPage() {
                 </div>
               </CardFooter>
             </Card>
+
+            {/* Save for Later card */}
+            <Card 
+              className={`border-2 cursor-pointer hover:border-[#5640E8]/40 transition-all ${
+                selectedOption === 'save' ? 'border-[#5640E8] shadow-md' : 'border-border'
+              }`}
+              onClick={() => setSelectedOption('save')}
+            >
+              <div className="absolute top-3 right-3">
+                {selectedOption === 'save' && (
+                  <div className="h-5 w-5 rounded-full bg-[#5640E8] flex items-center justify-center">
+                    <CheckIcon className="h-3 w-3 text-white" />
+                  </div>
+                )}
+              </div>
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-[#5640E8]/10 flex items-center justify-center">
+                    <SaveIcon className="h-5 w-5 text-[#5640E8]" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Save for Later</CardTitle>
+                    <CardDescription>Save as draft and complete later</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-start gap-2">
+                    <CheckIcon className="h-4 w-4 text-green-500 mt-0.5" />
+                    <p>Save your progress as a draft</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckIcon className="h-4 w-4 text-green-500 mt-0.5" />
+                    <p>Access from your campaign dashboard</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckIcon className="h-4 w-4 text-green-500 mt-0.5" />
+                    <p>Continue editing anytime</p>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <SaveIcon className="h-3 w-3" />
+                  Saves to "Drafts" in your campaigns
+                </div>
+              </CardFooter>
+            </Card>
           </div>
         </div>
         
@@ -176,11 +314,11 @@ export default function CampaignIntegrationPage() {
               <ChevronLeftIcon className="h-4 w-4" /> Back
             </Button>
             <Button 
-              onClick={handleFinish} 
-              disabled={!selectedOption}
+              onClick={selectedOption === 'save' ? handleSaveForLater : handleFinish} 
+              disabled={!selectedOption || isSaving}
               className="gap-1 bg-[#5640E8] hover:bg-[#5640E8]/90 text-white"
             >
-              Complete Campaign <ChevronRightIcon className="h-4 w-4" />
+              {isSaving ? "Saving..." : "Finish"} <ChevronRightIcon className="h-4 w-4" />
             </Button>
           </div>
         </div>

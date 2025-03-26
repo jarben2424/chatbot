@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CampaignHeader } from '../../../_components/campaign-header';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -131,33 +130,30 @@ export default function CampaignSegmentPage() {
   return (
     <>
       <div className="flex flex-col min-w-0 h-dvh bg-background">
-        <CampaignHeader />
         <div className="flex-1 flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full pb-24">
           <div className="mb-4 md:mb-8">
             <h1 className="text-3xl font-bold">Create Campaign</h1>
-            <p className="text-muted-foreground mt-2">Step {step} of 5 - Choose Target Segment</p>
+            <p className="text-muted-foreground">Step {step} of 5 - Choose Target Segment</p>
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-24">
             {/* Option 1: Choose existing segment */}
-            <Card className={`border ${!useAiSegment ? 'border-primary' : ''}`}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <CardTitle>Use Existing Segment</CardTitle>
-                    <CardDescription>
-                      Select from your existing customer segments
-                    </CardDescription>
-                  </div>
-                  <RadioGroup value={useAiSegment ? "ai" : "existing"} onValueChange={(value) => setUseAiSegment(value === "ai")}>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="existing" id="existing" />
-                      <Label htmlFor="existing" className="cursor-pointer">Select</Label>
-                    </div>
-                  </RadioGroup>
+            <div className={`border rounded-lg p-6 ${!useAiSegment ? 'border-primary' : ''}`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex-1">
+                  <h2 className="text-xl font-semibold">Use Existing Segment</h2>
+                  <p className="text-sm text-muted-foreground mt-1.5">
+                    Select from your existing customer segments
+                  </p>
                 </div>
-              </CardHeader>
-              <CardContent className={useAiSegment ? 'opacity-50 pointer-events-none' : ''}>
+                <RadioGroup value={useAiSegment ? "ai" : "existing"} onValueChange={(value) => setUseAiSegment(value === "ai")}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="existing" id="existing" />
+                    <Label htmlFor="existing" className="cursor-pointer">Select</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div className={useAiSegment ? 'opacity-50 pointer-events-none' : ''}>
                 <div className="space-y-4">
                   <div className="relative">
                     <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -188,7 +184,7 @@ export default function CampaignSegmentPage() {
                           <div className="flex justify-between">
                             <div>
                               <h3 className="font-medium">{segment.name}</h3>
-                              <p className="text-sm text-muted-foreground mt-1">
+                              <p className="text-sm text-muted-foreground mt-1.5">
                                 {segment.description}
                               </p>
                             </div>
@@ -199,7 +195,7 @@ export default function CampaignSegmentPage() {
                             </div>
                           </div>
                           <div className="flex items-center mt-2 space-x-4">
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="bg-muted/50">
                               {segment.count.toLocaleString()} customers
                             </Badge>
                             <span className="text-xs text-muted-foreground">
@@ -211,91 +207,71 @@ export default function CampaignSegmentPage() {
                     )}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
             
-            {/* Option 2: Create AI segment */}
-            <Card className={`border ${useAiSegment ? 'border-primary' : ''}`}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center">
-                      <CardTitle>Create with Hang AI</CardTitle>
-                      <Badge className="ml-2 bg-gradient-to-r from-indigo-400 to-purple-500 text-white border-none">
-                        Hang AI
-                      </Badge>
-                    </div>
-                    <CardDescription>
-                      Describe your ideal audience in natural language
-                    </CardDescription>
-                  </div>
-                  <RadioGroup value={useAiSegment ? "ai" : "existing"} onValueChange={(value) => setUseAiSegment(value === "ai")}>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="ai" id="ai" />
-                      <Label htmlFor="ai" className="cursor-pointer">Select</Label>
-                    </div>
-                  </RadioGroup>
+            {/* Option 2: Create AI Segment */}
+            <div className={`border rounded-lg p-6 ${useAiSegment ? 'border-primary' : ''}`}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl font-semibold flex items-center">
+                    <SparklesIcon className="h-5 w-5 text-indigo-500 mr-2" />
+                    <span className="bg-gradient-to-r from-indigo-400 to-purple-500 bg-clip-text text-transparent">
+                      Create with Hang AI
+                    </span>
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1.5">
+                    Describe your ideal audience in natural language
+                  </p>
                 </div>
-              </CardHeader>
-              <CardContent className={!useAiSegment ? 'opacity-50 pointer-events-none' : ''}>
+                <RadioGroup value={useAiSegment ? "ai" : "existing"} onValueChange={(value) => setUseAiSegment(value === "ai")}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="ai" id="ai" className="text-indigo-500 border-indigo-500" />
+                    <Label htmlFor="ai" className="cursor-pointer">Select</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div className={!useAiSegment ? 'opacity-50 pointer-events-none' : ''}>
                 <div className="space-y-4">
-                  <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 border border-indigo-100 dark:border-indigo-900">
-                    <div className="flex items-start">
-                      <SparklesIcon className="h-5 w-5 text-indigo-500 mt-0.5 mr-3 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm">
-                          Describe your target audience in plain English. Our AI will create a segment based on your description.
-                        </p>
-                        <div className="mt-2 text-xs text-muted-foreground space-y-1">
-                          <p>Examples:</p>
-                          <p>• "Customers who spend over $50 per order and visit at least once a week"</p>
-                          <p>• "Customers who like spicy food and have ordered within the last month"</p>
-                          <p>• "People who haven't ordered in 30 days but used to order weekly"</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
+                  <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-200 border-none">
+                    Powered by Hang AI
+                  </Badge>
                   <div>
-                    <Label htmlFor="ai-prompt">Describe your audience</Label>
-                    <div className="mt-1.5">
-                      <Input
-                        id="ai-prompt"
-                        placeholder="E.g., Frequent customers who typically order lunch..."
-                        value={aiPrompt}
-                        onChange={(e) => setAiPrompt(e.target.value)}
-                        onBlur={handlePromptBlur}
-                        className="h-20"
-                      />
-                    </div>
+                    <Label htmlFor="ai-prompt" className="text-sm font-medium mb-1.5 block">Describe your target audience</Label>
+                    <Input
+                      id="ai-prompt"
+                      placeholder="e.g. Customers who purchased coffee at least twice last month and live in urban areas"
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      onBlur={handlePromptBlur}
+                      className="w-full"
+                    />
                   </div>
                   
-                  <div className="bg-indigo-50 dark:bg-indigo-950/50 p-4 rounded-lg">
-                    <div className="flex">
-                      <UsersIcon className="h-5 w-5 text-indigo-500 mt-0.5 mr-3 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
-                          Estimated audience size
-                        </p>
-                        {isCalculating ? (
-                          <p className="text-sm mt-1 text-muted-foreground">
-                            Calculating size...
-                          </p>
-                        ) : showAudienceSize && aiPrompt.trim() && audienceSize !== null ? (
-                          <p className="text-sm mt-1">
-                            {audienceSize.toLocaleString()} customers
-                          </p>
-                        ) : (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Enter a description to see an estimate
-                          </p>
-                        )}
+                  {aiPrompt.trim() !== '' && (
+                    <div className="p-3 border rounded-lg border-indigo-200 bg-indigo-50/50">
+                      <div className="flex items-center mb-2">
+                        <span className="text-sm font-medium text-indigo-700">Audience Size</span>
                       </div>
+                      
+                      {isCalculating ? (
+                        <div className="flex items-center py-1">
+                          <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse mr-1"></div>
+                          <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse delay-75 mr-1"></div>
+                          <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse delay-150 mr-1"></div>
+                          <span className="text-sm text-indigo-600 ml-1">Calculating</span>
+                        </div>
+                      ) : showAudienceSize ? (
+                        <div className="flex items-center">
+                          <span className="text-xl font-bold text-indigo-700">{audienceSize?.toLocaleString()}</span>
+                          <span className="text-sm text-indigo-600 ml-1">customers</span>
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -312,7 +288,7 @@ export default function CampaignSegmentPage() {
             <Button 
               onClick={handleNext} 
               disabled={!isFormValid}
-              className="gap-1"
+              className="gap-1 bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               Next Step <ChevronRightIcon className="h-4 w-4" />
             </Button>

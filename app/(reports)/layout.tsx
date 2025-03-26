@@ -2,7 +2,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { auth } from '@/app/(auth)/auth';
 
-export default async function CampaignsLayout({
+export default async function Layout({
   children,
 }: {
   children: React.ReactNode;

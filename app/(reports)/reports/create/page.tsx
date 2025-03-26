@@ -7,70 +7,79 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRightIcon, SparklesIcon, TagIcon, UsersIcon, ZapIcon } from 'lucide-react';
-import { useCampaignState } from '../../_context/campaign-context';
+import { 
+  ChevronRightIcon, 
+  ActivityIcon, 
+  LineChartIcon, 
+  SparklesIcon, 
+  BellIcon 
+} from 'lucide-react';
+import { useReportState } from '../../_context/report-context';
 
-const campaignTypes = [
+const reportTypes = [
   {
-    id: 'personalized-segment',
-    name: 'Personalized Offers for a Segment',
-    description: 'Create targeted offers for a specific customer segment',
-    icon: UsersIcon,
-    aiPowered: true,
-  },
-  {
-    id: 'top-personalized',
-    name: 'Top Personalized Offers',
-    description: 'Send best personalized offers to all qualifying customers',
-    icon: ZapIcon,
-    aiPowered: true,
-  },
-  {
-    id: 'manual-creation',
-    name: 'Manual Creation',
-    description: 'Build a campaign from scratch with full control',
-    icon: TagIcon,
+    id: 'dashboard_update',
+    name: 'Dashboard Update',
+    description: 'Regular updates on key metrics and performance indicators',
+    icon: LineChartIcon,
     aiPowered: false,
+  },
+  {
+    id: 'anomaly_detection',
+    name: 'Anomaly Detection',
+    description: 'Get alerts when unusual patterns or trends are detected',
+    icon: ActivityIcon,
+    aiPowered: true,
+  },
+  {
+    id: 'recommendation',
+    name: 'Recommendation Reports',
+    description: 'AI-powered insights and recommendations for improvement',
+    icon: BellIcon,
+    aiPowered: true,
   },
 ];
 
-export default function CampaignCreatePage() {
-  const { campaignState, updateCampaign } = useCampaignState();
-  const [selectedType, setSelectedType] = useState(campaignState.campaignType || '');
-  const [campaignName, setCampaignName] = useState(campaignState.name || '');
+export default function ReportCreatePage() {
+  const { reportState, updateReport } = useReportState();
+  const [selectedType, setSelectedType] = useState(reportState.type || 'dashboard_update');
+  const [reportTitle, setReportTitle] = useState(reportState.title || '');
+  const [reportDescription, setReportDescription] = useState(reportState.description || '');
   const router = useRouter();
 
   const handleNextStep = () => {
-    // Save current progress to the campaign context
-    updateCampaign({
-      name: campaignName,
-      campaignType: selectedType,
+    // Save current progress to the report context
+    updateReport({
+      title: reportTitle,
+      description: reportDescription,
+      type: selectedType,
     });
     
     // Save to localStorage for persistence across steps
     try {
-      const existingData = localStorage.getItem('campaignData');
-      const campaignData = existingData ? JSON.parse(existingData) : {};
+      const existingData = localStorage.getItem('reportData');
+      const reportData = existingData ? JSON.parse(existingData) : {};
       
-      localStorage.setItem('campaignData', JSON.stringify({
-        ...campaignData,
-        name: campaignName,
-        campaignType: selectedType,
+      localStorage.setItem('reportData', JSON.stringify({
+        ...reportData,
+        title: reportTitle,
+        description: reportDescription,
+        type: selectedType,
       }));
     } catch (error) {
-      console.error('Error saving campaign data to localStorage:', error);
+      console.error('Error saving report data to localStorage:', error);
     }
     
-    // Proceed to the next step (offers selection)
-    router.push('/campaigns/create/offers');
+    // Proceed to the next step (schedule selection)
+    router.push('/reports/create/schedule');
   };
 
   return (
@@ -78,23 +87,34 @@ export default function CampaignCreatePage() {
       <div className="flex flex-col min-w-0 h-dvh bg-background">
         <div className="flex-1 flex flex-col p-8 max-w-4xl mx-auto w-full pb-24">
           <div className="mb-4 md:mb-8">
-            <h1 className="text-3xl font-bold">Create Campaign</h1>
-            <p className="text-muted-foreground">Step 1 of 5</p>
+            <h1 className="text-3xl font-bold">Create Automated Report</h1>
+            <p className="text-muted-foreground">Step 1 of 3</p>
           </div>
           <div className="mb-6">
-            <Label htmlFor="campaign-name" className="text-base mb-1.5">Campaign Name</Label>
+            <Label htmlFor="report-title" className="text-base mb-1.5">Report Title</Label>
             <Input 
-              id="campaign-name" 
-              placeholder="e.g. Summer Special, VIP Member Offer" 
+              id="report-title" 
+              placeholder="e.g. Weekly Performance Overview, Monthly Analytics" 
               className="w-full"
-              value={campaignName}
-              onChange={(e) => setCampaignName(e.target.value)}
+              value={reportTitle}
+              onChange={(e) => setReportTitle(e.target.value)}
+            />
+          </div>
+          <div className="mb-6">
+            <Label htmlFor="report-description" className="text-base mb-1.5">Description (Optional)</Label>
+            <Textarea 
+              id="report-description" 
+              placeholder="Provide a brief description of what this report will contain" 
+              className="w-full resize-none"
+              rows={3}
+              value={reportDescription}
+              onChange={(e) => setReportDescription(e.target.value)}
             />
           </div>
           <div className="mb-8">
-            <Label className="text-base mb-2 block">Campaign Type</Label>
+            <Label className="text-base mb-2 block">Report Type</Label>
             <RadioGroup value={selectedType} onValueChange={setSelectedType} className="grid gap-4 md:grid-cols-2">
-              {campaignTypes.map((type) => {
+              {reportTypes.map((type) => {
                 const Icon = type.icon;
                 return (
                   <div 
@@ -152,12 +172,12 @@ export default function CampaignCreatePage() {
         {/* Fixed navigation bar */}
         <div className="fixed bottom-0 left-0 right-0 bg-background border-t py-4 px-6 flex justify-between z-10">
           <div className="max-w-7xl mx-auto w-full flex justify-between">
-            <Button variant="outline" onClick={() => router.push('/campaigns')}>
+            <Button variant="outline" onClick={() => router.push('/reports')}>
               Cancel
             </Button>
             <Button 
               onClick={handleNextStep} 
-              disabled={campaignName.trim() === '' || selectedType === ''}
+              disabled={reportTitle.trim() === ''}
               className="gap-1 bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               Next Step <ChevronRightIcon className="h-4 w-4" />

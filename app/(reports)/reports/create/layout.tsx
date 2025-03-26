@@ -1,25 +1,25 @@
 'use client';
 
-import { CampaignHeader } from "../../_components/campaign-header";
-import { CampaignProvider } from "../../_context/campaign-context";
+import { ReportHeader } from "../../_components/report-header";
+import { ReportProvider } from "../../_context/report-context";
 import { Toaster } from "@/components/ui/toaster";
 
 export const dynamic = 'force-dynamic';
 
-export default function CampaignCreateLayout({
+export default function ReportCreateLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <CampaignProvider>
+    <ReportProvider>
       <div className="min-h-screen">
-        <CampaignHeader />
+        <ReportHeader />
         <main className="w-full mx-auto">
           {children}
         </main>
         <Toaster />
       </div>
-    </CampaignProvider>
+    </ReportProvider>
   );
 }

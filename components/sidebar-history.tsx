@@ -72,11 +72,11 @@ const PureChatItem = ({
       href={`/chat/${chat.id}`} 
       onClick={() => setOpenMobile(false)}
       className={cn(
-        "flex items-center justify-between rounded-lg px-3 py-1.5 text-xs transition-all hover:bg-accent",
+        "flex items-center justify-between rounded-lg px-3 py-1.5 text-sm transition-all hover:bg-accent",
         isActive && "bg-accent/50 font-medium"
       )}
     >
-      <span className="flex-1">{chat.title}</span>
+      <span className="flex-1 truncate max-w-[170px]" title={chat.title}>{chat.title}</span>
       
       <DropdownMenu modal={true}>
         <DropdownMenuTrigger asChild>

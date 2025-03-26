@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { CampaignHeader } from '../../../_components/campaign-header';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -16,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/components/ui/use-toast';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -35,7 +35,9 @@ import {
   UserPlusIcon,
   TruckIcon,
   SparklesIcon,
+  ArrowDownIcon,
 } from 'lucide-react';
+import { useCampaignContext } from '@/context/campaign-context';
 
 // Sample customer data
 const customers = [
@@ -520,35 +522,72 @@ export default function CampaignMatchingPage() {
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
-  const [filteredCustomers, setFilteredCustomers] = useState(customers);
   const [displayCount, setDisplayCount] = useState(5);
+  const [fromPreviousPage, setFromPreviousPage] = useState(true);
+  const { toast } = useToast();
+
   const router = useRouter();
   
-  // Simulate the matching/loading process
   useEffect(() => {
-    if (loading) {
-      const timer = setTimeout(() => {
-        const nextProgress = progress + 1;
+    // Reset the loading animation
+    setLoading(true);
+    setProgress(0);
+    
+    // Calculate number of steps and total duration
+    const totalSteps = matchingSteps.length;
+    const totalDuration = 5000; // 5 seconds total
+    const stepDuration = totalDuration / totalSteps;
+    const progressIncrementsPerStep = 25; // Each step adds 25% progress (100% / 4 steps)
+    
+    // Progress bar increment interval - more frequent updates for smoother animation
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        // Calculate which step we're on based on elapsed time
+        const elapsedTime = Date.now() - startTime;
+        const currentStepIndex = Math.min(Math.floor(elapsedTime / stepDuration), totalSteps - 1);
         
-        if (nextProgress <= 100) {
-          setProgress(nextProgress);
-          
-          // Update the current step based on progress
-          if (nextProgress === 20) setCurrentStep(1);
-          if (nextProgress === 40) setCurrentStep(2);
-          if (nextProgress === 60) setCurrentStep(3);
-          if (nextProgress === 80) setCurrentStep(4);
-          
-          // End loading at 100%
-          if (nextProgress === 100) {
-            setTimeout(() => setLoading(false), 500);
-          }
+        // Target progress should be proportional to the current step
+        const targetProgress = ((currentStepIndex + 1) * progressIncrementsPerStep);
+        
+        // Increment progressively toward target
+        const increment = Math.max(1, Math.floor((targetProgress - prev) / 5));
+        const newProgress = Math.min(prev + increment, targetProgress);
+        
+        return newProgress;
+      });
+    }, 100);
+    
+    // Track start time for calculations
+    const startTime = Date.now();
+    
+    // Step change interval - change steps at regular intervals
+    const stepInterval = setInterval(() => {
+      setCurrentStep(prev => {
+        const next = prev + 1;
+        if (next >= matchingSteps.length) {
+          clearInterval(stepInterval);
+          return prev;
         }
-      }, 30); // Fast enough to not take too long, but slow enough to show the animation
-      
-      return () => clearTimeout(timer);
-    }
-  }, [progress, loading]);
+        return next;
+      });
+    }, stepDuration);
+    
+    // End loading after total duration
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      clearInterval(stepInterval);
+      setProgress(100);
+      setLoading(false);
+    }, totalDuration);
+    
+    return () => {
+      clearInterval(interval);
+      clearInterval(stepInterval);
+      clearTimeout(timeout);
+    };
+  }, []);
+  
+  const [filteredCustomers, setFilteredCustomers] = useState(customers);
   
   // Filter customers based on search term only
   useEffect(() => {
@@ -566,10 +605,34 @@ export default function CampaignMatchingPage() {
     setFilteredCustomers(result);
   }, [searchTerm]);
   
-  const handleFinish = () => {
-    // In a real app, we would save the matched customers and offers
-    // to a global state or backend before proceeding
-    router.push('/campaigns/create/integration');
+  const handleFinish = async () => {
+    setLoading(true);
+    
+    try {
+      // In a real application, this would update the campaign status to 'ready'
+      // This would use the actual campaign ID from state/context
+      
+      // Simulate API call to update campaign status
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: "Success",
+        description: "Campaign created successfully! Status set to 'Ready'",
+        variant: "default",
+      });
+      
+      // Redirect to campaigns page
+      router.push('/campaigns');
+    } catch (error) {
+      console.error("Error completing campaign:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create campaign",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
   
   const handleBack = () => {
@@ -597,7 +660,7 @@ export default function CampaignMatchingPage() {
             <CardContent className="p-3">
               <div className="flex items-center gap-3">
                 <Avatar>
-                  <AvatarFallback className="bg-[#5640E8]/10 text-[#5640E8]">
+                  <AvatarFallback className="bg-primary/10 text-primary">
                     {customer.name.charAt(0)}{customer.name.split(' ')[1]?.charAt(0)}
                   </AvatarFallback>
                   <AvatarImage src={customer.avatar} />
@@ -627,12 +690,12 @@ export default function CampaignMatchingPage() {
           {/* Match connector */}
           <div className="flex flex-col items-center justify-center px-1.5 relative">
             {/* Horizontal connector lines with gradient */}
-            <div className="absolute top-1/2 left-0 w-[calc(50%-11px)] h-0.5 bg-gradient-to-r from-[#5640E8]/10 to-[#5640E8]/40 transform -translate-y-1/2"></div>
-            <div className="absolute top-1/2 right-0 w-[calc(50%-11px)] h-0.5 bg-gradient-to-l from-[#5640E8]/10 to-[#5640E8]/40 transform -translate-y-1/2"></div>
+            <div className="absolute top-1/2 left-0 w-[calc(50%-11px)] h-0.5 bg-gradient-to-r from-primary/10 to-primary/40 transform -translate-y-1/2"></div>
+            <div className="absolute top-1/2 right-0 w-[calc(50%-11px)] h-0.5 bg-gradient-to-l from-primary/10 to-primary/40 transform -translate-y-1/2"></div>
             
             <div className="flex items-center justify-center">
               <div className="relative z-10">
-                <div className="w-11 h-11 rounded-full bg-gradient-to-r from-[#5640E8] to-[#7566E9] text-white flex items-center justify-center text-sm font-bold shadow-md border-2 border-white">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-r from-primary to-primary/90 text-white flex items-center justify-center text-sm font-bold shadow-md border-2 border-white">
                   {customer.matchedOffer.matchScore}%
                 </div>
               </div>
@@ -643,8 +706,8 @@ export default function CampaignMatchingPage() {
           <Card className="flex-1">
             <CardContent className="p-3">
               <div className="flex items-start gap-2 mb-2">
-                <div className="rounded-full bg-[#5640E8]/10 p-1.5 mt-0.5 flex-shrink-0">
-                  {OfferIcon && <OfferIcon className="h-4 w-4 text-[#5640E8]" />}
+                <div className="rounded-full bg-primary/10 p-1.5 mt-0.5 flex-shrink-0">
+                  {OfferIcon && <OfferIcon className="h-4 w-4 text-primary" />}
                 </div>
                 <div>
                   <h3 className="font-medium text-sm">{customer.matchedOffer.title}</h3>
@@ -652,7 +715,7 @@ export default function CampaignMatchingPage() {
                 </div>
               </div>
               
-              <div className="mt-3 pl-2 border-l-2 border-[#5640E8]/30">
+              <div className="mt-3 pl-2 border-l-2 border-primary/30">
                 <p className="text-xs italic text-muted-foreground">"{customer.matchedOffer.matchReason}"</p>
               </div>
             </CardContent>
@@ -694,201 +757,243 @@ export default function CampaignMatchingPage() {
     setDisplayCount(prev => prev + 5);
   };
   
+  const handleCompleteCampaign = async () => {
+    setLoading(true);
+    
+    try {
+      const { campaign } = useCampaignContext();
+      const matchedCustomers = filteredCustomers.length;
+      
+      // Update campaign status to 'ready' instead of 'active'
+      const response = await fetch("/api/campaigns", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: campaign?.id,
+          status: "ready",
+          matchingComplete: true,
+          matchCount: matchedCustomers,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to update campaign");
+      }
+      
+      toast({
+        title: "Success",
+        description: "Campaign created successfully!",
+        variant: "default",
+      });
+      
+      // Redirect to campaigns page
+      router.push("/campaigns");
+    } catch (error) {
+      console.error("Error completing campaign:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create campaign",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   return (
     <>
       <div className="flex flex-col min-w-0 h-dvh bg-background">
-        <CampaignHeader />
-        <div className="flex-1 flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full pb-24">
-          <div className="mb-4 md:mb-8">
-            <h1 className="text-3xl font-bold">Create Campaign</h1>
-            <p className="text-muted-foreground">Step {step} of 5 - Customer Matching</p>
-          </div>
-          
-          {loading ? (
-            <div className="flex-1 flex flex-col items-center justify-center max-w-2xl mx-auto">
-              <div className="w-full text-center mb-8">
-                <div className="inline-flex items-center justify-center rounded-full bg-[#5640E8]/10 p-3 mb-3">
-                  <BrainCircuitIcon className="h-8 w-8 text-[#5640E8] animate-pulse" />
-                </div>
-                <h2 className="text-2xl font-bold">Personalizing Your Campaign</h2>
-                <p className="text-muted-foreground mt-2">
-                  Hang AI is analyzing your customer data and matching each person with the most relevant offer
-                </p>
+        {loading ? (
+          <div className="flex-1 flex flex-col items-center justify-start py-16 max-w-2xl mx-auto">
+            <div className="w-full text-center mb-8">
+              <div className="inline-flex items-center justify-center rounded-full bg-primary/10 p-3 mb-3">
+                <BrainCircuitIcon className="h-8 w-8 text-primary animate-pulse" />
               </div>
-              
-              <div className="w-full mb-10">
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Progress</span>
-                  <span>{progress}%</span>
-                </div>
-                <Progress value={progress} className="h-2" />
+              <h2 className="text-2xl font-bold">Personalizing Your Campaign</h2>
+              <p className="text-muted-foreground mt-2">
+                Hang AI is analyzing your customer data and matching each person with the most relevant offer
+              </p>
+            </div>
+            
+            <div className="w-full mb-10">
+              <div className="flex justify-between text-sm mb-2">
+                <span>Progress</span>
+                <span>{Math.min(progress, 100)}%</span>
               </div>
+              <Progress value={Math.min(progress, 100)} className="h-2" />
+            </div>
+            
+            <div className="w-full border rounded-xl p-6 bg-card">
+              <h3 className="font-medium mb-4 flex items-center">
+                <Sparkles className="h-4 w-4 text-primary mr-2" /> 
+                <span>Currently processing</span>
+              </h3>
               
-              <div className="w-full border rounded-xl p-6 bg-card">
-                <h3 className="font-medium mb-4 flex items-center">
-                  <Sparkles className="h-4 w-4 text-[#5640E8] mr-2" /> 
-                  <span>Currently processing</span>
-                </h3>
-                
-                <div className="space-y-4">
-                  {matchingSteps.map((step, index) => (
-                    <div 
-                      key={index}
-                      className={`flex items-start gap-3 transition-opacity duration-300 ${
-                        index === currentStep ? 'opacity-100' : (index < currentStep ? 'opacity-50' : 'opacity-30')
-                      }`}
-                    >
-                      <div className={`rounded-full flex items-center justify-center h-5 w-5 flex-shrink-0 mt-0.5 ${
-                        index < currentStep ? 'bg-[#5640E8] text-white' : 'bg-muted'
-                      }`}>
-                        {index < currentStep ? (
-                          <CheckCircleIcon className="h-4 w-4" />
-                        ) : (
-                          <span className="text-xs">{index + 1}</span>
+              <div className="space-y-4">
+                {matchingSteps.map((step, index) => (
+                  <div 
+                    key={index}
+                    className={`flex items-start gap-3 transition-opacity duration-300 ${
+                      index === currentStep ? 'opacity-100' : (index < currentStep ? 'opacity-50' : 'opacity-30')
+                    }`}
+                  >
+                    <div className={`rounded-full flex items-center justify-center h-5 w-5 flex-shrink-0 mt-0.5 ${
+                      index < currentStep ? 'bg-primary text-white' : 'bg-muted'
+                    }`}>
+                      {index < currentStep ? (
+                        <CheckCircleIcon className="h-4 w-4" />
+                      ) : (
+                        <span className="text-xs">{index + 1}</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className={`text-sm font-medium ${index === currentStep ? 'text-primary' : ''}`}>
+                        {step.name}
+                        {index === currentStep && (
+                          <span className="inline-flex ml-2 space-x-1">
+                            <span className="animate-[bounce_1s_infinite_0ms]">.</span>
+                            <span className="animate-[bounce_1s_infinite_200ms]">.</span>
+                            <span className="animate-[bounce_1s_infinite_400ms]">.</span>
+                          </span>
                         )}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{step.detail}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-6 pt-4 border-t">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center">
+                    <UsersIcon className="h-3.5 w-3.5 mr-1.5" />
+                    Processing {customers.length} customers
+                  </span>
+                  <span className="bg-muted px-2 py-0.5 rounded text-xs text-muted-foreground">
+                    {Math.ceil(customers.length * progress / 100)}/{customers.length} completed
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full pb-24">
+            <div className="mb-4 md:mb-8">
+              <h1 className="text-3xl font-bold">Create Campaign</h1>
+              <p className="text-muted-foreground">Step {step} of 5 - Customer Matching</p>
+            </div>
+            
+            <div className="bg-primary/5 border border-primary/10 rounded-lg p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full bg-primary/10 p-2 flex-shrink-0">
+                  <CheckCircleIcon className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-primary">Personalization Complete</h3>
+                  <p className="text-sm">
+                    Hang AI has matched each customer with the most relevant offer based on their purchasing patterns, 
+                    preferences, and engagement history. These personalized matches are designed to maximize conversion 
+                    and customer satisfaction.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Offer Distribution</CardTitle>
+                    <CardDescription className="text-xs">Based on offers selected in Step 3</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {Object.entries(stats.offerCounts).map(([offer, count]) => (
+                        <div key={offer} className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-primary"></div>
+                            <span className="text-sm">{offer}</span>
+                          </div>
+                          <Badge variant="outline" className="bg-primary/5">
+                            {count} customer{count !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Campaign Economics</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-sm text-muted-foreground mb-1">Average Reward Cost</div>
+                        <div className="text-2xl font-bold text-primary">
+                          ${stats.averageCost.toFixed(2)}
+                        </div>
                       </div>
                       <div>
-                        <p className={`text-sm font-medium ${index === currentStep ? 'text-[#5640E8]' : ''}`}>
-                          {step.name}
-                          {index === currentStep && (
-                            <span className="inline-flex ml-2 space-x-1">
-                              <span className="animate-[bounce_1s_infinite_0ms]">.</span>
-                              <span className="animate-[bounce_1s_infinite_200ms]">.</span>
-                              <span className="animate-[bounce_1s_infinite_400ms]">.</span>
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{step.detail}</p>
+                        <div className="text-sm text-muted-foreground mb-1">Total Campaign Budget</div>
+                        <div className="text-2xl font-bold">
+                          ${(stats.averageCost * customers.length).toFixed(2)}
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-                
-                <div className="mt-6 pt-4 border-t">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center">
-                      <UsersIcon className="h-3.5 w-3.5 mr-1.5" />
-                      Processing {customers.length} customers
-                    </span>
-                    <span className="bg-muted px-2 py-0.5 rounded text-xs text-muted-foreground">
-                      {Math.ceil(customers.length * progress / 100)}/{customers.length} completed
-                    </span>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
-          ) : (
-            <div className="flex-1 flex flex-col">
-              <div className="bg-[#5640E8]/5 border border-[#5640E8]/10 rounded-lg p-4 mb-6">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-full bg-[#5640E8]/10 p-2 flex-shrink-0">
-                    <CheckCircleIcon className="h-5 w-5 text-[#5640E8]" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-[#5640E8]">Personalization Complete</h3>
-                    <p className="text-sm">
-                      Hang AI has matched each customer with the most relevant offer based on their purchasing patterns, 
-                      preferences, and engagement history. These personalized matches are designed to maximize conversion 
-                      and customer satisfaction.
-                    </p>
-                  </div>
-                </div>
+            
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+              <div className="relative max-w-md w-full">
+                <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search customers..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
               </div>
-              
-              <div className="mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Offer Distribution</CardTitle>
-                      <CardDescription className="text-xs">Based on offers selected in Step 3</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {Object.entries(stats.offerCounts).map(([offer, count]) => (
-                          <div key={offer} className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full bg-[#5640E8]"></div>
-                              <span className="text-sm">{offer}</span>
-                            </div>
-                            <Badge variant="outline" className="bg-[#5640E8]/5">
-                              {count} customer{count !== 1 ? 's' : ''}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+            </div>
+            
+            {/* Hang AI pill above match percentage column */}
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-primary to-primary/90 text-white text-xs font-medium shadow-sm">
+                <SparklesIcon className="h-3.5 w-3.5" />
+                <span>Matched by Hang AI</span>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-auto pr-1">
+              {filteredCustomers.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No customers match your search criteria</p>
+                </div>
+              ) : (
+                <div className="space-y-4 pb-24">
+                  {displayedCustomers.map(customer => renderCustomerCard(customer))}
                   
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Campaign Economics</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div>
-                          <div className="text-sm text-muted-foreground mb-1">Average Reward Cost</div>
-                          <div className="text-2xl font-bold text-[#5640E8]">
-                            ${stats.averageCost.toFixed(2)}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-sm text-muted-foreground mb-1">Total Campaign Budget</div>
-                          <div className="text-2xl font-bold">
-                            ${(stats.averageCost * customers.length).toFixed(2)}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {hasMoreToLoad && (
+                    <div className="flex justify-center mt-8 mb-8">
+                      <Button 
+                        variant="outline" 
+                        onClick={handleLoadMore}
+                        className="text-primary border-primary/20 hover:bg-primary/5"
+                      >
+                        Load 5 More Customers
+                      </Button>
+                    </div>
+                  )}
                 </div>
-              </div>
-              
-              <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-                <div className="relative max-w-md w-full">
-                  <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search customers..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
-                </div>
-              </div>
-              
-              {/* Hang AI pill above match percentage column */}
-              <div className="flex justify-center mb-4">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-[#5640E8] to-[#7566E9] text-white text-xs font-medium shadow-sm">
-                  <SparklesIcon className="h-3.5 w-3.5" />
-                  <span>Matched by Hang AI</span>
-                </div>
-              </div>
-              
-              <div className="flex-1 overflow-auto pr-1">
-                {filteredCustomers.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">No customers match your search criteria</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4 pb-24">
-                    {displayedCustomers.map(customer => renderCustomerCard(customer))}
-                    
-                    {hasMoreToLoad && (
-                      <div className="flex justify-center mt-8 mb-8">
-                        <Button 
-                          variant="outline" 
-                          onClick={handleLoadMore}
-                          className="text-[#5640E8] border-[#5640E8]/20 hover:bg-[#5640E8]/5"
-                        >
-                          Load 5 More Customers
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
         
         {/* Fixed navigation bar */}
         <div className="fixed bottom-0 left-0 right-0 bg-background border-t py-4 px-6 flex justify-between z-10">
@@ -904,9 +1009,9 @@ export default function CampaignMatchingPage() {
             <Button 
               onClick={handleFinish} 
               disabled={loading}
-              className="gap-1 bg-[#5640E8] hover:bg-[#5640E8]/90 text-white"
+              className="gap-1 bg-primary hover:bg-primary/90 text-white"
             >
-              Continue <ChevronRightIcon className="h-4 w-4" />
+              {loading ? "Processing..." : "Complete Campaign"} <ChevronRightIcon className="h-4 w-4" />
             </Button>
           </div>
         </div>

@@ -59,6 +59,28 @@ kind (character varying, NOT NULL, default: 'text')
 userId (uuid, NOT NULL)
 
 
+-- Campaign table for storing campaign data
+Table: Campaign
+Columns:
+
+id (uuid, NOT NULL, default: gen_random_uuid())
+userId (uuid, NOT NULL)
+createdAt (timestamp with time zone, NOT NULL, default: now())
+updatedAt (timestamp with time zone, NOT NULL, default: now())
+name (text, NOT NULL)
+campaignType (text, NOT NULL)
+status (text, NOT NULL, default: 'draft')
+selectedOfferIds (text[], default: '{}')
+useAiSegment (boolean, default: false)
+selectedSegmentId (uuid)
+aiSegmentPrompt (text)
+audienceSize (integer)
+matchingComplete (boolean, default: false)
+matchCount (integer, default: 0)
+integrationType (text)
+integrationSettings (jsonb, default: '{}')
+
+
 Table: Message
 Columns:
 
@@ -115,3 +137,46 @@ Columns:
 chatId (uuid, NOT NULL)
 messageId (uuid, NOT NULL)
 isUpvoted (boolean, NOT NULL)
+
+
+-- Report related tables
+CREATE TYPE report_type AS ENUM ('dashboard_update', 'anomaly_detection', 'recommendation');
+CREATE TYPE report_schedule AS ENUM ('daily', 'weekly', 'monthly', 'custom');
+CREATE TYPE report_status AS ENUM ('success', 'failure');
+
+Table: Report
+Columns:
+id (uuid, PRIMARY KEY, NOT NULL, default: gen_random_uuid())
+userId (uuid, NOT NULL, references: User.id)
+title (text, NOT NULL)
+description (text)
+type (report_type, NOT NULL)
+content (jsonb, NOT NULL)
+schedule (report_schedule, NOT NULL)
+customSchedule (text)
+isActive (boolean, NOT NULL, default: true)
+createdAt (timestamp with time zone, NOT NULL, default: now())
+updatedAt (timestamp with time zone, NOT NULL, default: now())
+lastSentAt (timestamp with time zone)
+
+Table: ReportRecipient
+Columns:
+id (uuid, PRIMARY KEY, NOT NULL, default: gen_random_uuid())
+reportId (uuid, NOT NULL, references: Report.id ON DELETE CASCADE)
+email (character varying(64), NOT NULL)
+name (character varying(64))
+createdAt (timestamp with time zone, NOT NULL, default: now())
+
+Table: ReportHistory
+Columns:
+id (uuid, PRIMARY KEY, NOT NULL, default: gen_random_uuid())
+reportId (uuid, NOT NULL, references: Report.id ON DELETE CASCADE)
+status (report_status, NOT NULL)
+sentAt (timestamp with time zone, NOT NULL, default: now())
+recipientCount (integer, NOT NULL)
+content (jsonb, NOT NULL)
+
+-- Indexes
+CREATE INDEX "report_user_id_idx" ON "Report" ("userId");
+CREATE INDEX "report_recipient_report_id_idx" ON "ReportRecipient" ("reportId");
+CREATE INDEX "report_history_report_id_idx" ON "ReportHistory" ("reportId");
