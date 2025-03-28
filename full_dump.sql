@@ -176,7 +176,50 @@ sentAt (timestamp with time zone, NOT NULL, default: now())
 recipientCount (integer, NOT NULL)
 content (jsonb, NOT NULL)
 
+-- Alert related tables
+CREATE TYPE alert_type AS ENUM ('threshold', 'anomaly', 'inventory', 'sales', 'custom');
+CREATE TYPE alert_frequency AS ENUM ('instant', 'hourly', 'daily', 'custom');
+CREATE TYPE alert_status AS ENUM ('sent', 'failed', 'pending');
+
+Table: Alert
+Columns:
+id (uuid, PRIMARY KEY, NOT NULL, default: gen_random_uuid())
+userId (uuid, NOT NULL, references: User.id ON DELETE CASCADE)
+title (text, NOT NULL)
+description (text)
+type (alert_type, NOT NULL)
+condition (jsonb, NOT NULL)
+frequency (alert_frequency, NOT NULL)
+customFrequency (text)
+isActive (boolean, NOT NULL, default: false)
+createdAt (timestamp with time zone, NOT NULL, default: now())
+updatedAt (timestamp with time zone, NOT NULL, default: now())
+lastTriggeredAt (timestamp with time zone)
+
+Table: AlertRecipient
+Columns:
+id (uuid, PRIMARY KEY, NOT NULL, default: gen_random_uuid())
+alertId (uuid, NOT NULL, references: Alert.id ON DELETE CASCADE)
+email (character varying(64), NOT NULL)
+notifyBy (character varying(50), NOT NULL, default: 'email')
+createdAt (timestamp with time zone, NOT NULL, default: now())
+updatedAt (timestamp with time zone, NOT NULL, default: now())
+
+Table: AlertHistory
+Columns:
+id (uuid, PRIMARY KEY, NOT NULL, default: gen_random_uuid())
+alertId (uuid, NOT NULL, references: Alert.id ON DELETE CASCADE)
+triggeredAt (timestamp with time zone, NOT NULL, default: now())
+data (jsonb, NOT NULL)
+status (alert_status, NOT NULL, default: 'sent')
+recipientCount (integer, NOT NULL, default: 0)
+
 -- Indexes
 CREATE INDEX "report_user_id_idx" ON "Report" ("userId");
 CREATE INDEX "report_recipient_report_id_idx" ON "ReportRecipient" ("reportId");
 CREATE INDEX "report_history_report_id_idx" ON "ReportHistory" ("reportId");
+CREATE INDEX "alert_user_id_idx" ON "Alert" ("userId");
+CREATE INDEX "alert_is_active_idx" ON "Alert" ("isActive");
+CREATE INDEX "alert_recipient_alert_id_idx" ON "AlertRecipient" ("alertId");
+CREATE INDEX "alert_history_alert_id_idx" ON "AlertHistory" ("alertId");
+CREATE INDEX "alert_history_triggered_at_idx" ON "AlertHistory" ("triggeredAt");

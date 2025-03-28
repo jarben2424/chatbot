@@ -24,6 +24,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { useCampaignState } from '@/app/(campaigns)/_context/campaign-context';
+import type { CampaignState } from '@/app/(campaigns)/_context/campaign-context';
 
 // Sample segments data
 const segments = [
@@ -80,6 +82,7 @@ export default function CampaignSegmentPage() {
   const [showAudienceSize, setShowAudienceSize] = useState(false);
   const [audienceSize, setAudienceSize] = useState<number | null>(null);
   const router = useRouter();
+  const { campaignState, updateCampaign } = useCampaignState();
   
   const filteredSegments = segments.filter(segment => 
     segment.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -91,8 +94,30 @@ export default function CampaignSegmentPage() {
   };
   
   const handleNext = () => {
-    // In a production app, we would save the selected segment
-    // to a global state or backend before proceeding
+    // Update campaign state with selected segment info
+    const segmentInfo: Partial<CampaignState> = {
+      useAiSegment,
+      showMatchingAnimation: true, // Set to true when going to matching page
+      matchingComplete: false, // Reset matching complete flag to ensure animation shows
+      previousStep: 'segment' // Explicitly track that we're coming from segment page
+    };
+    
+    if (useAiSegment) {
+      segmentInfo.aiSegmentPrompt = aiPrompt;
+      segmentInfo.audienceSize = audienceSize || undefined; // Fix type error
+    } else {
+      segmentInfo.selectedSegmentId = selectedSegmentId;
+      // Get the audience size from the selected segment
+      const selectedSegment = segments.find(s => s.id === selectedSegmentId);
+      if (selectedSegment) {
+        segmentInfo.audienceSize = selectedSegment.count;
+      }
+    }
+    
+    // Update campaign state
+    updateCampaign(segmentInfo);
+    
+    // Navigate to matching page
     router.push('/campaigns/create/matching');
   };
   

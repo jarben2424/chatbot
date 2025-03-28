@@ -18,6 +18,9 @@ export type CampaignState = {
   matchCount: number;
   integrationType?: string;
   integrationSettings: Record<string, any>;
+  showMatchingAnimation: boolean;
+  isNavigatingToIntegration?: boolean;
+  previousStep?: string; // Track which step we're coming from
 };
 
 // Initial state
@@ -29,7 +32,10 @@ const initialState: CampaignState = {
   useAiSegment: false,
   matchingComplete: false,
   matchCount: 0,
-  integrationSettings: {}
+  integrationSettings: {},
+  showMatchingAnimation: false,
+  isNavigatingToIntegration: false,
+  previousStep: '' // Default empty string
 };
 
 // Context type

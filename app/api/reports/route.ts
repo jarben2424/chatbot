@@ -17,9 +17,8 @@ export async function GET(request: NextRequest) {
     // Create Supabase client
     const supabase = await createClient();
     
-    // If an ID is provided, fetch a specific report
     if (id) {
-      // Fetch the report data
+      // Get specific report with recipients
       const { data: report, error: reportError } = await supabase
         .from('Report')
         .select('*')
@@ -27,77 +26,80 @@ export async function GET(request: NextRequest) {
         .eq('userId', session.user.id)
         .single();
       
-      if (reportError) {
-        console.error('Error fetching report:', reportError);
-        return NextResponse.json({ error: 'Failed to fetch report details' }, { status: 500 });
-      }
+      if (reportError) throw reportError;
       
-      if (!report) {
-        return NextResponse.json({ error: 'Report not found' }, { status: 404 });
-      }
+      // Fetch recipients for this report
+      const { data: recipients, error: recipientsError } = await supabase
+        .from('ReportRecipient')
+        .select('*')
+        .eq('reportId', id);
       
-      // Initialize the formatted response
+      if (recipientsError) throw recipientsError;
+      
+      // Format the response
       const formattedReport = {
-        ...report
+        ...report,
+        customSchedule: report.customSchedule,
+        isActive: report.isActive,
+        createdAt: report.createdAt,
+        updatedAt: report.updatedAt,
+        lastSentAt: report.lastSentAt,
+        recipients: recipients || []
       };
       
-      // Fetch recipients count for this report
-      try {
-        const { count, error: recipientsCountError } = await supabase
-          .from('ReportRecipient')
-          .select('id', { count: 'exact', head: true })
-          .eq('reportId', report.id);
-        
-        if (!recipientsCountError) {
-          formattedReport.recipientCount = count || 0;
-        }
-      } catch (error) {
-        console.log('Error fetching recipients count:', error);
-        // Continue without count
+      return NextResponse.json(formattedReport);
+    } else {
+      // Get all reports
+      const { data, error } = await supabase
+        .from('Report')
+        .select('*')
+        .eq('userId', session.user.id)
+        .order('createdAt', { ascending: false });
+      
+      if (error) throw error;
+      
+      // Get recipient counts for all reports
+      const reportIds = data.map(report => report.id);
+      
+      // If there are no reports, return an empty array
+      if (reportIds.length === 0) {
+        return NextResponse.json([]);
       }
       
-      return NextResponse.json(formattedReport);
-    }
-    
-    // Otherwise, fetch all reports for the user
-    const { data: reports, error } = await supabase
-      .from('Report')
-      .select('*')
-      .eq('userId', session.user.id)
-      .order('updatedAt', { ascending: false });
-    
-    if (error) {
-      console.error('Error fetching reports:', error);
-      return NextResponse.json({ error: 'Failed to fetch reports' }, { status: 500 });
-    }
-    
-    // For each report, get the recipient count
-    const reportsWithRecipientCounts = await Promise.all(
-      reports.map(async (report) => {
-        try {
-          const { count, error: recipientsCountError } = await supabase
-            .from('ReportRecipient')
-            .select('id', { count: 'exact', head: true })
-            .eq('reportId', report.id);
-          
-          return {
-            ...report,
-            recipientCount: !recipientsCountError ? count || 0 : 0
-          };
-        } catch (error) {
-          console.log('Error fetching recipients count for report:', report.id, error);
-          return {
-            ...report,
-            recipientCount: 0
-          };
+      // Fetch recipient counts for each report
+      const recipientCounts: Record<string, number> = {};
+      
+      // Process each report individually to count recipients
+      for (const reportId of reportIds) {
+        const { count, error: countError } = await supabase
+          .from('ReportRecipient')
+          .select('*', { count: 'exact', head: true })
+          .eq('reportId', reportId);
+        
+        if (countError) {
+          console.error(`Error counting recipients for report ${reportId}:`, countError);
+          recipientCounts[reportId] = 0;
+        } else {
+          recipientCounts[reportId] = count || 0;
         }
-      })
-    );
-    
-    return NextResponse.json(reportsWithRecipientCounts);
+      }
+      
+      // Format the response with recipient counts
+      const formattedReports = data.map(report => ({
+        ...report,
+        customSchedule: report.customSchedule,
+        isActive: report.isActive,
+        createdAt: report.createdAt,
+        updatedAt: report.updatedAt,
+        lastSentAt: report.lastSentAt,
+        recipientCount: recipientCounts[report.id] || 0
+      }));
+      
+      return NextResponse.json(formattedReports);
+    }
   } catch (error) {
-    console.error('Unexpected error:', error);
-    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
+    console.error('Error fetching reports:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -110,55 +112,119 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    const reportData = await request.json();
+    const json = await request.json();
     
-    // Add user ID to the report data
-    reportData.userId = session.user.id;
+    // Required fields
+    if (!json.title || !json.type) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+    
+    // Extract report data from request
+    const {
+      title,
+      description = '',
+      type,
+      content = {},
+      schedule = 'weekly',
+      customSchedule = '',
+      recipients = [],
+      isActive = true
+    } = json;
+    
+    // Create or update the report
+    let reportId = json.id;
     
     // Create Supabase client
     const supabase = await createClient();
     
-    // If updating an existing report
-    if (reportData.id) {
-      const { data: updatedReport, error } = await supabase
+    if (reportId) {
+      // Update existing report
+      const { data, error } = await supabase
         .from('Report')
         .update({
-          ...reportData,
+          title,
+          description,
+          type,
+          content,
+          schedule,
+          customSchedule,
+          isActive,
           updatedAt: new Date().toISOString()
         })
-        .eq('id', reportData.id)
-        .eq('userId', session.user.id) // Security check
-        .select('*')
+        .eq('id', reportId)
+        .eq('userId', session.user.id)
+        .select()
         .single();
       
-      if (error) {
-        console.error('Error updating report:', error);
-        return NextResponse.json({ error: 'Error updating report' }, { status: 500 });
-      }
+      if (error) throw error;
+      reportId = data.id;
       
-      return NextResponse.json(updatedReport);
+      // Handle recipients update separately
+      if (recipients.length > 0) {
+        // For simplicity, we're replacing all recipients
+        // In a real app, you might want to handle adds and removals separately
+        await supabase
+          .from('ReportRecipient')
+          .delete()
+          .eq('reportId', reportId);
+        
+        // Add new recipients
+        const recipientData = recipients.map((recipient: any) => ({
+          reportId: reportId,
+          email: recipient.email,
+          name: recipient.name || null
+        }));
+        
+        if (recipientData.length > 0) {
+          const { error } = await supabase
+            .from('ReportRecipient')
+            .insert(recipientData);
+          
+          if (error) throw error;
+        }
+      }
+    } else {
+      // Create new report
+      const { data, error } = await supabase
+        .from('Report')
+        .insert({
+          title,
+          description,
+          type,
+          content,
+          schedule,
+          customSchedule,
+          isActive,
+          userId: session.user.id,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      reportId = data.id;
+      
+      // Add recipients
+      if (recipients.length > 0) {
+        const recipientData = recipients.map((recipient: any) => ({
+          reportId: reportId,
+          email: recipient.email,
+          name: recipient.name || null
+        }));
+        
+        const { error } = await supabase
+          .from('ReportRecipient')
+          .insert(recipientData);
+        
+        if (error) throw error;
+      }
     }
     
-    // If creating a new report
-    const { data: newReport, error } = await supabase
-      .from('Report')
-      .insert({
-        ...reportData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      })
-      .select('*')
-      .single();
-    
-    if (error) {
-      console.error('Error creating report:', error);
-      return NextResponse.json({ error: 'Error creating report' }, { status: 500 });
-    }
-    
-    return NextResponse.json(newReport);
+    return NextResponse.json({ id: reportId });
   } catch (error) {
-    console.error('Error in reports POST route:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error creating/updating report:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -230,6 +296,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in reports DELETE route:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

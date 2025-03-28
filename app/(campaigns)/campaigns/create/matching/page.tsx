@@ -37,7 +37,7 @@ import {
   SparklesIcon,
   ArrowDownIcon,
 } from 'lucide-react';
-import { useCampaignContext } from '@/context/campaign-context';
+import { useCampaignState } from '@/app/(campaigns)/_context/campaign-context';
 
 // Sample customer data
 const customers = [
@@ -523,70 +523,99 @@ export default function CampaignMatchingPage() {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [displayCount, setDisplayCount] = useState(5);
-  const [fromPreviousPage, setFromPreviousPage] = useState(true);
   const { toast } = useToast();
+  const { campaignState, updateCampaign } = useCampaignState();
 
   const router = useRouter();
   
+  // Directly check current and previous routes to completely control animation visibility
   useEffect(() => {
-    // Reset the loading animation
-    setLoading(true);
-    setProgress(0);
+    // Only show animation when we have explicit confirmation we're coming from the segment page
+    // This requires both the animation flag AND the previousStep being 'segment'
+    const isComingFromSegment = campaignState.showMatchingAnimation && 
+                               !campaignState.matchingComplete &&
+                               campaignState.previousStep === 'segment';
     
-    // Calculate number of steps and total duration
-    const totalSteps = matchingSteps.length;
-    const totalDuration = 5000; // 5 seconds total
-    const stepDuration = totalDuration / totalSteps;
-    const progressIncrementsPerStep = 25; // Each step adds 25% progress (100% / 4 steps)
+    setLoading(isComingFromSegment);
     
-    // Progress bar increment interval - more frequent updates for smoother animation
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        // Calculate which step we're on based on elapsed time
-        const elapsedTime = Date.now() - startTime;
-        const currentStepIndex = Math.min(Math.floor(elapsedTime / stepDuration), totalSteps - 1);
+    if (isComingFromSegment) {
+      // Reset the loading animation
+      setProgress(0);
+      
+      // Calculate number of steps and total duration
+      const totalSteps = matchingSteps.length;
+      const totalDuration = 5000; // 5 seconds total
+      const stepDuration = totalDuration / totalSteps;
+      const progressIncrementsPerStep = 25; // Each step adds 25% progress (100% / 4 steps)
+      
+      // Progress bar increment interval - more frequent updates for smoother animation
+      const interval = setInterval(() => {
+        setProgress(prev => {
+          // Calculate which step we're on based on elapsed time
+          const elapsedTime = Date.now() - startTime;
+          const currentStepIndex = Math.min(Math.floor(elapsedTime / stepDuration), totalSteps - 1);
+          
+          // Target progress should be proportional to the current step
+          const targetProgress = ((currentStepIndex + 1) * progressIncrementsPerStep);
+          
+          // Increment progressively toward target
+          const increment = Math.max(1, Math.floor((targetProgress - prev) / 5));
+          const newProgress = Math.min(prev + increment, targetProgress);
+          
+          return newProgress;
+        });
+      }, 100);
+      
+      // Track start time for calculations
+      const startTime = Date.now();
+      
+      // Step change interval - change steps at regular intervals
+      const stepInterval = setInterval(() => {
+        setCurrentStep(prev => {
+          const next = prev + 1;
+          if (next >= matchingSteps.length) {
+            clearInterval(stepInterval);
+            return prev;
+          }
+          return next;
+        });
+      }, stepDuration);
+      
+      // End loading after total duration
+      const timeout = setTimeout(() => {
+        clearInterval(interval);
+        clearInterval(stepInterval);
+        setProgress(100);
+        setLoading(false);
         
-        // Target progress should be proportional to the current step
-        const targetProgress = ((currentStepIndex + 1) * progressIncrementsPerStep);
-        
-        // Increment progressively toward target
-        const increment = Math.max(1, Math.floor((targetProgress - prev) / 5));
-        const newProgress = Math.min(prev + increment, targetProgress);
-        
-        return newProgress;
-      });
-    }, 100);
-    
-    // Track start time for calculations
-    const startTime = Date.now();
-    
-    // Step change interval - change steps at regular intervals
-    const stepInterval = setInterval(() => {
-      setCurrentStep(prev => {
-        const next = prev + 1;
-        if (next >= matchingSteps.length) {
-          clearInterval(stepInterval);
-          return prev;
-        }
-        return next;
-      });
-    }, stepDuration);
-    
-    // End loading after total duration
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-      clearInterval(stepInterval);
-      setProgress(100);
+        // Mark matching as complete in the campaign state and turn off animation flag
+        updateCampaign({ 
+          matchingComplete: true,
+          showMatchingAnimation: false, // Disable animation flag after completion
+          previousStep: 'matching', // Update the previous step
+          matchCount: customers.length
+        });
+      }, totalDuration);
+      
+      return () => {
+        clearInterval(interval);
+        clearInterval(stepInterval);
+        clearTimeout(timeout);
+      };
+    } else {
+      // We're not coming from segment, make sure loading is false and progress is complete
       setLoading(false);
-    }, totalDuration);
-    
-    return () => {
-      clearInterval(interval);
-      clearInterval(stepInterval);
-      clearTimeout(timeout);
-    };
-  }, []);
-  
+      setProgress(100);
+      
+      // If we're not showing the animation but previousStep isn't set, update it
+      if (campaignState.previousStep !== 'matching') {
+        updateCampaign({
+          previousStep: 'matching'
+        });
+      }
+    }
+  }, [campaignState.showMatchingAnimation, campaignState.matchingComplete, campaignState.previousStep, updateCampaign]);
+
   const [filteredCustomers, setFilteredCustomers] = useState(customers);
   
   // Filter customers based on search term only
@@ -617,12 +646,12 @@ export default function CampaignMatchingPage() {
       
       toast({
         title: "Success",
-        description: "Campaign created successfully! Status set to 'Ready'",
+        description: "Campaign created successfully!",
         variant: "default",
       });
       
-      // Redirect to campaigns page
-      router.push('/campaigns');
+      // Redirect to integration page (step 5) instead of campaigns home
+      router.push("/campaigns/create/integration");
     } catch (error) {
       console.error("Error completing campaign:", error);
       toast({
@@ -758,10 +787,18 @@ export default function CampaignMatchingPage() {
   };
   
   const handleCompleteCampaign = async () => {
-    setLoading(true);
+    // First, explicitly turn off the animation and set the navigation flag
+    updateCampaign({
+      matchingComplete: true,
+      showMatchingAnimation: false,
+      isNavigatingToIntegration: true,
+      previousStep: 'matching' // Ensure we track that we're coming from matching page
+    });
+    
+    // Make sure loading state is off immediately
+    setLoading(false);
     
     try {
-      const { campaign } = useCampaignContext();
       const matchedCustomers = filteredCustomers.length;
       
       // Update campaign status to 'ready' instead of 'active'
@@ -771,7 +808,7 @@ export default function CampaignMatchingPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          id: campaign?.id,
+          id: campaignState.id,
           status: "ready",
           matchingComplete: true,
           matchCount: matchedCustomers,
@@ -788,8 +825,8 @@ export default function CampaignMatchingPage() {
         variant: "default",
       });
       
-      // Redirect to campaigns page
-      router.push("/campaigns");
+      // Redirect to integration page after state is updated
+      router.push("/campaigns/create/integration");
     } catch (error) {
       console.error("Error completing campaign:", error);
       toast({
@@ -797,86 +834,96 @@ export default function CampaignMatchingPage() {
         description: "Failed to create campaign",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
+  };
+  
+  // Rendering loading animation
+  const renderLoadingAnimation = () => {
+    return (
+      <>
+        <div className="w-full text-center mb-8">
+          <div className="inline-flex items-center justify-center rounded-full bg-primary/10 p-3 mb-3">
+            <BrainCircuitIcon className="h-8 w-8 text-primary animate-pulse" />
+          </div>
+          <h2 className="text-2xl font-bold">Personalizing Your Campaign</h2>
+          <p className="text-muted-foreground mt-2">
+            Hang AI is analyzing your customer data and matching each person with the most relevant offer
+          </p>
+        </div>
+        
+        <div className="w-full mb-10">
+          <div className="flex justify-between text-sm mb-2">
+            <span>Progress</span>
+            <span>{Math.min(progress, 100)}%</span>
+          </div>
+          <Progress value={Math.min(progress, 100)} className="h-2" />
+        </div>
+        
+        <div className="w-full border rounded-xl p-6 bg-card">
+          <h3 className="font-medium mb-4 flex items-center">
+            <Sparkles className="h-4 w-4 text-primary mr-2" /> 
+            <span>Currently processing</span>
+          </h3>
+          
+          <div className="space-y-4">
+            {matchingSteps.map((step, index) => (
+              <div 
+                key={index}
+                className={`flex items-start gap-3 transition-opacity duration-300 ${
+                  index === currentStep ? 'opacity-100' : (index < currentStep ? 'opacity-50' : 'opacity-30')
+                }`}
+              >
+                <div className={`rounded-full flex items-center justify-center h-5 w-5 flex-shrink-0 mt-0.5 ${
+                  index < currentStep ? 'bg-primary text-white' : 'bg-muted'
+                }`}>
+                  {index < currentStep ? (
+                    <CheckCircleIcon className="h-4 w-4" />
+                  ) : (
+                    <span className="text-xs">{index + 1}</span>
+                  )}
+                </div>
+                <div>
+                  <p className={`text-sm font-medium ${index === currentStep ? 'text-primary' : ''}`}>
+                    {step.name}
+                    {index === currentStep && (
+                      <span className="inline-flex ml-2 space-x-1">
+                        <span className="animate-[bounce_1s_infinite_0ms]">.</span>
+                        <span className="animate-[bounce_1s_infinite_200ms]">.</span>
+                        <span className="animate-[bounce_1s_infinite_400ms]">.</span>
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{step.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="mt-6 pt-4 border-t">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center">
+                <UsersIcon className="h-3.5 w-3.5 mr-1.5" />
+                Processing {campaignState.audienceSize || 25} customers
+              </span>
+              <span className="bg-muted px-2 py-0.5 rounded text-xs text-muted-foreground">
+                {Math.min(Math.ceil((campaignState.audienceSize || 25) * progress / 100), campaignState.audienceSize || 25)}/{campaignState.audienceSize || 25} completed
+              </span>
+            </div>
+          </div>
+        </div>
+      </>
+    );
   };
   
   return (
     <>
       <div className="flex flex-col min-w-0 h-dvh bg-background">
-        {loading ? (
+        {/* If we're navigating to integration page, don't render anything */}
+        {campaignState.isNavigatingToIntegration ? (
+          <div className="flex-1"></div>
+        ) : loading ? (
           <div className="flex-1 flex flex-col items-center justify-start py-16 max-w-2xl mx-auto">
-            <div className="w-full text-center mb-8">
-              <div className="inline-flex items-center justify-center rounded-full bg-primary/10 p-3 mb-3">
-                <BrainCircuitIcon className="h-8 w-8 text-primary animate-pulse" />
-              </div>
-              <h2 className="text-2xl font-bold">Personalizing Your Campaign</h2>
-              <p className="text-muted-foreground mt-2">
-                Hang AI is analyzing your customer data and matching each person with the most relevant offer
-              </p>
-            </div>
-            
-            <div className="w-full mb-10">
-              <div className="flex justify-between text-sm mb-2">
-                <span>Progress</span>
-                <span>{Math.min(progress, 100)}%</span>
-              </div>
-              <Progress value={Math.min(progress, 100)} className="h-2" />
-            </div>
-            
-            <div className="w-full border rounded-xl p-6 bg-card">
-              <h3 className="font-medium mb-4 flex items-center">
-                <Sparkles className="h-4 w-4 text-primary mr-2" /> 
-                <span>Currently processing</span>
-              </h3>
-              
-              <div className="space-y-4">
-                {matchingSteps.map((step, index) => (
-                  <div 
-                    key={index}
-                    className={`flex items-start gap-3 transition-opacity duration-300 ${
-                      index === currentStep ? 'opacity-100' : (index < currentStep ? 'opacity-50' : 'opacity-30')
-                    }`}
-                  >
-                    <div className={`rounded-full flex items-center justify-center h-5 w-5 flex-shrink-0 mt-0.5 ${
-                      index < currentStep ? 'bg-primary text-white' : 'bg-muted'
-                    }`}>
-                      {index < currentStep ? (
-                        <CheckCircleIcon className="h-4 w-4" />
-                      ) : (
-                        <span className="text-xs">{index + 1}</span>
-                      )}
-                    </div>
-                    <div>
-                      <p className={`text-sm font-medium ${index === currentStep ? 'text-primary' : ''}`}>
-                        {step.name}
-                        {index === currentStep && (
-                          <span className="inline-flex ml-2 space-x-1">
-                            <span className="animate-[bounce_1s_infinite_0ms]">.</span>
-                            <span className="animate-[bounce_1s_infinite_200ms]">.</span>
-                            <span className="animate-[bounce_1s_infinite_400ms]">.</span>
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{step.detail}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="mt-6 pt-4 border-t">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center">
-                    <UsersIcon className="h-3.5 w-3.5 mr-1.5" />
-                    Processing {customers.length} customers
-                  </span>
-                  <span className="bg-muted px-2 py-0.5 rounded text-xs text-muted-foreground">
-                    {Math.ceil(customers.length * progress / 100)}/{customers.length} completed
-                  </span>
-                </div>
-              </div>
-            </div>
+            {renderLoadingAnimation()}
           </div>
         ) : (
           <div className="flex-1 flex flex-col p-4 md:p-8 max-w-7xl mx-auto w-full pb-24">

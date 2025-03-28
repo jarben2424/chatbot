@@ -52,6 +52,11 @@ export function generateUUID(): string {
   });
 }
 
+export function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
 function addToolMessageToChat({
   toolMessage,
   messages,

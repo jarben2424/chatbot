@@ -22,12 +22,28 @@ import {
   MailIcon,
   SaveIcon
 } from 'lucide-react';
+import { useCampaignState } from '@/app/(campaigns)/_context/campaign-context';
 
 export default function CampaignIntegrationPage() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const { campaignState, updateCampaign } = useCampaignState();
+
+  // When the page loads, ensure we're not showing animation
+  useEffect(() => {
+    // Turn off any animation flags that might have persisted
+    if (campaignState.showMatchingAnimation || 
+        campaignState.isNavigatingToIntegration || 
+        campaignState.previousStep !== 'matching') {
+      updateCampaign({
+        showMatchingAnimation: false,
+        isNavigatingToIntegration: false,
+        previousStep: 'integration' // Set current step as previous for future navigation
+      });
+    }
+  }, [campaignState, updateCampaign]);
 
   // Use real campaign data from the campaign creation flow
   const [campaignData, setCampaignData] = useState({
