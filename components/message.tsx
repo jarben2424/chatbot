@@ -140,8 +140,7 @@ const PurePreviewMessage = ({
 
                 <div
                   className={cn('flex flex-col gap-4', {
-                    'bg-primary text-primary-foreground px-3 py-2 rounded-xl':
-                      message.role === 'user',
+                    'bg-primary text-primary-foreground p-3 rounded-lg shadow-sm': message.role === 'user',
                   })}
                 >
                   <Markdown>{message.content as string}</Markdown>
@@ -287,7 +286,14 @@ const PurePreviewMessage = ({
                       ) : typedToolName === 'buildReport' ? (
                         <div key={toolCallId} className="flex flex-col gap-3">
                           <div className="mb-1">
-                            <RotatingLoader />
+                            {/* Show the dynamic status message from the report builder */}
+                            <RotatingLoader 
+                              message={
+                                // Access status message from the correct property
+                                (toolInvocation as any).status?.message || 
+                                `Generating ${args.title || 'report'}...`
+                              } 
+                            />
                           </div>
                           <DocumentPreview
                             isReadonly={isReadonly} 
@@ -374,34 +380,51 @@ export const ThinkingMessage = () => {
   );
 };
 
-const RotatingLoader = () => {
-  const [loadingPhase, setLoadingPhase] = useState(0);
-  const loadingTexts = [
-    "Analyzing chat context...",
-    "Examining data...",
-    "Processing charts..."
+const RotatingLoader = ({ message }: { message?: string }) => {
+  // Define a series of rotating status messages for the report builder
+  const reportBuilderMessages = [
+    "Connecting to database...",
+    "Retrieving schema information...",
+    "Analyzing data structure...",
+    "Generating SQL query...",
+    "Validating column references...",
+    "Executing query...",
+    "Processing results...",
+    "Formatting report data...",
+    "Applying visualization settings...",
+    "Finalizing report..."
   ];
 
+  // Use the provided message, or cycle through our status messages
+  const [messageIndex, setMessageIndex] = useState(0);
+  
   useEffect(() => {
-    const interval = setInterval(() => {
-      setLoadingPhase((prev) => (prev + 1) % loadingTexts.length);
-    }, 1800);
+    // If a specific message is provided, don't rotate
+    if (message) return;
     
-    return () => clearInterval(interval);
-  }, []);
+    // Set up rotation interval (every 3 seconds)
+    const rotationInterval = setInterval(() => {
+      setMessageIndex((prevIndex) => (prevIndex + 1) % reportBuilderMessages.length);
+    }, 3000);
+    
+    return () => clearInterval(rotationInterval);
+  }, [message]);
+  
+  // Either use the provided message or rotate through our predefined messages
+  const statusMessage = message || reportBuilderMessages[messageIndex];
 
   return (
     <div className="text-muted-foreground text-sm flex items-center gap-2">
       <LoaderIcon className="animate-spin h-4 w-4" />
       <AnimatePresence mode="wait">
         <motion.span
-          key={loadingPhase}
+          key={statusMessage}
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -5 }}
           transition={{ duration: 0.2 }}
         >
-          {loadingTexts[loadingPhase]}
+          {statusMessage}
         </motion.span>
       </AnimatePresence>
     </div>

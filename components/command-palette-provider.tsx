@@ -58,26 +58,59 @@ export function CommandPaletteProvider({ children }: CommandPaletteProviderProps
       )?.set;
       
       if (nativeInputValueSetter) {
-        nativeInputValueSetter.call(inputElement, command.action);
-        
-        // Trigger input event
-        const inputEvent = new Event('input', { bubbles: true });
-        inputElement.dispatchEvent(inputEvent);
-        
-        // Focus the input
-        inputElement.focus();
-        
-        // Automatically submit the command
-        setTimeout(() => {
-          const submitEvent = new KeyboardEvent('keydown', {
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13,
-            which: 13,
-            bubbles: true
-          });
-          inputElement.dispatchEvent(submitEvent);
-        }, 100);
+        // Special handling for segment command
+        if (command.id === 'create-segment') {
+          // For segment creation, use a consistent phrase that our AI is trained to recognize
+          nativeInputValueSetter.call(inputElement, 'Create a new customer segment for our business');
+
+          // Trigger input event to ensure the value change is recognized
+          const inputEvent = new Event('input', { bubbles: true });
+          inputElement.dispatchEvent(inputEvent);
+          
+          // Focus the input
+          inputElement.focus();
+          
+          // Use a longer delay for segment creation to ensure text is fully registered
+          setTimeout(() => {
+            // Double-check the input value is set correctly before submitting
+            if (inputElement.value !== 'Create a new customer segment for our business') {
+              inputElement.value = 'Create a new customer segment for our business';
+              inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            
+            // Then submit the form
+            const submitEvent = new KeyboardEvent('keydown', {
+              key: 'Enter',
+              code: 'Enter',
+              keyCode: 13,
+              which: 13,
+              bubbles: true
+            });
+            inputElement.dispatchEvent(submitEvent);
+          }, 300); // Increased timeout for better reliability
+        } else {
+          // Regular handling for other commands
+          nativeInputValueSetter.call(inputElement, command.action);
+          
+          // Trigger input event
+          const inputEvent = new Event('input', { bubbles: true });
+          inputElement.dispatchEvent(inputEvent);
+          
+          // Focus the input
+          inputElement.focus();
+          
+          // Regular timeout for other commands
+          setTimeout(() => {
+            const submitEvent = new KeyboardEvent('keydown', {
+              key: 'Enter',
+              code: 'Enter',
+              keyCode: 13,
+              which: 13,
+              bubbles: true
+            });
+            inputElement.dispatchEvent(submitEvent);
+          }, 100);
+        }
       }
     }
     

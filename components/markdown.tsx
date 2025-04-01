@@ -213,7 +213,8 @@ const NonMemoizedMarkdown = ({ children }: { children: string }) => {
       if (hasMarkdown) {
         console.debug('Rendering markdown content:', children.substring(0, 100) + '...');
       } else {
-        console.debug('Content doesn\'t contain markdown markers');
+        console.debug('Content doesn\'t contain markdown markers, content starts with:', 
+                     children.substring(0, 50) + '...');
       }
     }
   }, [children]);
@@ -240,7 +241,12 @@ const NonMemoizedMarkdown = ({ children }: { children: string }) => {
 
 // Function to preprocess markdown content before rendering
 function preprocessMarkdown(markdown: string): string {
+  if (!markdown) return '';
+  
   let processed = markdown;
+  
+  // Fix malformed header with missing space after hash
+  processed = processed.replace(/(^|\n)(#{1,6})([^#\s])/g, '$1$2 $3');
   
   // Ensure proper line breaks for headings
   processed = processed.replace(/(^|\n)(#{1,6}[^#\n]+)($|\n)/g, '$1\n$2\n$3');
@@ -248,19 +254,42 @@ function preprocessMarkdown(markdown: string): string {
   // Ensure list items have proper spacing
   processed = processed.replace(/(^|\n)([*\-+]|\d+\.) ([^\n]+)($|\n)/g, '$1$2 $3\n$4');
   
-  // Fix code blocks
-  processed = processed.replace(/```([^`]+)```/g, '\n```$1```\n');
+  // Fix code blocks that might be missing proper formatting
+  processed = processed.replace(/(^|\n)```(?!\s*\n)/g, '$1```\n');
+  processed = processed.replace(/(^|\n)```(\w+)(?!\s*\n)/g, '$1```$2\n');
+  processed = processed.replace(/(^|\n)([^`\n]+)\n```($|\n)/g, '$1$2\n\n```$3');
   
-  // Fix inline code with spaces
-  processed = processed.replace(/`([^`]+)`/g, '` $1 `').replace(/` \s+/g, '` ').replace(/\s+ `/g, ' `');
+  // Ensure proper spacing for bold/italic text
+  processed = processed.replace(/(\*\*)([^\s*])/g, '$1 $2');
+  processed = processed.replace(/([^\s*])(\*\*)/g, '$1 $2');
+  processed = processed.replace(/(\*)([^\s*])/g, '$1 $2');
+  processed = processed.replace(/([^\s*])(\*)/g, '$1 $2');
   
-  // Ensure proper line breaks for paragraphs
-  processed = processed.replace(/(\w)\n(\w)/g, '$1 $2');
+  // Fix blockquotes formatting
+  processed = processed.replace(/(^|\n)>([^\n]+)($|\n)/g, '$1> $2\n$3');
   
-  // Clean up any extra newlines
-  processed = processed.replace(/\n{3,}/g, '\n\n');
+  // Fix tables
+  const tableRegex = /(^|\n)(\|[^\n]+\|\s*\n\|[-:| ]+\|\s*\n)(\|[^\n]+\|\s*\n)+/g;
+  processed = processed.replace(tableRegex, (match) => {
+    // Make sure there's a newline before and after tables
+    return '\n' + match.trim() + '\n\n';
+  });
   
-  return processed.trim();
+  // Ensure proper spacing between list items
+  processed = processed.replace(/(^|\n)- ([^\n]+)(\n)(?![\s\n-])/g, '$1- $2$3\n');
+  
+  // Add extra line break before headers if missing
+  processed = processed.replace(/(^|\n)(?!\n)(#{1,6} )/g, '$1\n$2');
+  
+  // Add line break after code blocks if missing
+  processed = processed.replace(/(```[^`]*```)($|\n)(?!\n)/g, '$1\n\n');
+  
+  // Debug log the first part of the processed content
+  if (process.env.NODE_ENV === 'development') {
+    console.debug('Preprocessed content (first 100 chars):', processed.substring(0, 100) + '...');
+  }
+  
+  return processed;
 }
 
 export const Markdown = memo(

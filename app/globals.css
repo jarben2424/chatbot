@@ -45,6 +45,8 @@
     .animate-collapsible-up {
         animation: collapsibleUp 0.2s ease-in;
     }
+
+    /* Chat bubble styling moved to use Tailwind's primary color classes */
 }
 
 @keyframes blink {
@@ -156,6 +158,18 @@
 
     body {
         @apply bg-background text-foreground;
+    }
+    
+    /* Fix chat UI when document editors are expanded */
+    body.expanded-document .chat-container {
+        max-width: 100%;
+        width: 100%;
+    }
+    
+    /* Ensure proper spacing in the chat panel */
+    body.expanded-document .message-container {
+        padding-left: 1rem;
+        padding-right: 1rem;
     }
 
     @font-face {

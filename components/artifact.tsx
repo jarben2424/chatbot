@@ -31,6 +31,7 @@ import { codeArtifact } from '@/artifacts/code/client';
 import { sheetArtifact } from '@/artifacts/sheet/client';
 import { textArtifact } from '@/artifacts/text/client';
 import { visualizationArtifact } from '@/artifacts/visualization/client';
+import { segmentArtifact } from '@/artifacts/segment/client';
 import equal from 'fast-deep-equal';
 
 export const artifactDefinitions = [
@@ -38,7 +39,8 @@ export const artifactDefinitions = [
   codeArtifact,
   imageArtifact,
   sheetArtifact,
-  visualizationArtifact
+  visualizationArtifact,
+  segmentArtifact
 ];
 export type ArtifactKind = (typeof artifactDefinitions)[number]['kind'];
 

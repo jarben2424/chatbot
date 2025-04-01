@@ -26,7 +26,7 @@ export function QueryDisplay({
   description, 
   visualization 
 }: QueryDisplayProps) {
-  const { setArtifact } = useArtifact();
+  const { setArtifact, artifact } = useArtifact();
   const [showSql, setShowSql] = useState(false);
   const [isFlipping, setIsFlipping] = useState(false);
   const [visualizationResult, setVisualizationResult] = useState<{data: any[], type: string} | null>(null);
@@ -34,9 +34,44 @@ export function QueryDisplay({
   const [showInlineVisualization, setShowInlineVisualization] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isHiddenInChat, setIsHiddenInChat] = useState(false);
+  const [isInLeftSidePanel, setIsInLeftSidePanel] = useState(false);
   
   const queryCardRef = useRef<HTMLDivElement>(null);
   
+  // Check if document is expanded (chat is in left side panel)
+  const isDocumentExpanded = useRef(false);
+
+  useEffect(() => {
+    // Check if the document is expanded by looking for the body class
+    const checkIfDocumentExpanded = () => {
+      const isExpanded = document.body.classList.contains('expanded-document');
+      isDocumentExpanded.current = isExpanded;
+      
+      // If document is expanded and we're showing visualization, hide the card
+      if (isExpanded) {
+        setIsHiddenInChat(true);
+      }
+    };
+    
+    // Run the check immediately
+    checkIfDocumentExpanded();
+    
+    // Set up an observer to detect class changes on the body
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'class') {
+          checkIfDocumentExpanded();
+        }
+      });
+    });
+    
+    observer.observe(document.body, { attributes: true });
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   useEffect(() => {
     const handleRestoreVisualization = (event: CustomEvent) => {
       if (event.detail) {
@@ -48,11 +83,14 @@ export function QueryDisplay({
         }
         
         if (event.detail.restoreChart) {
-          setIsHiddenInChat(false);
-          
-          setTimeout(() => {
-            setShowInlineVisualization(true);
-          }, 50);
+          // Only restore if document isn't expanded
+          if (!isDocumentExpanded.current) {
+            setIsHiddenInChat(false);
+            
+            setTimeout(() => {
+              setShowInlineVisualization(true);
+            }, 50);
+          }
         }
       }
     };
@@ -72,11 +110,14 @@ export function QueryDisplay({
     
     const handleVisualizationClosed = (event: CustomEvent) => {
       if (event.detail && event.detail.restoreQueryCard) {
-        setIsHiddenInChat(false);
-        
-        setTimeout(() => {
-          setShowInlineVisualization(true);
-        }, 50);
+        // Only restore if document isn't expanded
+        if (!isDocumentExpanded.current) {
+          setIsHiddenInChat(false);
+          
+          setTimeout(() => {
+            setShowInlineVisualization(true);
+          }, 50);
+        }
       }
     };
     
@@ -91,30 +132,107 @@ export function QueryDisplay({
     };
   }, []);
   
+  // Add new effect to check for document expansion state changes
+  useEffect(() => {
+    const checkAndUpdateVisibility = () => {
+      const isExpanded = document.body.classList.contains('expanded-document');
+      
+      // If document is expanded (chat is in left panel), hide the query card
+      if (isExpanded) {
+        setIsHiddenInChat(true);
+      } else {
+        // Only restore visibility if we're not in a visualization artifact
+        if (!artifact.isVisible || artifact.kind !== 'visualization') {
+          setIsHiddenInChat(false);
+        }
+      }
+    };
+    
+    // Check initially
+    checkAndUpdateVisibility();
+    
+    // Set up observer to monitor body class changes
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach(mutation => {
+        if (mutation.attributeName === 'class') {
+          checkAndUpdateVisibility();
+        }
+      });
+    });
+    
+    observer.observe(document.body, { attributes: true });
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, [artifact.isVisible, artifact.kind]);
+  
+  // Also check artifact state changes for visibility updates
+  useEffect(() => {
+    if (artifact.isVisible && artifact.kind === 'visualization') {
+      setIsHiddenInChat(true);
+    } else if (!document.body.classList.contains('expanded-document')) {
+      setIsHiddenInChat(false);
+    }
+  }, [artifact.isVisible, artifact.kind]);
+
   function determineBestVisualization(data: any[]): string {
     if (!data || data.length === 0) return 'table';
     
     const sample = data[0];
-    const hasDateColumn = Object.keys(sample).some(key => 
+    
+    // Check if we have time series data (date/time columns)
+    const dateColumns = Object.keys(sample).filter(key => 
       key.toLowerCase().includes('date') || 
       key.toLowerCase().includes('month') || 
       key.toLowerCase().includes('year') ||
+      key.toLowerCase().includes('time') ||
       (typeof sample[key] === 'string' && !isNaN(Date.parse(sample[key])))
     );
     
+    // Check for numeric columns
     const numericColumns = Object.keys(sample).filter(key => 
       typeof sample[key] === 'number' || 
       (typeof sample[key] === 'string' && !isNaN(Number(sample[key].toString().replace(/[^0-9.-]+/g, ''))))
     );
     
-    if (hasDateColumn && numericColumns.length > 0) {
+    // Check for categorical data (strings that are not dates)
+    const categoricalColumns = Object.keys(sample).filter(key => 
+      typeof sample[key] === 'string' && 
+      isNaN(Date.parse(sample[key])) &&
+      !numericColumns.includes(key)
+    );
+    
+    // Check if we have geographical data
+    const geoColumns = Object.keys(sample).filter(key => 
+      key.toLowerCase().includes('country') || 
+      key.toLowerCase().includes('state') || 
+      key.toLowerCase().includes('city') ||
+      key.toLowerCase().includes('region') ||
+      key.toLowerCase().includes('location')
+    );
+    
+    // Time series data with numeric values - Line chart
+    if (dateColumns.length > 0 && numericColumns.length > 0) {
       return 'line';
-    } else if (numericColumns.length >= 2) {
+    } 
+    // Comparison between categories - Bar chart
+    else if (categoricalColumns.length >= 1 && numericColumns.length >= 1) {
+      return data.length > 8 ? 'bar' : 'bar';
+    } 
+    // Comparison between multiple numeric columns - Bar chart
+    else if (numericColumns.length >= 2) {
       return 'bar';
-    } else if (data.length <= 6 && numericColumns.length === 1) {
+    } 
+    // Distribution or parts of a whole (small dataset) - Pie chart
+    else if (data.length <= 6 && numericColumns.length === 1) {
       return 'pie';
     }
-    
+    // Many categories with one numeric value - Horizontal bar
+    else if (categoricalColumns.length === 1 && numericColumns.length === 1 && data.length > 8) {
+      return 'bar';
+    }
+    // Default to bar chart as it's the most versatile
     return 'bar';
   }
 
@@ -464,12 +582,58 @@ export function QueryDisplay({
     }).join('\n');
   }
 
-  const CARD_HEIGHT = "380px";
-  const TABLE_WRAPPER_HEIGHT = "305px";
+  // Get appropriate card heights based on context
+  const getCardHeight = () => {
+    if (isInLeftSidePanel) {
+      return "280px"; // Smaller height when in left panel
+    }
+    return "380px"; // Normal height
+  };
 
-  if (isHiddenInChat) {
+  const getTableWrapperHeight = () => {
+    if (isInLeftSidePanel) {
+      return "205px"; // Smaller height when in left panel
+    }
+    return "305px"; // Normal height
+  };
+
+  // Either hide the query card when in left side panel, or show a modified version
+  if (isHiddenInChat || (isInLeftSidePanel && document.body.classList.contains('expanded-document'))) {
     return null;
   }
+
+  // For the left side panel, provide a simplified version with just essential info
+  if (isInLeftSidePanel) {
+    return (
+      <div 
+        ref={queryCardRef}
+        className={cn(
+          "border rounded-lg overflow-hidden", 
+          "transition-opacity duration-300 ease-in-out",
+          isTransitioning ? "opacity-0" : "opacity-100"
+        )}
+      >
+        <div className="bg-muted p-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium truncate">{title}</h3>
+            <div className="flex gap-1">
+              <Button 
+                size="sm" 
+                className="h-7 px-2 py-1"
+                variant="default"
+                onClick={expandVisualization} 
+              >
+                Open
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const CARD_HEIGHT = getCardHeight();
+  const TABLE_WRAPPER_HEIGHT = getTableWrapperHeight();
 
   return (
     <>

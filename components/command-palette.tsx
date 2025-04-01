@@ -8,7 +8,8 @@ import {
   Sparkles, 
   LineChartIcon, 
   FileSpreadsheetIcon, 
-  FileTextIcon 
+  FileTextIcon,
+  PieChartIcon
 } from 'lucide-react';
 
 interface Command {
@@ -60,6 +61,12 @@ export const commands: Command[] = [
     icon: <FileTextIcon className="h-4 w-4" />,
     label: 'Create report',
     action: 'Create report'
+  },
+  {
+    id: 'create-segment',
+    icon: <PieChartIcon className="h-4 w-4" />,
+    label: 'Create segment',
+    action: 'Create a new customer segment for our business'
   }
 ];
 

@@ -2,7 +2,7 @@
 
 import type { Attachment, Message } from 'ai';
 import { useChat } from '@ai-sdk/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { ChatHeader } from '@/components/chat-header';
 import type { Vote } from '@/lib/db/schema';
@@ -16,6 +16,7 @@ import { QueryResult } from '@/components/data-visualization/query-result';
 import { VisualizationPanel } from '@/components/data-visualization/visualization-panel';
 import { QueryDisplay } from '@/components/data-visualization/query-display';
 import { ArtifactOpener } from './artifact-opener';
+import { useLocalStorage } from 'usehooks-ts';
 
 // Extended message type that includes visualization properties
 interface ExtendedMessage extends Message {
@@ -40,6 +41,16 @@ export function Chat({
   children
 }: ChatProps) {
   const { mutate } = useSWRConfig();
+  const [opusThinkEnabled, setOpusThinkEnabled] = useLocalStorage('opus-think-enabled', false);
+  const [useFallbackModel, setUseFallbackModel] = useState(false);
+
+  const modelToUse = useMemo(() => {
+    if (opusThinkEnabled && useFallbackModel) {
+      return 'gpt-4';
+    }
+    
+    return opusThinkEnabled ? 'opus-think' : selectedChatModel;
+  }, [opusThinkEnabled, selectedChatModel, useFallbackModel]);
 
   const {
     messages,
@@ -51,10 +62,14 @@ export function Chat({
     isLoading,
     stop,
     reload,
+    error
   } = useChat({
     id,
     api: '/chat',
-    body: { id, selectedChatModel: selectedChatModel },
+    body: { 
+      id, 
+      selectedChatModel: modelToUse
+    },
     initialMessages,
     experimental_throttle: 100,
     sendExtraMessageFields: true,
@@ -62,10 +77,23 @@ export function Chat({
     onFinish: () => {
       mutate('/chat');
     },
-    onError: () => {
-      toast.error('An error occurred, please try again!');
+    onError: (error) => {
+      console.error('Chat error:', error);
+      
+      if (opusThinkEnabled && !useFallbackModel) {
+        setUseFallbackModel(true);
+        toast.error('Opus Think unavailable, falling back to GPT-4');
+      } else {
+        toast.error('An error occurred, please try again!');
+      }
     },
   });
+
+  useEffect(() => {
+    if (!opusThinkEnabled) {
+      setUseFallbackModel(false);
+    }
+  }, [opusThinkEnabled]);
 
   // Automatically detect and visualize revenue-related messages
   useEffect(() => {

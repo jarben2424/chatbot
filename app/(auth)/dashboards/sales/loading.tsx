@@ -11,7 +11,7 @@ export default function SalesDashboardLoading() {
     <SidebarProvider>
       <div className="relative flex h-[100dvh]">
         <div className="flex w-full">
-          <AppSidebar />
+          <AppSidebar user={{ id: '', name: '', email: '' }} />
           <div className="flex-1">
             <DashboardHeader title="Sales" />
             <div className="flex-1 overflow-auto bg-slate-50/30">

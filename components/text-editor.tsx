@@ -1,36 +1,16 @@
 'use client';
 
-import { exampleSetup } from 'prosemirror-example-setup';
-import { inputRules } from 'prosemirror-inputrules';
-import { EditorState } from 'prosemirror-state';
-import { EditorView } from 'prosemirror-view';
 import React, { memo, useEffect, useRef, useState } from 'react';
 import * as htmlToImage from 'html-to-image';
 
 import type { Suggestion } from '@/lib/db/schema';
-import {
-  documentSchema,
-  handleTransaction,
-  headingRule,
-} from '@/lib/editor/config';
-import {
-  buildContentFromDocument,
-  buildDocumentFromContent,
-  createDecorations,
-} from '@/lib/editor/functions';
-import {
-  projectWithPositions,
-  suggestionsPlugin,
-  suggestionsPluginKey,
-} from '@/lib/editor/suggestions';
 import { useArtifact } from '@/hooks/use-artifact';
-import { toast } from 'sonner';
+import { Markdown } from './markdown';
 
 // Add imports for visualization handling
 import { drizzle } from 'drizzle-orm/neon-http';
 import { neon } from '@neondatabase/serverless';
 import { document as dbDocumentSchema } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
 
 type EditorProps = {
   content: string;
@@ -48,8 +28,10 @@ function PureEditor({
   status,
 }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<EditorView | null>(null);
   const { artifact } = useArtifact();
+  const [processedContent, setProcessedContent] = useState<string>('');
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editableContent, setEditableContent] = useState<string>('');
 
   // Function to process markdown content and replace viz: URLs with visualization image data
   const processMarkdownVisualizations = async (content: string) => {
@@ -81,6 +63,12 @@ function PureEditor({
       let processedContent = content;
       
       for (const vizId of vizIds) {
+        // Skip IDs that don't look like UUIDs
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vizId)) {
+          console.warn(`Skipping invalid visualization ID: ${vizId}`);
+          continue;
+        }
+        
         const vizRegex = new RegExp(`!\\[.*?\\]\\(viz:${vizId}\\)`, 'g');
         
         // Create a nicely formatted visualization container
@@ -105,125 +93,83 @@ function PureEditor({
   };
 
   useEffect(() => {
-    if (containerRef.current && !editorRef.current) {
-      const state = EditorState.create({
-        doc: buildDocumentFromContent(content),
-        plugins: [
-          ...exampleSetup({ schema: documentSchema, menuBar: false }),
-          inputRules({
-            rules: [
-              headingRule(1),
-              headingRule(2),
-              headingRule(3),
-              headingRule(4),
-              headingRule(5),
-              headingRule(6),
-            ],
-          }),
-          suggestionsPlugin,
-        ],
-      });
+    let mounted = true;
 
-      editorRef.current = new EditorView(containerRef.current, {
-        state,
-      });
-    }
-
-    return () => {
-      if (editorRef.current) {
-        editorRef.current.destroy();
-        editorRef.current = null;
+    // Process any visualization references in the content
+    const processContent = async () => {
+      if (!content) return;
+      
+      try {
+        // Process visualizations if any exist in the content
+        const processed = await processMarkdownVisualizations(content);
+        
+        if (!mounted) return;
+        
+        setProcessedContent(processed);
+        setEditableContent(processed);
+      } catch (error) {
+        console.error('Error processing content:', error);
+        if (mounted) {
+          setProcessedContent(content);
+          setEditableContent(content);
+        }
       }
     };
-    // NOTE: we only want to run this effect once
-    // eslint-disable-next-line
-  }, []);
 
-  useEffect(() => {
-    if (editorRef.current) {
-      editorRef.current.setProps({
-        dispatchTransaction: (transaction) => {
-          handleTransaction({
-            transaction,
-            editorRef,
-            onSaveContent,
-          });
-        },
-      });
-    }
-  }, [onSaveContent]);
+    processContent();
 
-  useEffect(() => {
-    if (editorRef.current && content) {
-      // Process content for visualizations
-      processMarkdownVisualizations(content).then(processedContent => {
-        // Check if editor is still valid
-        if (!editorRef.current) return;
-        
-        const currentContent = buildContentFromDocument(
-          editorRef.current.state.doc,
-        );
+    return () => {
+      mounted = false;
+    };
+  }, [content]);
 
-        if (status === 'streaming') {
-          const newDocument = buildDocumentFromContent(processedContent);
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
 
-          // Guard against null ref
-          if (!editorRef.current) return;
-          
-          const transaction = editorRef.current.state.tr.replaceWith(
-            0,
-            editorRef.current.state.doc.content.size,
-            newDocument.content,
-          );
+  const handleSave = () => {
+    setIsEditing(false);
+    onSaveContent(editableContent, false);
+  };
 
-          transaction.setMeta('no-save', true);
-          editorRef.current.dispatch(transaction);
-          return;
-        }
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditableContent(e.target.value);
+  };
 
-        if (currentContent !== processedContent) {
-          const newDocument = buildDocumentFromContent(processedContent);
+  // For streaming content or non-editable content, just display with Markdown
+  if (status === 'streaming' || artifact?.status === 'streaming' || !isEditing) {
+    return (
+      <div className="relative">
+        <div 
+          className="relative prose dark:prose-invert max-w-none cursor-text" 
+          ref={containerRef}
+          onClick={handleEdit}
+        >
+          <Markdown>{processedContent || content}</Markdown>
+        </div>
+      </div>
+    );
+  }
 
-          // Guard against null ref
-          if (!editorRef.current) return;
-          
-          const transaction = editorRef.current.state.tr.replaceWith(
-            0,
-            editorRef.current.state.doc.content.size,
-            newDocument.content,
-          );
-
-          transaction.setMeta('no-save', true);
-          editorRef.current.dispatch(transaction);
-        }
-      });
-    }
-  }, [content, status]);
-
-  useEffect(() => {
-    if (editorRef.current?.state.doc && content) {
-      const projectedSuggestions = projectWithPositions(
-        editorRef.current.state.doc,
-        suggestions,
-      ).filter(
-        (suggestion) => suggestion.selectionStart && suggestion.selectionEnd,
-      );
-
-      const decorations = createDecorations(
-        projectedSuggestions,
-        editorRef.current,
-      );
-
-      const transaction = editorRef.current.state.tr;
-      transaction.setMeta(suggestionsPluginKey, { decorations });
-      editorRef.current.dispatch(transaction);
-    }
-  }, [suggestions, content]);
-
+  // For editable mode, show a textarea
   return (
     <div className="relative">
-      {/* Editor content */}
-      <div className="relative prose dark:prose-invert max-w-none" ref={containerRef} />
+      <div className="relative prose dark:prose-invert max-w-none">
+        <textarea
+          className="w-full h-auto min-h-[300px] p-4 border rounded-md dark:bg-zinc-900 dark:text-white"
+          value={editableContent}
+          onChange={handleChange}
+          autoFocus
+        />
+        <div className="flex justify-end mt-2">
+          <button
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+            onClick={handleSave}
+          >
+            Save
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

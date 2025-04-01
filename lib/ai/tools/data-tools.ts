@@ -4,6 +4,9 @@ import { queryDatabase } from '@/lib/ai/tools/query-data';
 import { generateDataVisualization } from '@/lib/data-visualization/generate';
 import { queryData } from './query-data';
 import { visualizeData } from './visualize-data';
+import { aiQueryData } from './ai-query-data';
+import { directQueryTool } from './direct-query';
+import { qsrQueryTool } from './qsr-query';
 
 export const queryDataTool = tool({
   description: 'Execute SQL queries against the database to fetch data for analytics questions',
@@ -96,4 +99,7 @@ export const visualizeDataTool = tool({
 export const dataTools = {
   queryData,
   visualizeData,
+  aiQueryData,
+  directQuery: directQueryTool,
+  qsrQuery: qsrQueryTool,
 }; 

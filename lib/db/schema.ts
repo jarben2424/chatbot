@@ -72,7 +72,7 @@ export const document = pgTable(
     createdAt: timestamp('createdAt').notNull(),
     title: text('title').notNull(),
     content: text('content'),
-    kind: varchar('kind', { enum: ['text', 'code', 'image', 'sheet', 'visualization'] })
+    kind: varchar('kind', { enum: ['text', 'code', 'image', 'sheet', 'visualization', 'segment'] })
       .notNull()
       .default('text'),
     userId: uuid('userId')

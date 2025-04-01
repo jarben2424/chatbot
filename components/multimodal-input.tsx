@@ -22,12 +22,14 @@ import { toast } from 'sonner';
 import { useLocalStorage, useWindowSize } from 'usehooks-ts';
 import { useSidebar } from './ui/sidebar';
 import { useRouter } from 'next/navigation';
+import { BrainIcon } from 'lucide-react';
 
 import { sanitizeUIMessages } from '@/lib/utils';
 import { generateUUID } from '@/lib/utils';
 
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from './icons';
 import { PreviewAttachment } from './preview-attachment';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { SuggestedActions } from './suggested-actions';
@@ -159,7 +161,6 @@ function PureMultimodalInput({
   };
 
   const handleCommandSelect = (command: { id: string; label: string; action: string }) => {
-    setInput(command.action);
     setShowCommandPalette(false);
     
     // Immediately action the command based on its ID
@@ -176,7 +177,27 @@ function PureMultimodalInput({
       return;
     }
     
-    // Otherwise, auto-submit the command to be processed
+    // Handle special case for segment creation
+    if (command.id === 'create-segment') {
+      // Set input to the standard segment creation prompt
+      setInput(command.action);
+      // Auto-submit immediately
+      setTimeout(() => {
+        submitForm();
+      }, 50);
+      return;
+    }
+    
+    // Handle slash commands - remove the leading slash so AI doesn't treat it as a command
+    if (command.action.startsWith('/')) {
+      // For regular slash commands, remove the slash
+      setInput(command.action.substring(1));
+    } else {
+      // For non-slash commands, use the action as is
+      setInput(command.action);
+    }
+    
+    // Auto-submit the command to be processed
     setTimeout(() => {
       submitForm();
     }, 50);
@@ -231,6 +252,27 @@ function PureMultimodalInput({
     const handleHardcodedPrompts = (inputText: string): boolean => {
       const lowerInput = inputText.toLowerCase().trim();
       
+      // Direct handling for segment creation using various trigger phrases
+      const segmentTriggers = [
+        '/segment',
+        'create segment',
+        'create a segment',
+        'create customer segment',
+        'create a customer segment',
+        'new segment',
+        'make a segment',
+        'segment creation'
+      ];
+      
+      // Check if it's a segment creation request
+      for (const trigger of segmentTriggers) {
+        if (lowerInput.includes(trigger)) {
+          // Replace the input with a consistent format for the AI to recognize
+          setInput('Create a new customer segment for our business');
+          return false; // Continue with submission
+        }
+      }
+      
       // Map of trigger phrases to redirect paths
       const redirectMap: Record<string, string> = {
         'view my campaigns': '/campaigns',
@@ -264,11 +306,17 @@ function PureMultimodalInput({
       return; // If a hardcoded prompt was handled, don't proceed with normal submission
     }
 
+    // Store the current input for reference after it's cleared
+    const currentInput = input;
+
+    // Submit the form with current input
     handleSubmit(undefined, {
       experimental_attachments: attachments,
     });
 
+    // Clear attachments and the input *after* form submission
     setAttachments([]);
+    setInput('');
     setLocalStorageInput('');
     resetHeight();
 
@@ -350,6 +398,9 @@ function PureMultimodalInput({
     [setAttachments],
   );
 
+  // Update the state name and key for local storage
+  const [opusThinkEnabled, setOpusThinkEnabled] = useLocalStorage('opus-think-enabled', false);
+
   return (
     <div className="relative w-full flex flex-col gap-4">
       <input
@@ -410,8 +461,13 @@ function PureMultimodalInput({
           onKeyDown={handleKeyDown}
         />
 
-        <div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start">
+        <div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start items-center gap-1">
           <AttachmentsButton fileInputRef={fileInputRef} isLoading={isLoading} />
+          <OpusThinkToggle 
+            enabled={opusThinkEnabled} 
+            setEnabled={setOpusThinkEnabled} 
+            isLoading={isLoading} 
+          />
         </div>
 
         <CommandKHint />
@@ -530,3 +586,58 @@ const SendButton = memo(PureSendButton, (prevProps, nextProps) => {
   if (prevProps.input !== nextProps.input) return false;
   return true;
 });
+
+// Update the toggle component
+function PureOpusThinkToggle({
+  enabled,
+  setEnabled,
+  isLoading,
+}: {
+  enabled: boolean;
+  setEnabled: (enabled: boolean) => void;
+  isLoading: boolean;
+}) {
+  const handleToggle = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    try {
+      const newValue = !enabled;
+      setEnabled(newValue);
+      
+      // Show success message
+      toast.success(`Opus Think mode ${newValue ? 'enabled' : 'disabled'}`, {
+        id: 'opus-toggle',
+        duration: 2000
+      });
+      
+      // Log the change for debugging
+      console.log(`Opus Think mode ${newValue ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      console.error('Error toggling Opus Think mode:', error);
+      toast.error('Failed to toggle Opus Think mode');
+    }
+  }, [enabled, setEnabled]);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          data-testid="opus-think-button"
+          className={cx(
+            "rounded-md p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200",
+            enabled ? "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400" : ""
+          )}
+          onClick={handleToggle}
+          disabled={isLoading}
+          variant="ghost"
+        >
+          <BrainIcon size={14} />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {enabled ? 'Disable' : 'Enable'} Opus Think mode
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+const OpusThinkToggle = memo(PureOpusThinkToggle);

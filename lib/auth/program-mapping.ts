@@ -7,13 +7,13 @@ export interface ProgramMapping {
 
 // Specific user mappings (for special cases)
 const SPECIFIC_MAPPINGS: ProgramMapping[] = [
-  // Add any specific user mappings here
-  { email: 'brain@hang.com', programId: 1515, isAdmin: true },
+  // Add brian@hang.com as an admin user
+  { email: 'brian@hang.com', programId: 0, isAdmin: true }
 ];
 
 // Domain-based mappings
 const DOMAIN_MAPPINGS: Record<string, { programId: number, isAdmin: boolean }> = {
-  'hang.com': { programId: 1515, isAdmin: true },
+  // Removed hang.com domain mapping to program ID 1515
   // Add other domain mappings as needed
 };
 

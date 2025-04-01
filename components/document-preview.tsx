@@ -22,6 +22,7 @@ import equal from 'fast-deep-equal';
 import { SpreadsheetEditor } from './sheet-editor';
 import { ImageEditor } from './image-editor';
 import { Markdown } from './markdown';
+import { SegmentEditor } from './segment-editor';
 
 interface DocumentPreviewProps {
   isReadonly: boolean;
@@ -145,6 +146,25 @@ export function DocumentPreview({
       console.log('Document content preview:', previewDocument.content.substring(0, 100) + '...');
     }
   }, [previewDocument]);
+  
+  // Handle segment documents but without auto-expansion
+  useEffect(() => {
+    if (previewDocument && previewDocument.kind === 'segment') {
+      // Only set document ID and content, but don't auto-expand
+      console.log('Loading segment document without auto-expanding:', previewDocument.id);
+      
+      // Always ensure the correct document content is loaded, but respect current visibility state
+      setArtifact(artifact => ({
+        ...artifact,
+        documentId: previewDocument.id,
+        kind: 'segment',
+        title: previewDocument.title || 'Customer Segment',
+        content: previewDocument.content || '',
+        // Maintain current visibility state - don't auto-expand
+        isVisible: artifact.isVisible && artifact.documentId === previewDocument.id
+      }));
+    }
+  }, [previewDocument, artifact.documentId, setArtifact]);
 
   if (artifact.isVisible) {
     if (result) {
@@ -367,15 +387,8 @@ const DocumentContent = ({ document }: { document: Document }) => {
     isInline: true,
   };
 
-  // Check if content contains markdown formatting
-  const hasMarkdownFormatting = document.content?.includes('#') || 
-                               document.content?.includes('**') || 
-                               document.content?.includes('*') || 
-                               document.content?.includes('- ') ||
-                               document.content?.includes('1. ');
-
-  // Add enhanced styling for reports or markdown content
-  if ((isReport || hasMarkdownFormatting) && document.kind === 'text') {
+  // All text documents should be rendered with Markdown component
+  if (document.kind === 'text') {
     // Extract inner content from report-content div if it exists
     let contentToRender = document.content ?? '';
     
@@ -482,94 +495,33 @@ const DocumentContent = ({ document }: { document: Document }) => {
             background-color: #f8fafc;
           }
           
-          /* Executive summary special styling */
-          .document-preview h2:first-of-type {
-            margin-top: 0.25rem;
-            margin-bottom: 0.15rem;
-            color: #1e40af;
-            font-size: 1.1rem;
-            font-weight: 700;
-            padding-bottom: 0.15rem;
-            border-bottom: none;
-          }
-          
-          .document-preview h2:first-of-type + p {
-            font-size: 0.9rem;
-            line-height: 1.5;
-            margin-top: 0.25rem;
-            margin-bottom: 0.25rem;
-            color: #1f2937;
-          }
-          
-          /* Key Findings section styling */
-          .document-preview h2:nth-of-type(2) {
-            color: #1e40af;
-          }
-          
-          /* Conclusion special styling */
-          .document-preview h2:nth-last-of-type(2) {
-            color: #1e40af;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 1.5rem;
-            margin-top: 3rem;
-          }
-          
-          /* Data Visualization section */
-          .document-preview h2:last-of-type {
-            margin-top: 2.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid #e2e8f0;
-            color: #1e40af;
-          }
-          
-          /* Table styling */
-          .document-preview table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1.5rem 0;
-          }
-          
-          .document-preview th {
-            background-color: #f1f5f9;
-            color: #334155;
-            font-weight: 600;
-            text-align: left;
-            padding: 0.75rem 1rem;
-            border: 1px solid #e2e8f0;
-          }
-          
-          .document-preview td {
-            padding: 0.75rem 1rem;
-            border: 1px solid #e2e8f0;
-            color: #334155;
-          }
-          
-          .document-preview tr:nth-child(even) {
-            background-color: #f8fafc;
-          }
-          
+          /* Dark mode styling */
           .dark .report-container {
             background-color: #1e1e1e;
-            color: #e4e4e4;
+            color: #e2e8f0;
           }
           
-          .dark .document-preview h1,
+          .dark .document-preview h1 {
+            color: #f8fafc;
+            border-bottom-color: #2d2d2d;
+          }
+          
           .dark .document-preview h2,
           .dark .document-preview h3 {
-            color: #e4e4e4;
-            border-color: #2d2d2d;
+            color: #e2e8f0;
           }
           
           .dark .document-preview p,
-          .dark .document-preview li,
-          .dark .document-preview td {
-            color: #d1d1d1;
+          .dark .document-preview ul,
+          .dark .document-preview ol,
+          .dark .document-preview li {
+            color: #cbd5e1;
           }
           
           .dark .document-preview blockquote {
-            background-color: #2d2d2d;
-            color: #a1a1a1;
-            border-color: #4b4b4b;
+            border-left-color: #475569;
+            background-color: #1e1e1e;
+            color: #cbd5e1;
           }
           
           .dark .document-preview .report-visualization {
@@ -581,71 +533,32 @@ const DocumentContent = ({ document }: { document: Document }) => {
           .dark .document-preview .viz-caption {
             background-color: #2d2d2d;
             border-color: #3d3d3d;
-          }
-          
-          .dark .document-preview th {
-            background-color: #2d2d2d;
-            color: #e4e4e4;
-            border-color: #3d3d3d;
-          }
-          
-          .dark .document-preview td {
-            border-color: #3d3d3d;
-          }
-          
-          .dark .document-preview tr:nth-child(even) {
-            background-color: #2a2a2a;
-          }
-          
-          /* For print styling */
-          @media print {
-            .document-preview {
-              font-size: 12pt;
-            }
-            
-            .document-preview h1 {
-              font-size: 18pt;
-            }
-            
-            .document-preview h2 {
-              font-size: 16pt;
-            }
-            
-            .document-preview h3 {
-              font-size: 14pt;
-            }
-            
-            .document-preview .report-visualization {
-              break-inside: avoid;
-              page-break-inside: avoid;
-            }
+            color: #d1d1d1;
           }
         `}</style>
         <div className="document-preview">
-          {/* Use direct Markdown rendering for reports instead of the Editor */}
           <Markdown>{contentToRender}</Markdown>
         </div>
       </div>
     );
   }
 
-  // For non-report documents
+  // For non-text documents
   const containerClassName = cn(
     'max-h-[800px] h-auto overflow-y-auto border rounded-b-2xl dark:bg-muted border-t-0 dark:border-zinc-700',
     {
-      'p-4 sm:px-14 sm:py-16': document.kind === 'text',
       'p-0': document.kind === 'code',
     },
   );
 
   return (
     <div className={containerClassName}>
-      {document.kind === 'text' ? (
-        <Editor {...editorProps} />
-      ) : document.kind === 'code' ? (
+      {document.kind === 'code' ? (
         <CodeEditor {...codeEditorProps} />
       ) : document.kind === 'sheet' ? (
         <SpreadsheetEditor {...sheetEditorProps} />
+      ) : document.kind === 'segment' ? (
+        <SegmentEditor {...sheetEditorProps} />
       ) : document.kind === 'image' ? (
         <ImageEditor {...imageEditorProps} />
       ) : null}

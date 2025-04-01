@@ -23,9 +23,11 @@
     "setup-db": "tsx lib/db/setup-warehouse.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^1.1.19",
     "@ai-sdk/fireworks": "0.1.12",
     "@ai-sdk/openai": "1.2.0",
     "@ai-sdk/react": "^1.1.20",
+    "@ai-sdk/xai": "^1.2.1",
     "@aws-sdk/client-s3": "^3.758.0",
     "@codemirror/lang-javascript": "^6.2.2",
     "@codemirror/lang-python": "^6.1.6",
@@ -54,6 +56,7 @@
     "@vercel/blob": "^0.24.1",
     "@vercel/postgres": "^0.10.0",
     "ai": "4.1.50",
+    "axios": "^1.6.2",
     "bcrypt-ts": "^5.0.2",
     "class-variance-authority": "^0.7.0",
     "classnames": "^2.5.1",
@@ -61,7 +64,6 @@
     "codemirror": "^6.0.1",
     "date-fns": "^4.1.0",
     "diff-match-patch": "^1.0.5",
-    "dotenv": "^16.4.5",
     "drizzle-orm": "^0.34.0",
     "fast-deep-equal": "^3.1.3",
     "framer-motion": "^11.3.19",
@@ -101,6 +103,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@biomejs/biome": "1.9.4",
     "@playwright/test": "^1.50.1",
     "@tailwindcss/typography": "^0.5.15",
@@ -111,6 +114,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/snowflake-sdk": "^1.6.24",
+    "dotenv": "^16.4.7",
     "drizzle-kit": "^0.25.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.5",

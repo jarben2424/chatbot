@@ -18,13 +18,35 @@ import {
   getMostRecentUserMessage,
 } from '@/lib/utils';
 import { generateTitleFromUserMessage } from '../actions';
-import { myProvider } from '@/lib/ai/providers';
+import { myProvider, createAnthropicProvider } from '@/lib/ai/providers';
 import { dataTools } from '@/lib/ai/tools/data-tools';
 import { getWeather } from '@/lib/ai/tools/get-weather';
 import { createDocument } from '@/lib/ai/tools/create-document';
 import { updateDocument } from '@/lib/ai/tools/update-document';
 import { buildReport, buildReportTool } from '@/lib/ai/tools/report-builder';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { webSearchTool, webSearch } from '@/lib/ai/tools/web-search';
+import { directQueryTool } from '@/lib/ai/tools/direct-query';
+import { qsrQueryTool } from '@/lib/ai/tools/qsr-query';
+
+// Add this type definition near the top of the file
+type CustomActiveTools = Array<string>;
+
+// Update the Anthropic model name to use Claude 3 Opus
+const CLAUDE_MODEL_NAME = 'claude-3-opus-20240229';
+
+// Helper function for Sonnet 3.7 to directly query data
+const directQueryForSonnet = async (query: string) => {
+  try {
+    // Implementation for direct data querying that Sonnet can use
+    // This is a placeholder and would need to be implemented based on your data sources
+    console.log('Direct query for Sonnet 3.7:', query);
+    return { success: true, data: [] };
+  } catch (error) {
+    console.error('Error in directQueryForSonnet:', error);
+    return { success: false, error: String(error) };
+  }
+};
 
 // These are some helper tools we use to format the chat route response
 const getWeatherTool = getWeather;
@@ -102,11 +124,86 @@ const directlyOpenArtifact = (dataStream: any, documentInfo: { id: string; title
   }
 };
 
+// Add a safe tools wrapper function that prevents errors from crashing the stream
+const createSafeToolWrapper = (tool: any) => {
+  const originalExecute = tool.execute;
+  
+  // Create a wrapped execute function with error handling
+  const safeExecute = async (...args: any[]) => {
+    try {
+      const result = await originalExecute(...args);
+      return result;
+    } catch (error) {
+      console.error(`Error in tool execution:`, error);
+      // Return a safe error response that won't crash the stream
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+        fallback: true
+      };
+    }
+  };
+  
+  // Return a new tool with the safe execute function
+  return {
+    ...tool,
+    execute: safeExecute
+  };
+};
+
+// Add a function to check Anthropic availability
+const checkAnthropicAvailability = async () => {
+  try {
+    // Create the provider on demand
+    const anthropicProvider = createAnthropicProvider();
+    
+    // Log the debug info
+    console.log('Checking Anthropic availability');
+    console.log('Anthropic provider exists:', !!anthropicProvider);
+    
+    if (!anthropicProvider) {
+      return {
+        available: false,
+        reason: 'No Anthropic provider available - missing or invalid API key'
+      };
+    }
+    
+    // Return success
+    return {
+      available: true,
+      reason: 'Anthropic provider is available'
+    };
+  } catch (error) {
+    console.error('Error checking Anthropic availability:', error);
+    return {
+      available: false,
+      reason: `Anthropic error: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+};
+
 // Chat endpoint - POST /chat
 export async function POST(request: Request) {
   try {
-    const { id, messages } = await request.json();
+    const { id, messages, selectedChatModel } = await request.json();
     const session = await auth();
+
+    // Update check for OpusThink mode
+    const isOpusThinkMode = selectedChatModel === 'opus-think';
+    
+    // Check if Anthropic is available when in Opus mode
+    let anthropicStatus = { available: false, reason: 'Not checked' };
+    if (isOpusThinkMode) {
+      anthropicStatus = await checkAnthropicAvailability();
+    }
+    
+    console.log('Chat route:', { 
+      selectedModel: selectedChatModel, 
+      isOpusThinkMode, 
+      anthropicKeyExists: !!process.env.ANTHROPIC_API_KEY,
+      webSearchEnabled: process.env.ENABLE_WEB_SEARCH === 'true',
+      anthropicStatus
+    });
 
     if (!session?.user?.id) {
       return new Response('Unauthorized', { status: 401 });
@@ -156,84 +253,161 @@ export async function POST(request: Request) {
     return createDataStreamResponse({
       execute: async (dataStream) => {
         try {
+          // Send an initial thinking indicator if using OpusThink mode
+          if (isOpusThinkMode) {
+            dataStream.writeData({
+              type: 'thinking-update',
+              content: {
+                status: 'started',
+                step: 'initialization',
+                message: 'OpusThink mode activated. Analyzing request...'
+              }
+            });
+            
+            // Set up a timer to send periodic updates about thinking progress
+            let stepCount = 0;
+            const thinkingSteps = [
+              'Analyzing query requirements',
+              'Determining information needs',
+              'Checking for required data sources',
+              'Planning analytical approach',
+              'Preparing response framework',
+              'Gathering relevant information',
+              'Applying business frameworks',
+              'Synthesizing insights',
+              'Formulating recommendations',
+              'Finalizing response'
+            ];
+            
+            const thinkingInterval = setInterval(() => {
+              if (stepCount < thinkingSteps.length) {
+                try {
+                  dataStream.writeData({
+                    type: 'thinking-update',
+                    content: {
+                      status: 'in_progress',
+                      step: `step_${stepCount + 1}`,
+                      message: thinkingSteps[stepCount]
+                    }
+                  });
+                  stepCount++;
+                } catch (e) {
+                  // Ignore errors if stream is already closed
+                  clearInterval(thinkingInterval);
+                }
+              } else {
+                clearInterval(thinkingInterval);
+              }
+            }, 1000); // Update every second
+            
+            // Make sure to clear the interval when done or on error
+            setTimeout(() => clearInterval(thinkingInterval), 12000); // Safety clear after 12s
+          }
+          
+          // Define the tools including conditionally added Sonnet tools
+          const baseTools = {
+            ...dataTools,
+            getWeather: getWeatherTool,
+            createDocument: createDocument({ session, dataStream }),
+            updateDocument: updateDocument({ session, dataStream }),
+            buildReport: {
+              parameters: buildReportTool.parameters,
+              description: buildReportTool.description,
+              execute: async (args, options) => {
+                try {
+                  console.log('Building report with args:', args, 'toolCallId:', options?.toolCallId);
+                  
+                  // Send an initial progress update to show the "Thinking" indicator
+                  dataStream.writeData({
+                    type: 'tool-status',
+                    content: {
+                      toolCallId: options?.toolCallId || '',
+                      status: 'running',
+                      message: 'Generating comprehensive report...'
+                    }
+                  });
+                  
+                  // Generate the report and get the response
+                  const report = await buildReport(args, { 
+                    toolCallId: options?.toolCallId || '', 
+                    dataStream, 
+                    session, 
+                    chatId: id 
+                  });
+                  
+                  console.log('Report build successful:', report);
+                  
+                  // Update tool status to complete
+                  dataStream.writeData({
+                    type: 'tool-status',
+                    content: {
+                      toolCallId: options?.toolCallId || '',
+                      status: 'complete',
+                      message: 'Report generation complete'
+                    }
+                  });
+                  
+                  // Add UI to open the document without exposing document ID to user
+                  dataStream.writeData({
+                    type: 'artifact',
+                    content: {
+                      documentId: report.documentId,
+                      title: report.title,
+                      kind: report.kind || 'text',
+                      isVisible: true,
+                      status: 'idle'
+                    }
+                  });
+                  
+                  // Modify the assistant's message to avoid including document ID
+                  dataStream.writeData({
+                    type: 'text',
+                    content: `I have generated a comprehensive report on ${args.topic || 'your requested topic'}. You can access the report below.`
+                  });
+                  
+                  // Return the document info as the tool result
+                  return report;
+                } catch (error) {
+                  console.error('Error building report:', error);
+                  return `Error building report: ${error instanceof Error ? error.message : String(error)}`;
+                }
+              }
+            },
+          };
+          
+          // Add Sonnet-specific tools conditionally
+          let allTools = baseTools;
+          let activeTools: CustomActiveTools = [
+            'queryData',
+            'visualizeData',
+            'getWeather',
+            'createDocument',
+            'updateDocument',
+            'buildReport',
+          ];
+          
+          if (isOpusThinkMode) {
+            allTools = {
+              ...baseTools,
+              directQuery: directQueryTool,
+              webSearch: createSafeToolWrapper(webSearchTool),
+              qsrQuery: qsrQueryTool
+            };
+            
+            activeTools.push('directQuery');
+            activeTools.push('webSearch');
+            activeTools.push('qsrQuery');
+          }
+
           const result = streamText({
-            model: myProvider.languageModel('gpt-3.5-turbo'),
-            system: await getSystemPrompt({}),
+            model: myProvider.languageModel(isOpusThinkMode ? CLAUDE_MODEL_NAME : 'gpt-3.5-turbo'),
+            system: await getSystemPrompt({ isOpusThinkMode }),
             messages,
-            maxSteps: 5, // Allow multiple steps for multi-tool interactions
+            maxSteps: isOpusThinkMode ? 12 : 5, // More steps for Opus Think mode
             experimental_transform: smoothStream({ chunking: 'word' }),
             experimental_generateMessageId: generateUUID,
-            experimental_activeTools: [
-              'queryData',
-              'visualizeData',
-              'getWeather',
-              'createDocument',
-              'updateDocument',
-              'buildReport',
-            ],
-            tools: {
-              ...dataTools,
-              getWeather: getWeatherTool,
-              createDocument: createDocument({ session, dataStream }),
-              updateDocument: updateDocument({ session, dataStream }),
-              buildReport: {
-                parameters: buildReportTool.parameters,
-                description: buildReportTool.description,
-                execute: async (args, options) => {
-                  try {
-                    console.log('Building report with args:', args, 'toolCallId:', options?.toolCallId);
-                    
-                    // Send an initial progress update to show the "Thinking" indicator
-                    dataStream.writeData({
-                      type: 'tool-status',
-                      content: {
-                        toolCallId: options?.toolCallId || '',
-                        status: 'running',
-                        message: 'Generating comprehensive report...'
-                      }
-                    });
-                    
-                    // Generate the report and get the response
-                    const report = await buildReport(args, { 
-                      toolCallId: options?.toolCallId || '', 
-                      dataStream, 
-                      session, 
-                      chatId: id 
-                    });
-                    
-                    console.log('Report build successful:', report);
-                    
-                    // Update tool status to complete
-                    dataStream.writeData({
-                      type: 'tool-status',
-                      content: {
-                        toolCallId: options?.toolCallId || '',
-                        status: 'complete',
-                        message: 'Report generation complete'
-                      }
-                    });
-                    
-                    // Add UI to open the document
-                    dataStream.writeData({
-                      type: 'artifact',
-                      content: {
-                        documentId: report.documentId,
-                        title: report.title,
-                        kind: report.kind,
-                        isVisible: true,
-                        status: 'idle'
-                      }
-                    });
-                    
-                    // Return the document info as the tool result
-                    return report;
-                  } catch (error) {
-                    console.error('Error building report:', error);
-                    return `Error building report: ${error instanceof Error ? error.message : String(error)}`;
-                  }
-                }
-              },
-            },
+            experimental_activeTools: activeTools,
+            tools: allTools,
             onFinish: async (result: any) => {
               try {
                 // Basic type checking to prevent errors

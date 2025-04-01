@@ -7,9 +7,11 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { CampaignsHeader } from '@/components/campaigns/campaigns-header';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { RefreshCw, ChevronRight, ChevronLeft, Users, Zap, Sparkles } from 'lucide-react';
+import { RefreshCw, ChevronRight, ChevronLeft, Users, Zap, Sparkles, Brain } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocalStorage } from 'usehooks-ts';
+import { toast } from 'sonner';
 
 // Sample audience segments data
 const segments = [
@@ -33,9 +35,40 @@ const segments = [
   }
 ];
 
-// Optimization modal component
-function OptimizationModal({ isOpen, onComplete }: { isOpen: boolean; onComplete: () => void }) {
+// Sample offers data
+const offers = [
+  {
+    id: 'summer-discount',
+    name: '20% Summer Discount',
+    description: 'Summer sale discount for all products'
+  },
+  {
+    id: 'free-shipping',
+    name: 'Free Shipping',
+    description: 'Free shipping on orders over $50'
+  },
+  {
+    id: 'loyalty-bonus',
+    name: 'Loyalty Bonus',
+    description: 'Special bonus points for loyal customers'
+  }
+];
+
+// Enhanced optimization modal with OpusThink integration
+function OptimizationModal({ 
+  isOpen, 
+  onComplete, 
+  selectedSegmentId, 
+  useOpusThink 
+}: { 
+  isOpen: boolean; 
+  onComplete: () => void; 
+  selectedSegmentId: string | null;
+  useOpusThink: boolean;
+}) {
   const [progress, setProgress] = useState(0);
+  const [insightText, setInsightText] = useState('');
+  const [thinkingStep, setThinkingStep] = useState('');
   
   useEffect(() => {
     if (!isOpen) return;
@@ -43,16 +76,56 @@ function OptimizationModal({ isOpen, onComplete }: { isOpen: boolean; onComplete
     let animationFrameId: number;
     let timeoutId: NodeJS.Timeout;
     
-    // Longer, more gradual animation (5 seconds total)
-    const startTime = Date.now();
-    const duration = 5000; // 5 seconds for the entire animation
+    // Get segment data
+    const segment = segments.find(s => s.id === selectedSegmentId);
     
-    // Use requestAnimationFrame for smoother animation
+    // Create thinking steps for OpusThink mode
+    if (useOpusThink) {
+      const thinkingSteps = [
+        `Analyzing ${segment?.name || 'segment'} characteristics...`,
+        `Evaluating demographic profiles and purchasing patterns...`,
+        `Calculating predicted response rates for each offer...`,
+        `Evaluating seasonal trends and purchase history...`,
+        `Determining optimal offer-to-customer matches...`,
+        `Calculating projected conversion improvements...`,
+        `Finalizing personalized recommendations...`
+      ];
+      
+      // Show thinking steps in sequence
+      let currentStepIndex = 0;
+      const thinkingInterval = setInterval(() => {
+        if (currentStepIndex < thinkingSteps.length) {
+          setThinkingStep(thinkingSteps[currentStepIndex]);
+          currentStepIndex++;
+        } else {
+          clearInterval(thinkingInterval);
+        }
+      }, 700);
+      
+      // Simulate deep analysis insights
+      setTimeout(() => {
+        if (segment?.id === 'high-value') {
+          setInsightText('Analysis indicates Loyalty Bonus will increase engagement by 42% for High Value segment.');
+        } else if (segment?.id === 'recent-purchasers') {
+          setInsightText('Free Shipping offer projected to drive 27% higher repeat purchases for Recent Purchasers.');
+        } else if (segment?.id === 'at-risk') {
+          setInsightText('20% Summer Discount shows highest recovery potential of 35% for At Risk customers.');
+        }
+      }, 3000);
+      
+      // Clean up
+      return () => {
+        clearInterval(thinkingInterval);
+      };
+    }
+    
+    // Original progress animation logic
+    const startTime = Date.now();
+    const duration = useOpusThink ? 6000 : 5000; // Slightly longer for OpusThink
+    
     const updateProgress = () => {
       const elapsed = Date.now() - startTime;
       
-      // Use a cubic easing function for more natural progression
-      // Starts slower, accelerates in the middle, slows down at the end
       let newProgress;
       const t = Math.min(1, elapsed / duration);
       if (t < 0.5) {
@@ -79,10 +152,14 @@ function OptimizationModal({ isOpen, onComplete }: { isOpen: boolean; onComplete
       cancelAnimationFrame(animationFrameId);
       clearTimeout(timeoutId);
     };
-  }, [isOpen, onComplete]);
+  }, [isOpen, onComplete, selectedSegmentId, useOpusThink]);
   
   // Get a descriptive text based on progress
   const getStepText = () => {
+    if (useOpusThink && thinkingStep) {
+      return thinkingStep;
+    }
+    
     if (progress < 33) {
       return 'Analyzing customer data...';
     } else if (progress < 66) {
@@ -94,6 +171,20 @@ function OptimizationModal({ isOpen, onComplete }: { isOpen: boolean; onComplete
   
   // Get the icon based on progress
   const getStepIcon = () => {
+    if (useOpusThink) {
+      return (
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.1, 1],
+            rotateY: [0, 180, 360],
+          }}
+          transition={{ duration: 3, repeat: Infinity }}
+        >
+          <Brain className="h-8 w-8" />
+        </motion.div>
+      );
+    }
+    
     if (progress < 33) {
       return (
         <motion.div 
@@ -160,34 +251,48 @@ function OptimizationModal({ isOpen, onComplete }: { isOpen: boolean; onComplete
                 ></motion.div>
                 
                 {/* Main circle */}
-                <div className="absolute inset-3 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white">
+                <div className={`absolute inset-3 rounded-full ${useOpusThink ? 'bg-gradient-to-br from-purple-500 to-purple-700' : 'bg-gradient-to-br from-indigo-500 to-indigo-700'} flex items-center justify-center text-white`}>
                   {getStepIcon()}
                 </div>
               </div>
               
-              <h2 className="text-xl font-semibold mb-2 text-gray-800">Optimizing Your Campaign</h2>
+              <h2 className="text-xl font-semibold mb-2 text-gray-800">
+                {useOpusThink ? 'OpusThink Analysis' : 'Optimizing Your Campaign'}
+              </h2>
+              
               <p className="text-gray-600 mb-6">
-                Our AI is analyzing data patterns to create the perfect personalized experience for your customers
+                {useOpusThink 
+                  ? 'Advanced AI is performing deep analysis on your customer data and offers'
+                  : 'Our AI is analyzing data patterns to create personalized experiences'
+                }
               </p>
+              
+              {/* OpusThink insights */}
+              {useOpusThink && insightText && (
+                <div className="mb-6 p-3 bg-purple-50 border border-purple-100 rounded-lg text-sm text-purple-700">
+                  <p className="font-medium">OpusThink Insight:</p>
+                  <p>{insightText}</p>
+                </div>
+              )}
               
               {/* Step Indicators - visually show position in the process */}
               <div className="flex justify-between mb-3 text-sm text-gray-500 font-medium">
-                <div className={progress >= 33 ? "text-indigo-600 font-medium" : ""}>Analyzing</div>
-                <div className={progress >= 66 ? "text-indigo-600 font-medium" : ""}>Matching</div>
-                <div className={progress >= 95 ? "text-indigo-600 font-medium" : ""}>Optimizing</div>
+                <div className={progress >= 33 ? `${useOpusThink ? "text-purple-600" : "text-indigo-600"} font-medium` : ""}>Analyzing</div>
+                <div className={progress >= 66 ? `${useOpusThink ? "text-purple-600" : "text-indigo-600"} font-medium` : ""}>Matching</div>
+                <div className={progress >= 95 ? `${useOpusThink ? "text-purple-600" : "text-indigo-600"} font-medium` : ""}>Optimizing</div>
               </div>
               
               {/* Progress bar */}
               <div className="h-3 w-full bg-gray-100 rounded-full mb-4 overflow-hidden">
                 <div 
-                  className="h-full bg-indigo-600 rounded-full"
+                  className={`h-full ${useOpusThink ? 'bg-purple-600' : 'bg-indigo-600'} rounded-full`}
                   style={{ 
                     width: `${progress}%`,
                   }}
                 />
               </div>
               
-              <p className="text-sm text-indigo-600 font-medium">
+              <p className={`text-sm ${useOpusThink ? 'text-purple-600' : 'text-indigo-600'} font-medium`}>
                 {getStepText()}
               </p>
             </div>
@@ -204,8 +309,19 @@ export default function TargetAudiencePage() {
   const [loading, setLoading] = useState(true);
   const [selectedSegment, setSelectedSegment] = useState<string | null>(null);
   const [showOptimization, setShowOptimization] = useState(false);
+  
+  // Get the OpusThink setting from localStorage
+  const [opusThinkEnabled] = useLocalStorage('opus-think-enabled', false);
 
   useEffect(() => {
+    // Load data from localStorage
+    const previousOffers = localStorage.getItem('selectedOffers');
+    const previousSegment = localStorage.getItem('selectedSegment');
+    
+    if (previousSegment) {
+      setSelectedSegment(previousSegment);
+    }
+    
     async function getSession() {
       try {
         const res = await fetch('/api/auth/session');
@@ -234,7 +350,23 @@ export default function TargetAudiencePage() {
   }
 
   const handleOptimizeCampaign = () => {
-    // Show the optimization modal instead of navigating directly
+    // Save segment selection for step 4
+    if (selectedSegment) {
+      localStorage.setItem('selectedSegment', selectedSegment);
+      
+      // If OpusThink is enabled, save that we used it
+      if (opusThinkEnabled) {
+        localStorage.setItem('usedOpusThink', 'true');
+        
+        // Show toast when using OpusThink
+        toast.success('OpusThink mode activated for advanced analysis', {
+          description: 'Using Claude 3 Opus for intelligent offer matching',
+          duration: 3000
+        });
+      }
+    }
+    
+    // Show the optimization modal
     setShowOptimization(true);
   };
   
@@ -354,6 +486,19 @@ export default function TargetAudiencePage() {
                   )}
                 </div>
                 
+                {/* OpusThink indicator */}
+                {opusThinkEnabled && (
+                  <div className="mb-8 p-4 bg-purple-50 border border-purple-100 rounded-lg flex items-center">
+                    <div className="p-2 bg-purple-100 rounded-lg mr-3">
+                      <Brain className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-purple-800">OpusThink Mode Active</h3>
+                      <p className="text-sm text-purple-600">Using advanced AI to optimize offer-to-customer matching</p>
+                    </div>
+                  </div>
+                )}
+                
                 {/* Action Buttons */}
                 <div className="flex justify-between">
                   <Link href="/campaigns/create/step2">
@@ -378,10 +523,12 @@ export default function TargetAudiencePage() {
         </div>
       </SidebarProvider>
       
-      {/* Optimization Modal */}
+      {/* Optimization Modal with OpusThink integration */}
       <OptimizationModal 
         isOpen={showOptimization} 
-        onComplete={handleOptimizationComplete} 
+        onComplete={handleOptimizationComplete}
+        selectedSegmentId={selectedSegment}
+        useOpusThink={opusThinkEnabled}
       />
     </div>
   );

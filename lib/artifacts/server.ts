@@ -89,11 +89,15 @@ export function createDocumentHandler<T extends ArtifactKind>(config: {
 /*
  * Use this array to define the document handlers for each artifact kind.
  */
+// Import the new segment document handler
+import { segmentDocumentHandler } from '@/artifacts/segment/server';
+
 export const documentHandlersByArtifactKind: Array<DocumentHandler> = [
   textDocumentHandler,
   codeDocumentHandler,
   imageDocumentHandler,
   sheetDocumentHandler,
+  segmentDocumentHandler,
 ];
 
-export const artifactKinds = ['text', 'code', 'image', 'sheet'] as const;
+export const artifactKinds = ['text', 'code', 'image', 'sheet', 'segment'] as const;

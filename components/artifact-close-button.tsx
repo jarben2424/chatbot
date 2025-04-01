@@ -11,19 +11,37 @@ function PureArtifactCloseButton() {
       variant="outline"
       className="h-fit p-2 dark:hover:bg-zinc-700"
       onClick={() => {
-        // Check if we're closing a visualization
+        // Check if we're closing a specific document kind
         const isVisualization = artifact.kind === 'visualization';
+        const isSegment = artifact.kind === 'segment';
         const artifactId = artifact.documentId;
         
-        // First, reset the artifact state
-        setArtifact((currentArtifact) =>
-          currentArtifact.status === 'streaming'
-            ? {
-                ...currentArtifact,
-                isVisible: false,
-              }
-            : { ...initialArtifactData, status: 'idle' },
-        );
+        // Log which artifact was closed to help with debugging
+        console.log(`Closing ${artifact.kind} document:`, artifactId);
+        
+        // For all document types, handle closure consistently
+        setArtifact((currentArtifact) => {
+          // For all document types, just set isVisible to false to collapse them initially
+          // This provides consistent behavior across all document types
+          console.log(`Setting ${currentArtifact.kind} document to invisible:`, artifactId);
+          
+          if (currentArtifact.status === 'streaming') {
+            // If document is still streaming, just hide it but keep state
+            return {
+              ...currentArtifact,
+              isVisible: false,
+            };
+          } else if (isVisualization) {
+            // For visualizations, maintain some state for potential restoration
+            return {
+              ...currentArtifact,
+              isVisible: false,
+            };
+          } else {
+            // For completed non-visualization documents, fully reset
+            return { ...initialArtifactData, status: 'idle' };
+          }
+        });
         
         // After closing a visualization editor, trigger events to restore the query card
         if (isVisualization) {
