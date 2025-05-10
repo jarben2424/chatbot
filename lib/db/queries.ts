@@ -81,15 +81,16 @@ export async function deleteChatById({ id }: { id: string }) {
   }
 }
 
-export async function getChatsByUserId({ id }: { id: string }) {
+export async function getChatsByUserId({ userId }: { userId: string }) {
   try {
-    return await db
+    const chats = await db
       .select()
       .from(chat)
-      .where(eq(chat.userId, id))
+      .where(eq(chat.userId, userId))
       .orderBy(desc(chat.createdAt));
+    return chats;
   } catch (error) {
-    console.error('Failed to get chats by user from database');
+    console.error('Failed to get chats:', error);
     throw error;
   }
 }
@@ -106,9 +107,25 @@ export async function getChatById({ id }: { id: string }) {
 
 export async function saveMessages({ messages }: { messages: Array<Message> }) {
   try {
-    return await db.insert(message).values(messages);
+    return await db.insert(message).values(
+      messages.map(msg => {
+        // Create a basic object with only fields we know exist in DB
+        const messageData = {
+          id: msg.id,
+          chatId: msg.chatId,
+          role: msg.role,
+          content: typeof msg.content === 'string' 
+            ? { text: msg.content } 
+            : msg.content,
+          createdAt: msg.createdAt,
+        };
+        
+        // Don't include any other fields
+        return messageData;
+      })
+    );
   } catch (error) {
-    console.error('Failed to save messages in database', error);
+    console.error('Failed to save messages:', error);
     throw error;
   }
 }
@@ -153,7 +170,7 @@ export async function voteMessage({
       isUpvoted: type === 'up',
     });
   } catch (error) {
-    console.error('Failed to upvote message in database', error);
+    console.error('Failed to vote message:', error);
     throw error;
   }
 }
@@ -162,7 +179,7 @@ export async function getVotesByChatId({ id }: { id: string }) {
   try {
     return await db.select().from(vote).where(eq(vote.chatId, id));
   } catch (error) {
-    console.error('Failed to get votes by chat id from database', error);
+    console.error('Failed to get votes:', error);
     throw error;
   }
 }
@@ -343,5 +360,37 @@ export async function updateChatVisiblityById({
   } catch (error) {
     console.error('Failed to update chat visibility in database');
     throw error;
+  }
+}
+
+export async function getVisualizationById(id: string) {
+  try {
+    // Since we don't have a visualizations table yet, we'll create a simple
+    // mock implementation that returns visualization data from the artifact ID
+    
+    // In a real implementation, you would query your database:
+    // const visualization = await db.query.visualizationsTable.findFirst({
+    //   where: eq(visualizationsTable.id, id)
+    // });
+    
+    // Mock implementation for now:
+    return {
+      id,
+      title: "Visualization", 
+      description: "Data visualization",
+      type: "bar",
+      data: [
+        { month: "Jan", value: 1000 },
+        { month: "Feb", value: 1200 },
+        { month: "Mar", value: 900 },
+        { month: "Apr", value: 1500 },
+        { month: "May", value: 1800 },
+        { month: "Jun", value: 1200 }
+      ],
+      createdAt: new Date()
+    };
+  } catch (error) {
+    console.error('Error fetching visualization:', error);
+    return null;
   }
 }

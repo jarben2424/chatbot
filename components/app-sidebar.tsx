@@ -4,7 +4,8 @@ import type { User } from 'next-auth';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
-import { LayoutDashboard, Users, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Users, Megaphone, Cpu, Cable } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { PlusIcon } from '@/components/icons';
 import { SidebarHistory } from '@/components/sidebar-history';
@@ -24,7 +25,16 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 export function AppSidebar({ user }: { user: User | undefined }) {
   const router = useRouter();
   const { setOpenMobile } = useSidebar();
-  const { theme } = useTheme();
+  const { theme, systemTheme } = useTheme();
+  
+  const [logoSrc, setLogoSrc] = useState('/images/Hang-Logo-Short.png');
+  
+  useEffect(() => {
+    const currentTheme = theme === 'system' ? systemTheme : theme;
+    setLogoSrc(currentTheme === 'dark' 
+      ? '/images/Hang-Logo-Short-W.png'
+      : '/images/Hang-Logo-Short.png');
+  }, [theme, systemTheme]);
 
   const navigationItems = [
     {
@@ -41,6 +51,16 @@ export function AppSidebar({ user }: { user: User | undefined }) {
       name: 'Campaigns',
       href: '/campaigns',
       icon: Megaphone
+    },
+    {
+      name: 'AI Tools',
+      href: '/ai-tools',
+      icon: Cpu
+    },
+    {
+      name: 'Connectors',
+      href: '/connectors',
+      icon: Cable
     }
   ];
 
@@ -60,10 +80,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
               className="flex items-center"
             >
               <Image
-                src={theme === 'dark' 
-                  ? '/images/Hang-Logo-Short-W.png'
-                  : '/images/Hang-Logo-Short.png'
-                }
+                src={logoSrc}
                 alt="Hang Logo"
                 width={32}
                 height={32}

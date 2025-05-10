@@ -9,6 +9,8 @@ import {
   primaryKey,
   foreignKey,
   boolean,
+  relations,
+  integer,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('User', {
@@ -34,7 +36,7 @@ export const chat = pgTable('Chat', {
 export type Chat = InferSelectModel<typeof chat>;
 
 export const message = pgTable('Message', {
-  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  id: uuid('id').primaryKey().notNull(),
   chatId: uuid('chatId')
     .notNull()
     .references(() => chat.id),
@@ -113,3 +115,79 @@ export const suggestion = pgTable(
 );
 
 export type Suggestion = InferSelectModel<typeof suggestion>;
+
+// Dashboard Tables
+export const dashboards = pgTable('dashboards', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow()
+});
+
+export const visualizations = pgTable('visualizations', {
+  id: text('id').primaryKey(),
+  dashboardId: text('dashboard_id')
+    .references(() => dashboards.id, { onDelete: 'cascade' }),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  type: text('type').notNull(), // bar, line, pie, etc.
+  data: json('data'),
+  settings: json('settings'),
+  position: json('position'), // x, y, width, height for dashboard layout
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow()
+});
+
+// Define relations
+export const chatsRelations = relations(chat, ({ one, many }) => ({
+  user: one(user, {
+    fields: [chat.userId],
+    references: [user.id]
+  }),
+  messages: many(message)
+}));
+
+export const messagesRelations = relations(message, ({ one }) => ({
+  chat: one(chat, {
+    fields: [message.chatId],
+    references: [chat.id]
+  })
+}));
+
+export const documentsRelations = relations(document, ({ one }) => ({
+  user: one(user, {
+    fields: [document.userId],
+    references: [user.id]
+  })
+}));
+
+export const dashboardsRelations = relations(dashboards, ({ one, many }) => ({
+  user: one(user, {
+    fields: [dashboards.userId],
+    references: [user.id]
+  }),
+  visualizations: many(visualizations)
+}));
+
+export const visualizationsRelations = relations(visualizations, ({ one }) => ({
+  dashboard: one(dashboards, {
+    fields: [visualizations.dashboardId],
+    references: [dashboards.id]
+  }),
+  user: one(user, {
+    fields: [visualizations.userId],
+    references: [user.id]
+  })
+}));
+
+export type Chat = typeof chat.$inferSelect;
+export type Message = typeof message.$inferSelect;
+export type Document = typeof document.$inferSelect;
+export type Dashboard = typeof dashboards.$inferSelect;
+export type Visualization = typeof visualizations.$inferSelect;

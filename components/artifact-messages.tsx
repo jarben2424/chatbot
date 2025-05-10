@@ -5,6 +5,8 @@ import { ChatRequestOptions, Message } from 'ai';
 import { memo } from 'react';
 import equal from 'fast-deep-equal';
 import { UIArtifact } from './artifact';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/utils';
 
 interface ArtifactMessagesProps {
   chatId: string;
@@ -33,6 +35,11 @@ function PureArtifactMessages({
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();
 
+  const { data: votesData } = useSWR<Array<Vote>>(
+    chatId ? `/chat?chatId=${chatId}` : null,
+    fetcher
+  );
+
   return (
     <div
       ref={messagesContainerRef}
@@ -46,8 +53,8 @@ function PureArtifactMessages({
           isLoading={isLoading && index === messages.length - 1}
           index={index}
           vote={
-            votes
-              ? votes.find((vote) => vote.messageId === message.id)
+            votesData
+              ? votesData.find((vote) => vote.messageId === message.id)
               : undefined
           }
           setMessages={setMessages}

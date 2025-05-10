@@ -1,151 +1,80 @@
-import { memo } from 'react';
+'use client';
 
-import type { ArtifactKind } from './artifact';
-import { FileIcon, LoaderIcon, MessageIcon, PencilEditIcon } from './icons';
-import { toast } from 'sonner';
-import { useArtifact } from '@/hooks/use-artifact';
+import { useState, useEffect } from 'react';
+import { Button } from './ui/button';
+import { DocumentPreview } from './document-preview';
+import { AlertCircle, FileText } from 'lucide-react';
 
-const getActionText = (
-  type: 'create' | 'update' | 'request-suggestions',
-  tense: 'present' | 'past',
-) => {
-  switch (type) {
-    case 'create':
-      return tense === 'present' ? 'Creating' : 'Created';
-    case 'update':
-      return tense === 'present' ? 'Updating' : 'Updated';
-    case 'request-suggestions':
-      return tense === 'present'
-        ? 'Adding suggestions'
-        : 'Added suggestions to';
-    default:
-      return null;
+// Main component for rendering document tool results
+export function DocumentToolResult({ type, result, isReadonly, args }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isError, setIsError] = useState(false);
+  
+  // Check for document tool errors
+  useEffect(() => {
+    // If result is undefined or has error property, set error state
+    if (!result || result.error) {
+      setIsError(true);
+    }
+  }, [result]);
+  
+  // Make sure we handle empty or missing results
+  if (isError || !result) {
+    return (
+      <div className="p-4 rounded-lg border bg-destructive/10">
+        <div className="flex items-center mb-2">
+          <AlertCircle className="h-5 w-5 mr-2 text-destructive" />
+          <h3 className="font-medium text-destructive">Document Creation Failed</h3>
+        </div>
+        <p className="text-sm ml-7 text-muted-foreground">
+          The document could not be created due to a server configuration issue.
+        </p>
+      </div>
+    );
   }
-};
-
-interface DocumentToolResultProps {
-  type: 'create' | 'update' | 'request-suggestions';
-  result: { id: string; title: string; kind: ArtifactKind };
-  isReadonly: boolean;
-}
-
-function PureDocumentToolResult({
-  type,
-  result,
-  isReadonly,
-}: DocumentToolResultProps) {
-  const { setArtifact } = useArtifact();
-
+  
+  let title;
+  switch(type) {
+    case 'create':
+      title = 'Document Created: ';
+      break;
+    case 'update':
+      title = 'Document Updated: ';
+      break;
+    default:
+      title = 'Document: ';
+  }
+  
   return (
-    <button
-      type="button"
-      className="bg-background cursor-pointer border py-2 px-3 rounded-xl w-fit flex flex-row gap-3 items-start"
-      onClick={(event) => {
-        if (isReadonly) {
-          toast.error(
-            'Viewing files in shared chats is currently not supported.',
-          );
-          return;
-        }
-
-        const rect = event.currentTarget.getBoundingClientRect();
-
-        const boundingBox = {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        };
-
-        setArtifact({
-          documentId: result.id,
-          kind: result.kind,
-          content: '',
-          title: result.title,
-          isVisible: true,
-          status: 'idle',
-          boundingBox,
-        });
-      }}
-    >
-      <div className="text-muted-foreground mt-1">
-        {type === 'create' ? (
-          <FileIcon />
-        ) : type === 'update' ? (
-          <PencilEditIcon />
-        ) : type === 'request-suggestions' ? (
-          <MessageIcon />
-        ) : null}
+    <div className="p-4 rounded-lg border bg-card">
+      <div className="flex items-center gap-2 mb-3">
+        <FileText className="h-5 w-5 text-primary" />
+        <h3 className="font-medium">{title}{result.title || 'Untitled'}</h3>
       </div>
-      <div className="text-left">
-        {`${getActionText(type, 'past')} "${result.title}"`}
+      <div className="mt-2">
+        <DocumentPreview 
+          isReadonly={isReadonly} 
+          result={result} 
+        />
       </div>
-    </button>
+      <div className="flex justify-end mt-3">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          {isExpanded ? 'Hide Details' : 'Show Details'}
+        </Button>
+      </div>
+    </div>
   );
 }
 
-export const DocumentToolResult = memo(PureDocumentToolResult, () => true);
+// Re-export DocumentToolCall directly from this file
+export { DocumentToolCall } from './document-tool-call';
 
-interface DocumentToolCallProps {
-  type: 'create' | 'update' | 'request-suggestions';
-  args: { title: string };
-  isReadonly: boolean;
-}
+// Export both components from the document.tsx file
+export { DocumentToolResult } from './document-tool-result';
 
-function PureDocumentToolCall({
-  type,
-  args,
-  isReadonly,
-}: DocumentToolCallProps) {
-  const { setArtifact } = useArtifact();
-
-  return (
-    <button
-      type="button"
-      className="cursor pointer w-fit border py-2 px-3 rounded-xl flex flex-row items-start justify-between gap-3"
-      onClick={(event) => {
-        if (isReadonly) {
-          toast.error(
-            'Viewing files in shared chats is currently not supported.',
-          );
-          return;
-        }
-
-        const rect = event.currentTarget.getBoundingClientRect();
-
-        const boundingBox = {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        };
-
-        setArtifact((currentArtifact) => ({
-          ...currentArtifact,
-          isVisible: true,
-          boundingBox,
-        }));
-      }}
-    >
-      <div className="flex flex-row gap-3 items-start">
-        <div className="text-zinc-500 mt-1">
-          {type === 'create' ? (
-            <FileIcon />
-          ) : type === 'update' ? (
-            <PencilEditIcon />
-          ) : type === 'request-suggestions' ? (
-            <MessageIcon />
-          ) : null}
-        </div>
-
-        <div className="text-left">
-          {`${getActionText(type, 'present')} ${args.title ? `"${args.title}"` : ''}`}
-        </div>
-      </div>
-
-      <div className="animate-spin mt-1">{<LoaderIcon />}</div>
-    </button>
-  );
-}
-
-export const DocumentToolCall = memo(PureDocumentToolCall, () => true);
+// Also create a barrel export for easier imports
+export { DocumentPreview } from './document-preview';

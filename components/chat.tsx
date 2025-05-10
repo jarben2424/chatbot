@@ -1,123 +1,139 @@
-'use client';
+'use client'
 
-import type { Attachment, Message } from 'ai';
-import { useChat } from '@ai-sdk/react';
-import { useState } from 'react';
-import useSWR, { useSWRConfig } from 'swr';
-import { ChatHeader } from '@/components/chat-header';
-import type { Vote } from '@/lib/db/schema';
-import { fetcher, generateUUID } from '@/lib/utils';
-import { Artifact } from './artifact';
-import { MultimodalInput } from './multimodal-input';
-import { Messages } from './messages';
-import { VisibilityType } from './visibility-selector';
-import { useArtifactSelector } from '@/hooks/use-artifact';
-import { toast } from 'sonner';
+import { useChat, type Message } from 'ai/react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 
-export function Chat({
-  id,
-  initialMessages,
-  selectedChatModel,
-  selectedVisibilityType,
-  isReadonly,
-}: {
-  id: string;
-  initialMessages: Array<Message>;
-  selectedChatModel: string;
-  selectedVisibilityType: VisibilityType;
-  isReadonly: boolean;
-}) {
-  const { mutate } = useSWRConfig();
+import { ChatList } from '@/components/chat-list'
+import { ChatPanel } from '@/components/chat-panel'
+import { ChatScrollAnchor } from '@/components/chat-scroll-anchor'
+import { EmptyScreen } from '@/components/empty-screen'
+import { ChatMessage } from '@/components/chat-message'
+import { toast } from 'sonner'
+import { useArtifact } from '@/hooks/use-artifact'
+import { extractFunctionCall } from '@/lib/utils'
+
+export interface ChatProps extends React.ComponentProps<'div'> {
+  id?: string
+  initialMessages?: Message[]
+}
+
+export function Chat({ id, initialMessages = [] }: ChatProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const formRef = useRef<HTMLFormElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const [attachments, setAttachments] = useState<Array<any>>([])
+  const { isVisible } = useArtifact()
 
   const {
     messages,
-    setMessages,
-    handleSubmit,
     input,
-    setInput,
-    append,
+    handleInputChange,
+    handleSubmit,
     isLoading,
-    stop,
+    error,
+    append,
     reload,
+    stop,
+    setMessages,
+    setInput
   } = useChat({
+    api: '/api/chat',
     id,
-    body: { id, selectedChatModel: selectedChatModel },
     initialMessages,
-    experimental_throttle: 100,
-    sendExtraMessageFields: true,
-    generateId: generateUUID,
-    onFinish: () => {
-      mutate('/api/history');
+    onResponse(response) {
+      if (response.status === 401) {
+        toast.error('Please sign in to continue.')
+      }
+      
+      // Handle function calls for document creation
+      const reader = response.body?.getReader();
+      if (!reader) return;
+      
+      const decoder = new TextDecoder();
+      let content = '';
+      
+      (async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          content += decoder.decode(value);
+        }
+        
+        // Handle function calls
+        const functionCall = extractFunctionCall(content);
+        if (functionCall?.name === 'create_document' && functionCall.arguments) {
+          const { title, kind } = functionCall.arguments;
+          
+          if (title && kind) {
+            console.log(`Created document: ${title} (${kind})`);
+          }
+        }
+      })();
     },
-    onError: () => {
-      toast.error('An error occured, please try again!');
+    onFinish() {
+      if (!id) {
+        const newId = response.headers.get('x-chat-id')
+        if (newId && pathname === '/') {
+          router.push(`/${newId}`)
+        }
+      }
     },
-  });
+    onError(error) {
+      toast.error('An error occurred during the chat.')
+      console.error(error)
+    }
+  })
 
-  const { data: votes } = useSWR<Array<Vote>>(
-    `/api/vote?chatId=${id}`,
-    fetcher,
-  );
-
-  const [attachments, setAttachments] = useState<Array<Attachment>>([]);
-  const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
+  // Focus on input when messages change
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [messages])
 
   return (
-    <>
-      <div className="flex flex-col min-w-0 h-dvh bg-background">
-        <ChatHeader
-          chatId={id}
-          selectedModelId={selectedChatModel}
-          selectedVisibilityType={selectedVisibilityType}
-          isReadonly={isReadonly}
-        />
-
-        <Messages
-          chatId={id}
-          isLoading={isLoading}
-          votes={votes}
-          messages={messages}
+    <div className={`flex flex-col h-full ${isVisible ? 'chat-with-artifact' : ''}`}>
+      {messages.length ? (
+        <div className="flex-1 overflow-auto">
+          <div className="pb-[200px] pt-4 md:pt-10">
+            {messages.map((message, index) => (
+              <ChatMessage key={index} message={message} />
+            ))}
+            {isLoading && (
+              <div className="thinking-indicator">
+                <div className="dots">
+                  <span className="dot"></span>
+                  <span className="dot"></span>
+                  <span className="dot"></span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <EmptyScreen
+          setInput={handleInputChange}
           setMessages={setMessages}
-          reload={reload}
-          isReadonly={isReadonly}
-          isArtifactVisible={isArtifactVisible}
+          append={append}
         />
-
-        <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
-          {!isReadonly && (
-            <MultimodalInput
-              chatId={id}
-              input={input}
-              setInput={setInput}
-              handleSubmit={handleSubmit}
-              isLoading={isLoading}
-              stop={stop}
-              attachments={attachments}
-              setAttachments={setAttachments}
-              messages={messages}
-              setMessages={setMessages}
-              append={append}
-            />
-          )}
-        </form>
-      </div>
-
-      <Artifact
-        chatId={id}
-        input={input}
-        setInput={setInput}
-        handleSubmit={handleSubmit}
+      )}
+      <ChatPanel
+        id={id}
         isLoading={isLoading}
         stop={stop}
+        append={append}
+        reload={reload}
+        messages={messages}
+        input={input}
+        handleInputChange={handleInputChange}
+        handleSubmit={handleSubmit}
+        formRef={formRef}
+        inputRef={inputRef}
         attachments={attachments}
         setAttachments={setAttachments}
-        append={append}
-        messages={messages}
-        setMessages={setMessages}
-        reload={reload}
-        votes={votes}
-        isReadonly={isReadonly}
       />
-    </>
-  );
+    </div>
+  )
 }
